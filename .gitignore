@@ -25,3 +25,5 @@ debug
 /target
 .idea/
 .env
+.docker_password.example
+.docker_password
