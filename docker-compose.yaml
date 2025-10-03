@@ -1,0 +1,21 @@
+services:
+  engine:
+    container_name: engine
+    image: armanmojaver/backtesting-engine
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT}
+    volumes:
+      - .:/app
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+      - target:/app/target
+    working_dir: /app
+    command: cargo watch -i logs/ -x run
+    ports:
+      - "80:80"
+
+volumes:
+  cargo-registry:
+  cargo-git:
+  target:
