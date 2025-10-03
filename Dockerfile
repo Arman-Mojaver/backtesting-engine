@@ -1,4 +1,4 @@
- FROM rust:1.81 AS fetcher
+ FROM rust:1.82 AS fetcher
  WORKDIR /app
 
  COPY Cargo.toml Cargo.lock ./
@@ -6,7 +6,7 @@
  RUN cargo fetch
 
 
- FROM rust:1.81 AS builder
+ FROM rust:1.82 AS builder
  WORKDIR /app
 
  COPY --from=fetcher /usr/local/cargo /usr/local/cargo
@@ -16,7 +16,7 @@
      cargo install cargo-watch --root /usr/local
 
 
- FROM rust:1.81
+ FROM rust:1.82
  RUN apt-get update && apt-get install -y \
        ca-certificates \
        build-essential \
