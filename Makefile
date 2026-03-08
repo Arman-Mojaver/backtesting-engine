@@ -49,4 +49,4 @@ pull:  ## Pull images
 
 
 fmt:  ## Run rust formatter
-	cd $(PWD)/rust_http && cargo fmt
+	cd $(PWD) && cargo fmt

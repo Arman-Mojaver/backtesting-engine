@@ -13,7 +13,6 @@ async fn health_check() -> impl Responder {
     })
 }
 
-
 fn configure_routes(config: &mut web::ServiceConfig) {
     config.route("/health", web::get().to(health_check));
 }
@@ -28,8 +27,8 @@ async fn main() -> io::Result<()> {
             .wrap(actix_web::middleware::Logger::default())
             .configure(configure_routes)
     })
-        .workers(7)
-        .bind(&host)?
-        .run()
-        .await
+    .workers(7)
+    .bind(&host)?
+    .run()
+    .await
 }
