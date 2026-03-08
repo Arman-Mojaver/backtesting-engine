@@ -1,0 +1,1 @@
+Use RUSTFLAGS="-C target-cpu=native" when releasing the binary, it optimises for M2 chips in your case
