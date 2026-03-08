@@ -27,3 +27,4 @@ debug
 .env
 .docker_password.example
 .docker_password
+.DS_Store
