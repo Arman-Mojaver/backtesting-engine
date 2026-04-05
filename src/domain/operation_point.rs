@@ -10,6 +10,10 @@ pub struct OperationPoint {
     pub timestamp: i32,
 }
 
-pub trait OperationPointRepository {
+pub trait LongOperationPointRepository {
+    fn get_all(&self) -> Vec<OperationPoint>;
+}
+
+pub trait ShortOperationPointRepository {
     fn get_all(&self) -> Vec<OperationPoint>;
 }

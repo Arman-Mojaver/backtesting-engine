@@ -1,11 +1,23 @@
-use crate::domain::operation_point::{OperationPoint, OperationPointRepository};
+use crate::domain::operation_point::{
+    LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
+};
 use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repository};
 
-pub struct InMemoryOperationRepo {
+pub struct InMemoryLongRepo {
     pub data: Vec<OperationPoint>,
 }
 
-impl OperationPointRepository for InMemoryOperationRepo {
+impl LongOperationPointRepository for InMemoryLongRepo {
+    fn get_all(&self) -> Vec<OperationPoint> {
+        self.data.clone()
+    }
+}
+
+pub struct InMemoryShortRepo {
+    pub data: Vec<OperationPoint>,
+}
+
+impl ShortOperationPointRepository for InMemoryShortRepo {
     fn get_all(&self) -> Vec<OperationPoint> {
         self.data.clone()
     }
