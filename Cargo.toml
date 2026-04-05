@@ -2,6 +2,10 @@
 name = "backtesting-engine"
 version = "0.1.0"
 edition = "2021"
+default-run = "backtesting-engine"
+
+[lib]
+doctest = false
 
 [dependencies]
 actix-web = "4.11.0"
