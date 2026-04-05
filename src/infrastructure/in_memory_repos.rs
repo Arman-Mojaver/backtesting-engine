@@ -1,6 +1,8 @@
-use crate::domain::operation_point::{LongOperationPointRepository, OperationPoint, ShortOperationPointRepository};
-use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repository};
 use crate::domain::indicator::{Indicator, IndicatorRepository};
+use crate::domain::operation_point::{
+    LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
+};
+use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repository};
 
 pub struct InMemoryLongRepo {
     pub data: Vec<OperationPoint>,
