@@ -27,8 +27,8 @@ async fn main() -> io::Result<()> {
             .wrap(actix_web::middleware::Logger::default())
             .configure(configure_routes)
     })
-        .workers(7)
-        .bind(&host)?
-        .run()
-        .await
+    .workers(7)
+    .bind(&host)?
+    .run()
+    .await
 }

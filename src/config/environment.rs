@@ -80,7 +80,6 @@ impl DbConfig {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,11 +95,23 @@ mod tests {
 
     #[test]
     fn environment_from_str_parses_valid_values() {
-        assert_eq!("production".parse::<Environment>().unwrap(), Environment::Production);
-        assert_eq!("development".parse::<Environment>().unwrap(), Environment::Development);
-        assert_eq!("testing".parse::<Environment>().unwrap(), Environment::Testing);
+        assert_eq!(
+            "production".parse::<Environment>().unwrap(),
+            Environment::Production
+        );
+        assert_eq!(
+            "development".parse::<Environment>().unwrap(),
+            Environment::Development
+        );
+        assert_eq!(
+            "testing".parse::<Environment>().unwrap(),
+            Environment::Testing
+        );
         // Case-insensitive
-        assert_eq!("Production".parse::<Environment>().unwrap(), Environment::Production);
+        assert_eq!(
+            "Production".parse::<Environment>().unwrap(),
+            Environment::Production
+        );
     }
 
     #[test]
