@@ -2,18 +2,11 @@ use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
+// Operation Point fixtures
+
 pub fn op_points_empty() -> Vec<OperationPoint> {
     Vec::new()
 }
-
-pub fn resampled_points_empty() -> Vec<ResampledPointD1> {
-    Vec::new()
-}
-
-pub fn indicators_empty() -> Vec<Indicator> {
-    Vec::new()
-}
-
 pub fn op_points_default() -> Vec<OperationPoint> {
     vec![
         OperationPoint {
@@ -39,11 +32,111 @@ pub fn op_points_default() -> Vec<OperationPoint> {
     ]
 }
 
-pub fn indicators_default() -> Vec<Indicator> {
-    vec![Indicator { id: 1 }, Indicator { id: 2 }]
+pub fn op_points_mms_id_2() -> Vec<OperationPoint> {
+    vec![
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: 1,
+            tp: 10,
+            risk: 0.01,
+            money_management_strategy_id: 2,
+            id: 1,
+            sl: 5,
+            timestamp: 1000,
+        },
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: -1,
+            tp: 8,
+            risk: 0.02,
+            money_management_strategy_id: 2,
+            id: 2,
+            sl: 4,
+            timestamp: 1001,
+        },
+    ]
 }
 
-/// Default resampled points
+pub fn op_points_default_usdcad() -> Vec<OperationPoint> {
+    vec![
+        OperationPoint {
+            instrument: "USDCAD".into(),
+            result: 1,
+            tp: 10,
+            risk: 0.01,
+            money_management_strategy_id: 1,
+            id: 1,
+            sl: 5,
+            timestamp: 1000,
+        },
+        OperationPoint {
+            instrument: "USDCAD".into(),
+            result: -1,
+            tp: 8,
+            risk: 0.02,
+            money_management_strategy_id: 1,
+            id: 2,
+            sl: 4,
+            timestamp: 1001,
+        },
+    ]
+}
+
+pub fn op_points_partial_mismatch() -> Vec<OperationPoint> {
+    vec![
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: 1,
+            tp: 10,
+            risk: 0.01,
+            money_management_strategy_id: 1,
+            id: 1,
+            sl: 5,
+            timestamp: 1000,
+        },
+        OperationPoint {
+            instrument: "USDCAD".into(),
+            result: -1,
+            tp: 8,
+            risk: 0.02,
+            money_management_strategy_id: 1,
+            id: 2,
+            sl: 4,
+            timestamp: 1001,
+        },
+    ]
+}
+
+pub fn op_points_mms_partial_mismatch() -> Vec<OperationPoint> {
+    vec![
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: 1,
+            tp: 10,
+            risk: 0.01,
+            money_management_strategy_id: 1,
+            id: 1,
+            sl: 5,
+            timestamp: 1000,
+        },
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: -1,
+            tp: 8,
+            risk: 0.02,
+            money_management_strategy_id: 2,
+            id: 2,
+            sl: 4,
+            timestamp: 1001,
+        },
+    ]
+}
+
+// Resampled Point fixtures
+
+pub fn resampled_points_empty() -> Vec<ResampledPointD1> {
+    Vec::new()
+}
 pub fn resampled_points_default() -> Vec<ResampledPointD1> {
     vec![
         ResampledPointD1 {
@@ -93,32 +186,6 @@ pub fn resampled_points_usdcad() -> Vec<ResampledPointD1> {
         },
     ]
 }
-
-pub fn op_points_default_usdcad() -> Vec<OperationPoint> {
-    vec![
-        OperationPoint {
-            instrument: "USDCAD".into(),
-            result: 1,
-            tp: 10,
-            risk: 0.01,
-            money_management_strategy_id: 1,
-            id: 1,
-            sl: 5,
-            timestamp: 1000,
-        },
-        OperationPoint {
-            instrument: "USDCAD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id: 2,
-            sl: 4,
-            timestamp: 1001,
-        },
-    ]
-}
-
 pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
     vec![
         ResampledPointD1 {
@@ -144,27 +211,12 @@ pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
     ]
 }
 
-pub fn op_points_partial_mismatch() -> Vec<OperationPoint> {
-    vec![
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: 1,
-            tp: 10,
-            risk: 0.01,
-            money_management_strategy_id: 1,
-            id: 1,
-            sl: 5,
-            timestamp: 1000,
-        },
-        OperationPoint {
-            instrument: "USDCAD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id: 2,
-            sl: 4,
-            timestamp: 1001,
-        },
-    ]
+// Indicator fixtures
+
+pub fn indicators_empty() -> Vec<Indicator> {
+    Vec::new()
+}
+
+pub fn indicators_default() -> Vec<Indicator> {
+    vec![Indicator { id: 1 }, Indicator { id: 2 }]
 }
