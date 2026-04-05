@@ -40,10 +40,7 @@ pub fn op_points_default() -> Vec<OperationPoint> {
 }
 
 pub fn indicators_default() -> Vec<Indicator> {
-    vec![
-        Indicator { id: 1 },
-        Indicator { id: 2 },
-    ]
+    vec![Indicator { id: 1 }, Indicator { id: 2 }]
 }
 
 /// Default resampled points
