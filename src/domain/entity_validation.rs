@@ -2,22 +2,43 @@ use crate::domain::indicator::IndicatorRepository;
 use crate::domain::operation_point::{LongOperationPointRepository, ShortOperationPointRepository};
 use crate::domain::resampled_point::ResampledPointD1Repository;
 
-fn validate_entities<LPR, SPR, IR, RPR>(
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidationError {
+    LongOperationPointsEmpty,
+    ShortOperationPointsEmpty,
+    IndicatorsEmpty,
+    ResampledPointsEmpty,
+}
+
+pub fn validate_entities<LPR, SPR, IR, RPR>(
     long_repo: &LPR,
     short_repo: &SPR,
     indicator_repo: &IR,
     resampled_repo: &RPR,
-) -> bool
+) -> Result<(), ValidationError>
 where
     LPR: LongOperationPointRepository,
     SPR: ShortOperationPointRepository,
     IR: IndicatorRepository,
     RPR: ResampledPointD1Repository,
 {
-    !long_repo.get_all().is_empty()
-        && !short_repo.get_all().is_empty()
-        && !indicator_repo.get_all().is_empty()
-        && !resampled_repo.get_all().is_empty()
+    if long_repo.get_all().is_empty() {
+        return Err(ValidationError::LongOperationPointsEmpty);
+    }
+
+    if short_repo.get_all().is_empty() {
+        return Err(ValidationError::ShortOperationPointsEmpty);
+    }
+
+    if indicator_repo.get_all().is_empty() {
+        return Err(ValidationError::IndicatorsEmpty);
+    }
+
+    if resampled_repo.get_all().is_empty() {
+        return Err(ValidationError::ResampledPointsEmpty);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -55,7 +76,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_all_empty() {
         let long_repo = InMemoryLongRepo { data: op_points_empty() };
@@ -63,7 +83,10 @@ mod tests {
         let indicator_repo = InMemoryIndicatorRepo { data: indicators_empty() };
         let resampled_repo = InMemoryResampledRepo { data: resampled_points_empty() };
 
-        assert!(!validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo));
+        assert_eq!(
+            validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo),
+            Err(ValidationError::LongOperationPointsEmpty)
+        );
     }
 
     #[test]
@@ -73,7 +96,10 @@ mod tests {
         let indicator_repo = indicators_with_data();
         let resampled_repo = resampled_with_data();
 
-        assert!(!validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo));
+        assert_eq!(
+            validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo),
+            Err(ValidationError::LongOperationPointsEmpty)
+        );
     }
 
     #[test]
@@ -83,7 +109,10 @@ mod tests {
         let indicator_repo = indicators_with_data();
         let resampled_repo = resampled_with_data();
 
-        assert!(!validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo));
+        assert_eq!(
+            validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo),
+            Err(ValidationError::ShortOperationPointsEmpty)
+        );
     }
 
     #[test]
@@ -93,7 +122,10 @@ mod tests {
         let indicator_repo = InMemoryIndicatorRepo { data: indicators_empty() };
         let resampled_repo = resampled_with_data();
 
-        assert!(!validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo));
+        assert_eq!(
+            validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo),
+            Err(ValidationError::IndicatorsEmpty)
+        );
     }
 
     #[test]
@@ -103,6 +135,22 @@ mod tests {
         let indicator_repo = indicators_with_data();
         let resampled_repo = InMemoryResampledRepo { data: resampled_points_empty() };
 
-        assert!(!validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo));
+        assert_eq!(
+            validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo),
+            Err(ValidationError::ResampledPointsEmpty)
+        );
+    }
+
+    #[test]
+    fn test_all_have_data() {
+        let long_repo = long_with_data();
+        let short_repo = short_with_data();
+        let indicator_repo = indicators_with_data();
+        let resampled_repo = resampled_with_data();
+
+        assert_eq!(
+            validate_entities(&long_repo, &short_repo, &indicator_repo, &resampled_repo),
+            Ok(())
+        );
     }
 }
