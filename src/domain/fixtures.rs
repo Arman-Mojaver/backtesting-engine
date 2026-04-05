@@ -132,6 +132,76 @@ pub fn op_points_mms_partial_mismatch() -> Vec<OperationPoint> {
     ]
 }
 
+pub fn op_points_ts_123() -> Vec<OperationPoint> {
+    vec![
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: 1,
+            tp: 10,
+            risk: 0.01,
+            money_management_strategy_id: 1,
+            id: 1,
+            sl: 5,
+            timestamp: 1,
+        },
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: -1,
+            tp: 8,
+            risk: 0.02,
+            money_management_strategy_id: 1,
+            id: 2,
+            sl: 4,
+            timestamp: 2,
+        },
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: -1,
+            tp: 8,
+            risk: 0.02,
+            money_management_strategy_id: 1,
+            id: 3,
+            sl: 4,
+            timestamp: 3,
+        },
+    ]
+}
+
+pub fn op_points_ts_124() -> Vec<OperationPoint> {
+    vec![
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: 1,
+            tp: 10,
+            risk: 0.01,
+            money_management_strategy_id: 1,
+            id: 1,
+            sl: 5,
+            timestamp: 1,
+        },
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: -1,
+            tp: 8,
+            risk: 0.02,
+            money_management_strategy_id: 1,
+            id: 2,
+            sl: 4,
+            timestamp: 2,
+        },
+        OperationPoint {
+            instrument: "EURUSD".into(),
+            result: -1,
+            tp: 8,
+            risk: 0.02,
+            money_management_strategy_id: 1,
+            id: 3,
+            sl: 4,
+            timestamp: 4,
+        },
+    ]
+}
+
 // Resampled Point fixtures
 
 pub fn resampled_points_empty() -> Vec<ResampledPointD1> {
@@ -158,6 +228,41 @@ pub fn resampled_points_default() -> Vec<ResampledPointD1> {
             close: 1.22,
             volume: 800,
             timestamp: 1001,
+        },
+    ]
+}
+
+pub fn resampled_points_ts_123() -> Vec<ResampledPointD1> {
+    vec![
+        ResampledPointD1 {
+            id: 1,
+            instrument: "EURUSD".into(),
+            open: 1.0,
+            high: 1.1,
+            low: 0.9,
+            close: 1.05,
+            volume: 1000,
+            timestamp: 1,
+        },
+        ResampledPointD1 {
+            id: 2,
+            instrument: "EURUSD".into(),
+            open: 1.2,
+            high: 1.25,
+            low: 1.15,
+            close: 1.22,
+            volume: 800,
+            timestamp: 2,
+        },
+        ResampledPointD1 {
+            id: 3,
+            instrument: "EURUSD".into(),
+            open: 1.2,
+            high: 1.25,
+            low: 1.15,
+            close: 1.22,
+            volume: 800,
+            timestamp: 3,
         },
     ]
 }
