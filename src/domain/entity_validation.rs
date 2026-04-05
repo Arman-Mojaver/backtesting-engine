@@ -3,34 +3,31 @@ use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum EmptyValidationError {
+pub enum EmptyRepoValidationError {
     LongOperationPointsEmpty,
     ShortOperationPointsEmpty,
     IndicatorsEmpty,
     ResampledPointsEmpty,
 }
 
-fn ensure_not_empty<T>(
-    data: &[T],
-    error: EmptyValidationError,
-) -> Result<(), EmptyValidationError> {
-    if data.is_empty() {
-        Err(error)
-    } else {
-        Ok(())
-    }
-}
-
-pub fn validate_entities(
+pub fn validate_empty_entities(
     long_ops: &[OperationPoint],
     short_ops: &[OperationPoint],
     indicators: &[Indicator],
     resampled_points: &[ResampledPointD1],
-) -> Result<(), EmptyValidationError> {
-    ensure_not_empty(long_ops, EmptyValidationError::LongOperationPointsEmpty)?;
-    ensure_not_empty(short_ops, EmptyValidationError::ShortOperationPointsEmpty)?;
-    ensure_not_empty(indicators, EmptyValidationError::IndicatorsEmpty)?;
-    ensure_not_empty(resampled_points, EmptyValidationError::ResampledPointsEmpty)?;
+) -> Result<(), EmptyRepoValidationError> {
+    if long_ops.is_empty() {
+        return Err(EmptyRepoValidationError::LongOperationPointsEmpty);
+    }
+    if short_ops.is_empty() {
+        return Err(EmptyRepoValidationError::ShortOperationPointsEmpty);
+    }
+    if indicators.is_empty() {
+        return Err(EmptyRepoValidationError::IndicatorsEmpty);
+    }
+    if resampled_points.is_empty() {
+        return Err(EmptyRepoValidationError::ResampledPointsEmpty);
+    }
 
     Ok(())
 }
@@ -46,72 +43,72 @@ mod tests {
     #[test]
     fn test_all_empty() {
         assert_eq!(
-            validate_entities(
+            validate_empty_entities(
                 &op_points_empty(),
                 &op_points_empty(),
                 &indicators_empty(),
                 &resampled_points_empty()
             ),
-            Err(EmptyValidationError::LongOperationPointsEmpty)
+            Err(EmptyRepoValidationError::LongOperationPointsEmpty)
         );
     }
 
     #[test]
     fn test_long_empty_only() {
         assert_eq!(
-            validate_entities(
+            validate_empty_entities(
                 &op_points_empty(),
                 &op_points_default(),
                 &indicators_default(),
                 &resampled_points_default()
             ),
-            Err(EmptyValidationError::LongOperationPointsEmpty)
+            Err(EmptyRepoValidationError::LongOperationPointsEmpty)
         );
     }
 
     #[test]
     fn test_short_empty_only() {
         assert_eq!(
-            validate_entities(
+            validate_empty_entities(
                 &op_points_default(),
                 &op_points_empty(),
                 &indicators_default(),
                 &resampled_points_default()
             ),
-            Err(EmptyValidationError::ShortOperationPointsEmpty)
+            Err(EmptyRepoValidationError::ShortOperationPointsEmpty)
         );
     }
 
     #[test]
     fn test_indicators_empty_only() {
         assert_eq!(
-            validate_entities(
+            validate_empty_entities(
                 &op_points_default(),
                 &op_points_default(),
                 &indicators_empty(),
                 &resampled_points_default()
             ),
-            Err(EmptyValidationError::IndicatorsEmpty)
+            Err(EmptyRepoValidationError::IndicatorsEmpty)
         );
     }
 
     #[test]
     fn test_resampled_empty_only() {
         assert_eq!(
-            validate_entities(
+            validate_empty_entities(
                 &op_points_default(),
                 &op_points_default(),
                 &indicators_default(),
                 &resampled_points_empty()
             ),
-            Err(EmptyValidationError::ResampledPointsEmpty)
+            Err(EmptyRepoValidationError::ResampledPointsEmpty)
         );
     }
 
     #[test]
     fn test_all_have_data() {
         assert_eq!(
-            validate_entities(
+            validate_empty_entities(
                 &op_points_default(),
                 &op_points_default(),
                 &indicators_default(),
