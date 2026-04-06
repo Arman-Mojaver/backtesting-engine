@@ -323,5 +323,27 @@ pub fn indicators_empty() -> Vec<Indicator> {
 }
 
 pub fn indicators_default() -> Vec<Indicator> {
-    vec![Indicator { id: 1 }, Indicator { id: 2 }]
+    vec![
+        Indicator {
+            id: 1,
+            r#type: "a".to_string(),
+        },
+        Indicator {
+            id: 2,
+            r#type: "a".to_string(),
+        },
+    ]
+}
+
+pub fn indicators_different_type() -> Vec<Indicator> {
+    vec![
+        Indicator {
+            id: 1,
+            r#type: "a".to_string(),
+        },
+        Indicator {
+            id: 2,
+            r#type: "b".to_string(),
+        },
+    ]
 }
