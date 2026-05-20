@@ -5,9 +5,10 @@ pub enum ValidationError {
     MoneyManagementStrategyMismatch,
 }
 
+#[allow(dead_code)]
 fn validate_money_management_strategy_id_matches(
-    long_points: &Vec<OperationPoint>,
-    short_points: &Vec<OperationPoint>,
+    long_points: &[OperationPoint],
+    short_points: &[OperationPoint],
     expected_id: i32,
 ) -> Result<(), ValidationError> {
     if long_points

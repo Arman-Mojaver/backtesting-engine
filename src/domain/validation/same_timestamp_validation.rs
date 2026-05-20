@@ -7,6 +7,7 @@ pub enum ValidationError {
     TimestampMismatch,
 }
 
+#[allow(dead_code)]
 fn validate_timestamps_match(
     resampled: &[ResampledPointD1],
     long: &[OperationPoint],

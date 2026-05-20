@@ -6,10 +6,11 @@ pub enum ValidationError {
     InstrumentMismatch,
 }
 
+#[allow(dead_code)]
 fn validate_same_instrument(
-    resampled_points: &Vec<ResampledPointD1>,
-    long_operation_points: &Vec<OperationPoint>,
-    short_operation_points: &Vec<OperationPoint>,
+    resampled_points: &[ResampledPointD1],
+    long_operation_points: &[OperationPoint],
+    short_operation_points: &[OperationPoint],
 ) -> Result<(), ValidationError> {
     let reference_instrument = &resampled_points[0].instrument;
 

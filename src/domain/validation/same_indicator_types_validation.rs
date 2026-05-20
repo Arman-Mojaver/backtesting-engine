@@ -5,7 +5,8 @@ pub enum ValidationError {
     IndicatorTypeMismatch,
 }
 
-fn validate_same_indicator_types(indicators: &Vec<Indicator>) -> Result<(), ValidationError> {
+#[allow(dead_code)]
+fn validate_same_indicator_types(indicators: &[Indicator]) -> Result<(), ValidationError> {
     let reference = &indicators[0].r#type;
 
     if indicators

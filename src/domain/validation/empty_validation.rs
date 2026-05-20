@@ -11,10 +11,10 @@ pub enum EmptyRepoValidationError {
 }
 
 pub fn validate_empty_entities(
-    long_ops: &Vec<OperationPoint>,
-    short_ops: &Vec<OperationPoint>,
-    indicators: &Vec<Indicator>,
-    resampled_points: &Vec<ResampledPointD1>,
+    long_ops: &[OperationPoint],
+    short_ops: &[OperationPoint],
+    indicators: &[Indicator],
+    resampled_points: &[ResampledPointD1],
 ) -> Result<(), EmptyRepoValidationError> {
     if long_ops.is_empty() {
         return Err(EmptyRepoValidationError::LongOperationPointsEmpty);
