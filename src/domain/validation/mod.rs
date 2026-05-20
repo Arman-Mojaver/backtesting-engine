@@ -1,3 +1,4 @@
+pub mod combined_validation;
 pub mod empty_validation;
 pub mod same_indicator_types_validation;
 pub mod same_instrument_validation;

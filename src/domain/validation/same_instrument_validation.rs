@@ -6,8 +6,7 @@ pub enum ValidationError {
     InstrumentMismatch,
 }
 
-#[allow(dead_code)]
-fn validate_same_instrument(
+pub fn validate_same_instrument(
     resampled_points: &[ResampledPointD1],
     long_operation_points: &[OperationPoint],
     short_operation_points: &[OperationPoint],

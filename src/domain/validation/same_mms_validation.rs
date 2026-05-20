@@ -5,8 +5,7 @@ pub enum ValidationError {
     MoneyManagementStrategyMismatch,
 }
 
-#[allow(dead_code)]
-fn validate_money_management_strategy_id_matches(
+pub fn validate_money_management_strategy_id_matches(
     long_points: &[OperationPoint],
     short_points: &[OperationPoint],
     expected_id: i32,
