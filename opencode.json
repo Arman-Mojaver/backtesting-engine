@@ -1,0 +1,69 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "Plan",
+  "agent": {
+    "build": { "disable": true },
+    "plan": { "disable": true }
+  },
+  "permission": {
+    "bash": {
+      "*": "ask",
+
+      "ls": "allow",
+      "ls *": "allow",
+      "grep *": "allow",
+      "pwd": "allow",
+      "cat *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "tail -f*": "deny",
+      "tail -F*": "deny",
+      "tail --follow*": "deny",
+      "tail * -f*": "deny",
+      "tail * -F*": "deny",
+      "tail * --follow*": "deny",
+      "wc *": "allow",
+      "file *": "allow",
+      "stat *": "allow",
+      "du *": "allow",
+      "df *": "allow",
+      "tree": "allow",
+      "tree *": "allow",
+      "which *": "allow",
+      "diff *": "allow",
+      "realpath *": "allow",
+      "basename *": "allow",
+      "dirname *": "allow",
+
+      "git status": "allow",
+      "git status *": "allow",
+      "git diff": "allow",
+      "git diff *": "allow",
+      "git log": "allow",
+      "git log *": "allow",
+      "git show": "allow",
+      "git show *": "allow",
+
+      "mkdir *": "allow",
+      "mkdir -p *": "allow",
+
+      "sudo *": "deny",
+      "> /dev/*": "deny",
+      "rm -rf *": "deny",
+      "rm -rf /*": "deny"
+
+    },
+    "read": "allow",
+    "edit": {
+      "**/backtesting-engine/**": "ask",
+      "*": "deny"
+    },
+    "write": "ask",
+    "webfetch": "ask",
+    "task": "ask",
+    "external_directory": {
+      "**/backtesting-engine/**": "allow",
+      "*": "deny"
+    }
+  }
+}

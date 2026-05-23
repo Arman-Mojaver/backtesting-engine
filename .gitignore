@@ -28,3 +28,4 @@ debug
 .docker_password.example
 .docker_password
 .DS_Store
+**/node_modules/
