@@ -8,6 +8,7 @@ mod resampled_point;
 mod strategy;
 
 use clap::{ArgMatches, Command};
+use std::process::Command as ProcessCommand;
 
 pub enum AppCommand {
     Dev(dev::DevCommand),
@@ -64,4 +65,25 @@ impl AppCommand {
             AppCommand::Strategy(cmd) => cmd.execute(),
         }
     }
+}
+
+/// Execute the Python CLI inside the Docker container via `docker exec`.
+/// `args` are the subcommand path and options forwarded to `cli/main.py`.
+pub fn exec_python_cli(args: &[String]) -> anyhow::Result<()> {
+    let status = ProcessCommand::new("docker")
+        .arg("exec")
+        .arg("-i")
+        .arg("api")
+        .arg("bt")
+        .args(args)
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute docker exec: {}", e))?;
+
+    if !status.success() {
+        let code = status.code().unwrap_or(-1);
+        anyhow::bail!("Python CLI exited with non-zero status: {}", code);
+    }
+    Ok(())
 }

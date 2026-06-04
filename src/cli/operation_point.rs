@@ -39,21 +39,20 @@ impl OperationPointCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
             OperationPointCommand::Align(cmd) => cmd.execute(),
-            OperationPointCommand::Create => {
-                println!("o create");
-                Ok(())
-            }
-            OperationPointCommand::Delete => {
-                println!("o delete");
-                Ok(())
-            }
+            OperationPointCommand::Create => super::exec_python_cli(&["o".to_string(), "create".to_string()]),
+            OperationPointCommand::Delete => super::exec_python_cli(&["o".to_string(), "delete".to_string()]),
         }
     }
 }
 
+
 impl AlignOperationPoint {
     fn execute(self) -> anyhow::Result<()> {
-        println!("o align instrument={}", self.instrument);
-        Ok(())
+        let args = vec![
+            "o".to_string(),
+            "align".to_string(),
+            self.instrument,
+        ];
+        super::exec_python_cli(&args)
     }
 }

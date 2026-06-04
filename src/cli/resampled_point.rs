@@ -25,14 +25,8 @@ pub fn parse_resampled_point(m: &ArgMatches) -> ResampledPointCommand {
 impl ResampledPointCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            ResampledPointCommand::Create => {
-                println!("rr create");
-                Ok(())
-            }
-            ResampledPointCommand::Delete => {
-                println!("rr delete");
-                Ok(())
-            }
+            ResampledPointCommand::Create => super::exec_python_cli(&["rr".to_string(), "create".to_string()]),
+            ResampledPointCommand::Delete => super::exec_python_cli(&["rr".to_string(), "delete".to_string()]),
         }
     }
 }

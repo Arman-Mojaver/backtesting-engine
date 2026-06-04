@@ -51,16 +51,20 @@ impl RedisCommand {
     }
 }
 
+
 impl RedisGet {
     fn execute(self) -> anyhow::Result<()> {
-        println!("redis get key={:?}", self.key);
-        Ok(())
+        let mut args = vec!["redis".to_string(), "get".to_string()];
+        if let Some(key) = self.key {
+            args.push(key);
+        }
+        super::exec_python_cli(&args)
     }
 }
 
 impl RedisDelete {
     fn execute(self) -> anyhow::Result<()> {
-        println!("redis delete key={}", self.key);
-        Ok(())
+        let args = vec!["redis".to_string(), "delete".to_string(), self.key];
+        super::exec_python_cli(&args)
     }
 }

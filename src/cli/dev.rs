@@ -65,16 +65,27 @@ impl DevCommand {
     }
 }
 
+
 impl CreateIndicators {
     fn execute(self) -> anyhow::Result<()> {
-        println!("dev create_indicators --count {}", self.count);
-        Ok(())
+        let args = vec![
+            "dev".to_string(),
+            "create_indicators".to_string(),
+            "--count".to_string(),
+            self.count.to_string(),
+        ];
+        super::exec_python_cli(&args)
     }
 }
 
 impl CreateStrategies {
     fn execute(self) -> anyhow::Result<()> {
-        println!("dev create_strategies --count {}", self.count);
-        Ok(())
+        let args = vec![
+            "dev".to_string(),
+            "create_strategies".to_string(),
+            "--count".to_string(),
+            self.count.to_string(),
+        ];
+        super::exec_python_cli(&args)
     }
 }
