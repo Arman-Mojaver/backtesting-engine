@@ -22,7 +22,7 @@ pub enum AppCommand {
 }
 
 pub fn build_cli() -> Command {
-    Command::new("cc")
+    Command::new("ct")
         .about("Backtesting Engine CLI")
         .subcommand_required(true)
         .arg_required_else_help(true)

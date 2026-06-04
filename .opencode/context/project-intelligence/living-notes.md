@@ -31,7 +31,7 @@
 | Question | Stakeholders | Status | Next Action |
 |----------|--------------|--------|-------------|
 | Should engine commands be extended with strategy delete/update? | Arman Mojaver | Open | Add commands as needed |
-| Should the cc binary forward engine commands to bt-engine? | Arman Mojaver | Open | Currently separate binaries |
+| Should the ct binary forward engine commands to bt-engine? | Arman Mojaver | Open | Currently separate binaries |
 
 ### Open Question Details
 
@@ -40,7 +40,7 @@
 *Stakeholders*: Arman Mojaver
 *Options*:
 - Option A: Add all strategy commands to `bt-engine` (Rust-native)
-- Option B: Keep `cc` as the frontend that dispatches to either Python `bt` CLI or `bt-engine`
+- Option B: Keep `ct` as the frontend that dispatches to either Python `bt` CLI or `bt-engine`
 - Option C: Keep them separate
 *Timeline*: No deadline
 *Status*: Open
@@ -84,8 +84,8 @@
 - **Fixture module** -- `domain::fixtures.rs` provides reusable test data across all test modules. Single source of truth.
 
 ### Gotchas for Maintainers
-- **Two binaries to install** -- After changes to `engine/`, run `cargo install --path . --bin bt-engine --force`. After changes to `cli/`, run `cargo install --path . --bin cc --force`. Or use `--all` to install both.
-- **Python CLI dependency** -- `cc` commands (dev, indicator, etc.) forward to a Python Docker container. The `bt-engine` binary does NOT depend on Docker.
+- **Two binaries to install** -- After changes to `engine/`, run `cargo install --path . --bin bt-engine --force`. After changes to `cli/`, run `cargo install --path . --bin ct --force`. Or use `--all` to install both.
+- **Python CLI dependency** -- `ct` commands (dev, indicator, etc.) forward to a Python Docker container. The `bt-engine` binary does NOT depend on Docker.
 
 ## Active Projects
 

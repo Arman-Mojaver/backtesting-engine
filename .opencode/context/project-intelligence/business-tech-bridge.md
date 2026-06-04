@@ -25,19 +25,19 @@
 | Test data | `domain::fixtures::*` functions | `src/domain/fixtures.rs` | Shared across all test modules |
 | In-memory storage | `InMemory*Repo` structs | `src/infrastructure/in_memory_repos.rs` | Implement all 4 repository traits |
 | Environment config | `Environment` enum + `DbConfig` | `src/config/environment.rs` | Production / Development / Testing |
-| CLI binary (`cc`) | Full backtesting CLI | `src/main.rs` | `cli::build_cli()` → `cli::parse()` → `cli::execute()`. Installed at `~/.cargo/bin/cc` |
-| CLI dev tools | `cc dev create_indicators`, `cc dev create_strategies` | `src/cli/dev.rs` | Each file has its own builder, domain types, parser, and execute |
-| CLI indicator | `cc indicator/i create macd/rsi`, `bt i delete`, `bt i delete_unused` | `src/cli/indicator.rs` | Nested `create` subcommand with `macd` and `rsi` leaves |
-| CLI MMS | `cc money-management-strategy/mms create`, `cc mms delete` | `src/cli/money_management_strategy.rs` | |
-| CLI operation point | `cc operation-point/o align`, `cc o create`, `cc o delete` | `src/cli/operation_point.rs` | |
-| CLI raw point | `cc raw-point/r create`, `cc r delete` | `src/cli/raw_point.rs` | |
-| CLI redis | `cc redis get`, `cc redis delete` | `src/cli/redis.rs` | |
-| CLI resampled point | `cc resampled-point/rr create`, `cc rr delete` | `src/cli/resampled_point.rs` | |
-| CLI strategy | `cc strategy/s create/create_one`, `cc s delete/display_table/terminate` | `src/cli/strategy.rs` | Nested `filters` subcommand with `custom` and `global` leaves |
-| CLI strategy filters | `cc s filters custom/global` | `src/cli/strategy.rs` | Internal `build_strategy_filters_cli()`, `parse_strategy_filters()` |
+| CLI binary (`ct`) | Full backtesting CLI | `src/main.rs` | `cli::build_cli()` → `cli::parse()` → `cli::execute()`. Installed at `~/.cargo/bin/ct` |
+| CLI dev tools | `ct dev create_indicators`, `ct dev create_strategies` | `src/cli/dev.rs` | Each file has its own builder, domain types, parser, and execute |
+| CLI indicator | `ct indicator/i create macd/rsi`, `bt i delete`, `bt i delete_unused` | `src/cli/indicator.rs` | Nested `create` subcommand with `macd` and `rsi` leaves |
+| CLI MMS | `ct money-management-strategy/mms create`, `ct mms delete` | `src/cli/money_management_strategy.rs` | |
+| CLI operation point | `ct operation-point/o align`, `ct o create`, `ct o delete` | `src/cli/operation_point.rs` | |
+| CLI raw point | `ct raw-point/r create`, `ct r delete` | `src/cli/raw_point.rs` | |
+| CLI redis | `ct redis get`, `ct redis delete` | `src/cli/redis.rs` | |
+| CLI resampled point | `ct resampled-point/rr create`, `ct rr delete` | `src/cli/resampled_point.rs` | |
+| CLI strategy | `ct strategy/s create/create_one`, `ct s delete/display_table/terminate` | `src/cli/strategy.rs` | Nested `filters` subcommand with `custom` and `global` leaves |
+| CLI strategy filters | `ct s filters custom/global` | `src/cli/strategy.rs` | Internal `build_strategy_filters_cli()`, `parse_strategy_filters()` |
 | Engine CLI module | Command tree for `bt-engine` | `src/engine/mod.rs` | `EngineCommand` enum + `build_cli()`, `parse()`, `execute()` |
 | Engine strategy subcommand | Strategy operations under `bt-engine` | `src/engine/strategy.rs` | `StrategyCommand::Create { money_management_strategy_id }` |
-| Refresh CLI after changes | `cc-refresh` (zsh alias) | runs `cargo install --path . --bin cc --force` | Installs updated `cc` to `~/.cargo/bin/cc` |
+| Refresh CLI after changes | `ct-refresh` (zsh alias) | runs `cargo install --path . --bin ct --force` | Installs updated `ct` to `~/.cargo/bin/ct` |
 | Refresh engine binary after changes | `cargo install --path . --bin bt-engine --force` | `Cargo.toml` defines both `[[bin]]` entries | Installs updated `bt-engine` to `~/.cargo/bin/bt-engine` |
 | Engine CLI binary | Rust engine CLI (standalone) | `src/bin/bt-engine.rs` / `src/engine/` | Own command tree: `engine::build_cli()` -> `engine::parse()` -> `engine::execute()` |
 
@@ -59,7 +59,7 @@ Business Question                    Code Path
 | New entity | `src/domain/{entity}.rs` + trait | See `indicator.rs` |
 | New validation rule | `src/domain/validation/{rule}.rs` | See `same_instrument_validation.rs` |
 | New data source adapter | `src/infrastructure/{adapter}.rs` | See `in_memory_repos.rs` |
-| New CLI command group (cc binary) | `src/cli/{name}.rs` | See `src/cli/dev.rs` — 4 sections: builder, types, parse, execute |
+| New CLI command group (ct binary) | `src/cli/{name}.rs` | See `src/cli/dev.rs` — 4 sections: builder, types, parse, execute |
 | New CLI subcommand under existing group | Inside the relevant `src/cli/{group}.rs` or `src/engine/{group}.rs` | Add to the enum + builder + parser + execute match |
 | New engine command group (bt-engine binary) | `src/engine/{name}.rs` | Follow `src/engine/strategy.rs` pattern: builder, types, parse, execute |
 | New engine subcommand under existing group | Inside the relevant `src/engine/{group}.rs` | Add variant to EngineCommand enum + match arms in build_cli() and parse() |

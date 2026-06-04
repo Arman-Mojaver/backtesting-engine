@@ -66,8 +66,8 @@ Extract Rust engine CLI commands into their own `engine/` module with its own `E
 ### Alternatives Considered
 | Alternative | Pros | Cons | Why Rejected? |
 |-------------|------|------|---------------|
-| Keep engine as subcommand of `cc` | Single binary, minimal change | Mixed Python/Rust routing, confusing `docker exec engine` indirection | Makes CLI architecture unclear |
-| Single `cc` binary with internal dispatch | Single entry point | Over-complicated dispatch logic, tight coupling | Engine and CLI have different deployment needs |
+| Keep engine as subcommand of `ct` | Single binary, minimal change | Mixed Python/Rust routing, confusing `docker exec engine` indirection | Makes CLI architecture unclear |
+| Single `ct` binary with internal dispatch | Single entry point | Over-complicated dispatch logic, tight coupling | Engine and CLI have different deployment needs |
 
 ### Impact
 - **Positive**: Cleaner architecture, `bt-engine` runs directly, no Docker dependency for engine commands
@@ -115,11 +115,11 @@ Remove `src/bin/server.rs` and all Actix-web dependencies from `Cargo.toml`. The
 ---
 
 ### Context
-The `Cargo.toml` originally defined a single `[[bin]]` entry for the `cc` binary. After extracting the engine commands, we had two separate command trees that needed their own entry points.
+The `Cargo.toml` originally defined a single `[[bin]]` entry for the `ct` binary. After extracting the engine commands, we had two separate command trees that needed their own entry points.
 
 ### Decision
 Define two `[[bin]]` entries in `Cargo.toml`:
-- `cc` at `src/main.rs` — wraps the Python CLI (`cli/`)
+- `ct` at `src/main.rs` — wraps the Python CLI (`cli/`)
 - `bt-engine` at `src/bin/bt-engine.rs` — native Rust engine (`engine/`)
 
 ### Rationale

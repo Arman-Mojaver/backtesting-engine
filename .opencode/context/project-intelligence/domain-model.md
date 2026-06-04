@@ -200,7 +200,7 @@ src/
 5. **Ports-and-adapters**: Repository traits live in the domain; implementations live in infrastructure. The domain has zero dependencies on infrastructure.
 
 6. **Dual binary layout**: The project produces two binaries:
-   - **`cc`** (`src/main.rs`) — the full backtesting CLI (dev, indicator, strategy, etc.). Uses `cli::build_cli()` -> `cli::parse()` -> `cli::execute()`.
+   - **`ct`** (`src/main.rs`) — the full backtesting CLI (dev, indicator, strategy, etc.). Uses `cli::build_cli()` -> `cli::parse()` -> `cli::execute()`.
    - **`bt-engine`** (`src/bin/bt-engine.rs`) — the standalone Rust engine CLI. Uses `engine::build_cli()` -> `engine::parse()` -> `engine::execute()`.
    
    Both entry points follow the same `build -> parse -> execute` pattern and return `anyhow::Result<()>`.
