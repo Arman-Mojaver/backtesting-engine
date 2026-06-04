@@ -7,7 +7,7 @@ mod redis;
 mod resampled_point;
 mod strategy;
 
-use clap::{Arg, ArgMatches, Command};
+use clap::{ArgMatches, Command};
 use std::process::Command as ProcessCommand;
 
 pub enum AppCommand {
@@ -19,7 +19,6 @@ pub enum AppCommand {
     Redis(redis::RedisCommand),
     ResampledPoint(resampled_point::ResampledPointCommand),
     Strategy(strategy::StrategyCommand),
-    Engine(Vec<String>),
 }
 
 pub fn build_cli() -> Command {
@@ -35,17 +34,6 @@ pub fn build_cli() -> Command {
         .subcommand(redis::build_redis_cli())
         .subcommand(resampled_point::build_resampled_point_cli())
         .subcommand(strategy::build_strategy_cli())
-        .subcommand(
-            Command::new("engine")
-                .about("Execute Rust engine CLI commands inside the engine container")
-                .trailing_var_arg(true)
-                .arg(
-                    Arg::new("args")
-                        .help("Engine CLI arguments (flat commands)")
-                        .num_args(0..)
-                        .value_parser(clap::value_parser!(String)),
-                ),
-        )
 }
 
 pub fn parse(matches: ArgMatches) -> AppCommand {
@@ -64,14 +52,6 @@ pub fn parse(matches: ArgMatches) -> AppCommand {
             AppCommand::ResampledPoint(resampled_point::parse_resampled_point(m))
         }
         Some(("strategy", m)) => AppCommand::Strategy(strategy::parse_strategy(m)),
-        Some(("engine", m)) => {
-            let args = m
-                .get_many::<String>("args")
-                .unwrap_or_default()
-                .map(|s| s.to_string())
-                .collect();
-            AppCommand::Engine(args)
-        }
         _ => unreachable!("invalid top-level command"),
     }
 }
@@ -87,7 +67,6 @@ impl AppCommand {
             AppCommand::Redis(cmd) => cmd.execute(),
             AppCommand::ResampledPoint(cmd) => cmd.execute(),
             AppCommand::Strategy(cmd) => cmd.execute(),
-            AppCommand::Engine(args) => exec_engine_cli(&args),
         }
     }
 }
