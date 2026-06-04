@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.0 | Updated: 2025-01-12 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.1 | Updated: 2026-06-04 -->
 
 # Decisions Log
 
@@ -45,75 +45,116 @@
 
 ---
 
-## Decision: [Title]
+## Decision: Extract Engine as Standalone CLI Module
 
-**Date**: YYYY-MM-DD
-**Status**: [Status]
-**Owner**: [Owner]
+**Date**: 2026-06-04
+**Status**: Decided
+**Owner**: Arman Mojaver
 
 ### Context
-[What was happening? Why did we need to decide?]
+The original `cli::mod.rs` contained a mixed bag of commands: some forwarded to a Python CLI via Docker (`docker exec api bt ...`), and some were meant for the Rust engine. The `engine` subcommand was a catch-all that forwarded arbitrary args to `docker exec engine bt-engine ...`. This made the CLI confusing — users had to know which subcommands went to which backend.
 
 ### Decision
-[What we decided]
+Extract Rust engine CLI commands into their own `engine/` module with its own `EngineCommand` enum, `build_cli()`, `parse()`, and `execute()`. Compile as a separate binary (`bt-engine`) that runs directly without Docker forwarding.
 
 ### Rationale
-[Why this was the right choice]
+- Clear separation of concerns: the `bt` binary wraps Python the Python CLI; `bt-engine` is the native Rust engine
+- Removes indirection through Docker exec for engine commands
+- Each binary has its own command tree — no more catch-all `engine` subcommand
+- Follows the same `build -> parse -> execute` pattern already established in `cli/mod.rs`
 
 ### Alternatives Considered
 | Alternative | Pros | Cons | Why Rejected? |
 |-------------|------|------|---------------|
-| [Option A] | [Good things] | [Bad things] | [Reason] |
-| [Option B] | [Good things] | [Bad things] | [Reason] |
+| Keep engine as subcommand of `bt` | Single binary, minimal change | Mixed Python/Rust routing, confusing `docker exec engine` indirection | Makes CLI architecture unclear |
+| Single `bt` binary with internal dispatch | Single entry point | Over-complicated dispatch logic, tight coupling | Engine and CLI have different deployment needs |
 
 ### Impact
-- **Positive**: [What we gain]
-- **Negative**: [What we trade off]
-- **Risk**: [What to watch for]
+- **Positive**: Cleaner architecture, `bt-engine` runs directly, no Docker dependency for engine commands
+- **Negative**: Two binaries to maintain and install
+- **Risk**: Users must install both binaries; solved by `cargo install --all` or separate install scripts
 
 ### Related
-- [Link to PR #000]
-- [Link to issue #000]
-- [Link to documentation]
+- Commit `1f646c9` (cli: add bt-engine cli structure)
+- Commit `b3930c6` (cli: add "bt-engine strategy" command)
 
 ---
 
-## Decision: [Title]
+## Decision: Remove Actix-web HTTP Server Scaffold
 
-**Date**: YYYY-MM-DD
-**Status**: [Status]
-**Owner**: [Owner]
+**Date**: 2026-06-04
+**Status**: Decided
+**Owner**: Arman Mojaver
 
 ### Context
-[What was happening?]
+The initial project scaffold included an Actix-web HTTP server (`src/bin/server.rs`) with a single health-check endpoint (`/health` -> `"pong"`). As the project evolved, all actual functionality was CLI-based (backtesting validation and engine commands). The HTTP server was dead code — it was never wired to any real functionality.
 
 ### Decision
-[What we decided]
+Remove `src/bin/server.rs` and all Actix-web dependencies from `Cargo.toml`. The project is CLI-only for now.
 
 ### Rationale
-[Why this was right]
+- Eliminates dead code and its maintenance burden
+- Simplifies `Cargo.toml` dependencies (removed `actix-web`, `actix-rt`, `serde`, `serde_json`, `tokio`, `config`, `deadpool-postgres`, `tokio-postgres`, `rust_decimal`, `chrono`)
+- Reduces binary size and compile time
+- HTTP endpoints can be added later when there's an actual use case and API design
 
 ### Alternatives Considered
 | Alternative | Pros | Cons | Why Rejected? |
 |-------------|------|------|---------------|
-| [Option A] | [Good things] | [Bad things] | [Reason] |
+| Keep server scaffold | No work to remove | Dead code, misleading to newcomers, dependency burden | Clean code principle: delete dead code |
+| Rewrite server with simple framework | Lightweight alternative | Premature — no API consumers exist | YAGNI — not needed until API is designed |
 
 ### Impact
-- **Positive**: [What we gain]
-- **Negative**: [What we trade off]
+- **Positive**: Faster builds, smaller dependency footprint, clearer project scope
+- **Negative**: HTTP endpoints must be re-created from scratch when needed
+- **Risk**: None — no consumers depended on the health check
 
 ### Related
-- [Link]
+- Commit `1f646c9` (cli: add bt-engine cli structure)
 
 ---
+
+## Decision: Dual Binary Setup (bt + bt-engine)
+
+**Date**: 2026-06-04
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The `Cargo.toml` originally defined a single `[[bin]]` entry for the `bt` binary. After extracting the engine commands, we had two separate command trees that needed their own entry points.
+
+### Decision
+Define two `[[bin]]` entries in `Cargo.toml`:
+- `bt` at `src/main.rs` — wraps the Python CLI (`cli/`)
+- `bt-engine` at `src/bin/bt-engine.rs` — native Rust engine (`engine/`)
+
+### Rationale
+- Each binary has a focused responsibility
+- Both share the same library crate (`backtesting-engine`) for shared types
+- Users can install just what they need: `cargo install --path . --bin bt` or `cargo install --path . --bin bt-engine`
+- Follows Cargo's native multi-binary pattern
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Single binary with subcommand dispatch | Single install | Mixed responsibility, longer build | Two binaries already in use |
+| Separate crates | Fully isolated | Duplicate shared types, workspace complexity | Overkill — shared domain types benefit from single crate |
+
+### Impact
+- **Positive**: Clean separation, shared library, flexible install
+- **Negative**: Two binaries to build and version
+- **Risk**: Dependency drift between binaries (mitigated by shared lib crate)
+
+### Related
+- `Cargo.toml` — `[[bin]]` entries
+- `src/main.rs`, `src/bin/bt-engine.rs`
+
 
 ## Deprecated Decisions
 
-Decisions that were later overturned (for historical context):
-
 | Decision | Date | Replaced By | Why |
 |----------|------|-------------|-----|
-| [Old decision] | [Date] | [New decision] | [Reason] |
+(none yet)
 
 ## Onboarding Checklist
 

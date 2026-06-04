@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.0 | Updated: 2026-05-23 -->
+<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.1 | Updated: 2026-06-04 -->
 
 # Business ↔ Tech Bridge
 
@@ -25,7 +25,7 @@
 | Test data | `domain::fixtures::*` functions | `src/domain/fixtures.rs` | Shared across all test modules |
 | In-memory storage | `InMemory*Repo` structs | `src/infrastructure/in_memory_repos.rs` | Implement all 4 repository traits |
 | Environment config | `Environment` enum + `DbConfig` | `src/config/environment.rs` | Production / Development / Testing |
-| CLI binary | `bt` (installed at `~/.cargo/bin/bt`) | `src/main.rs` | Entry point: `build_cli()` → `parse()` → `execute()` |
+| CLI binary (`bt`) | Full backtesting CLI | `src/main.rs` | `cli::build_cli()` → `cli::parse()` → `cli::execute()`. Installed at `~/.cargo/bin/bt` |
 | CLI dev tools | `bt dev create_indicators`, `bt dev create_strategies` | `src/cli/dev.rs` | Each file has its own builder, domain types, parser, and execute |
 | CLI indicator | `bt indicator/i create macd/rsi`, `bt i delete`, `bt i delete_unused` | `src/cli/indicator.rs` | Nested `create` subcommand with `macd` and `rsi` leaves |
 | CLI MMS | `bt money-management-strategy/mms create`, `bt mms delete` | `src/cli/money_management_strategy.rs` | |
@@ -35,8 +35,11 @@
 | CLI resampled point | `bt resampled-point/rr create`, `bt rr delete` | `src/cli/resampled_point.rs` | |
 | CLI strategy | `bt strategy/s create/create_one`, `bt s delete/display_table/terminate` | `src/cli/strategy.rs` | Nested `filters` subcommand with `custom` and `global` leaves |
 | CLI strategy filters | `bt s filters custom/global` | `src/cli/strategy.rs` | Internal `build_strategy_filters_cli()`, `parse_strategy_filters()` |
+| Engine CLI module | Command tree for `bt-engine` | `src/engine/mod.rs` | `EngineCommand` enum + `build_cli()`, `parse()`, `execute()` |
+| Engine strategy subcommand | Strategy operations under `bt-engine` | `src/engine/strategy.rs` | `StrategyCommand::Create { money_management_strategy_id }` |
 | Refresh CLI after changes | `bt-refresh` (zsh alias) | runs `cargo install --path . --bin bt --force` | Installs updated `bt` to `~/.cargo/bin/bt` |
-| HTTP server | Actix-web app | `src/bin/server.rs` | Health check at `/health` only |
+| Refresh engine binary after changes | `cargo install --path . --bin bt-engine --force` | `Cargo.toml` defines both `[[bin]]` entries | Installs updated `bt-engine` to `~/.cargo/bin/bt-engine` |
+| Engine CLI binary | Rust engine CLI (standalone) | `src/bin/bt-engine.rs` / `src/engine/` | Own command tree: `engine::build_cli()` -> `engine::parse()` -> `engine::execute()` |
 
 ## Architecture Pattern
 
@@ -56,9 +59,10 @@ Business Question                    Code Path
 | New entity | `src/domain/{entity}.rs` + trait | See `indicator.rs` |
 | New validation rule | `src/domain/validation/{rule}.rs` | See `same_instrument_validation.rs` |
 | New data source adapter | `src/infrastructure/{adapter}.rs` | See `in_memory_repos.rs` |
-| New CLI command group | `src/cli/{name}.rs` | See `src/cli/dev.rs` — 4 sections: builder, types, parse, execute |
-| New CLI subcommand under existing group | Inside the relevant `src/cli/{group}.rs` | Add to the enum + builder + parser + execute match |
-| New API endpoint | `src/bin/server.rs` → `configure_routes` | See `health_check` handler |
+| New CLI command group (bt binary) | `src/cli/{name}.rs` | See `src/cli/dev.rs` — 4 sections: builder, types, parse, execute |
+| New CLI subcommand under existing group | Inside the relevant `src/cli/{group}.rs` or `src/engine/{group}.rs` | Add to the enum + builder + parser + execute match |
+| New engine command group (bt-engine binary) | `src/engine/{name}.rs` | Follow `src/engine/strategy.rs` pattern: builder, types, parse, execute |
+| New engine subcommand under existing group | Inside the relevant `src/engine/{group}.rs` | Add variant to EngineCommand enum + match arms in build_cli() and parse() |
 | New test fixtures | `src/domain/fixtures.rs` | Add `pub fn {name}() -> Vec<T>` |
 
 ## Related Files

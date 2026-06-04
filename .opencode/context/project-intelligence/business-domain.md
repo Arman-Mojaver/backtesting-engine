@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/business | Priority: high | Version: 1.0 | Updated: 2026-05-23 -->
+<!-- Context: project-intelligence/business | Priority: high | Version: 1.1 | Updated: 2026-06-04 -->
 
 # Business Domain
 
@@ -41,7 +41,8 @@ The engine is in **early development**:
 - ✅ Domain model defined (entities, repository traits)
 - ✅ Five validation rules implemented and tested
 - ✅ In-memory repository adapters for testing
-- ✅ Actix-web server scaffold (health check only)
+- ✅ CLI structure (`bt` binary with dev, indicator, mms, operation-point, raw-point, redis, resampled-point, strategy commands)
+- ✅ Engine CLI module extracted (`bt-engine` binary with its own command tree)
 - ✅ Environment/DB configuration
 - ⬜ Backtest execution logic (not yet implemented)
 - ⬜ Performance metrics calculation

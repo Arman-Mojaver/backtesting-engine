@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.0 | Updated: 2026-05-23 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.1 | Updated: 2026-06-04 -->
 
 # Domain Model — Backtesting Engine
 
@@ -160,6 +160,9 @@ src/
 │   ├── redis.rs               # redis get, delete
 │   ├── resampled_point.rs     # rr/resampled-point create, delete
 │   └── strategy.rs            # s/strategy create, create_one, delete, display_table, terminate, filters
+├── engine/                    # Standalone Rust CLI engine (own binary)
+│   ├── mod.rs                 # EngineCommand enum, build_cli(), parse(), execute()
+│   └── strategy.rs            # strategy create subcommand
 ├── domain/                    # Pure domain logic — no I/O, no frameworks
 │   ├── indicator.rs           # Indicator entity + repository trait
 │   ├── operation_point.rs     # OperationPoint entity + long/short repo traits
@@ -177,9 +180,9 @@ src/
 ├── config/                    # Environment + DB configuration
 │   └── environment.rs
 ├── bin/
-│   └── server.rs              # Actix-web HTTP server (health check only)
-├── main.rs                    # CLI entry point: build → parse → execute
-└── lib.rs                     # Crate root — re-exports all modules
+│   └── bt-engine.rs           # bt-engine binary entry: engine::build_cli() → parse() → execute()
+├── main.rs                    # bt binary entry: cli::build_cli() → parse() → execute()
+└── lib.rs                     # Crate root — re-exports all modules (cli, config, domain, engine, infrastructure)
 ```
 
 ---
@@ -195,6 +198,14 @@ src/
 4. **Fixtures module**: Test data lives in `domain::fixtures`, not in test files. This allows reuse across all validation test modules.
 
 5. **Ports-and-adapters**: Repository traits live in the domain; implementations live in infrastructure. The domain has zero dependencies on infrastructure.
+
+6. **Dual binary layout**: The project produces two binaries:
+   - **`bt`** (`src/main.rs`) — the full backtesting CLI (dev, indicator, strategy, etc.). Uses `cli::build_cli()` -> `cli::parse()` -> `cli::execute()`.
+   - **`bt-engine`** (`src/bin/bt-engine.rs`) — the standalone Rust engine CLI. Uses `engine::build_cli()` -> `engine::parse()` -> `engine::execute()`.
+   
+   Both entry points follow the same `build -> parse -> execute` pattern and return `anyhow::Result<()>`.
+
+7. **Engine module separation**: The `engine/` module was extracted from `cli/mod.rs` to give the Rust engine its own command tree independent of the Python-wrapping `bt` CLI. Engine commands run directly in the `bt-engine` binary.
 
 ---
 
