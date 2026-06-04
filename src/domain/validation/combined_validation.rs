@@ -31,11 +31,7 @@ pub fn validate_all(
     same_indicator_types_validation::validate_same_indicator_types(indicators)
         .map_err(|_| CombinedValidationError::IndicatorTypeMismatch)?;
 
-    same_instrument_validation::validate_same_instrument(
-        resampled_points,
-        long_ops,
-        short_ops,
-    )
+    same_instrument_validation::validate_same_instrument(resampled_points, long_ops, short_ops)
         .map_err(|_| CombinedValidationError::InstrumentMismatch)?;
 
     same_mms_validation::validate_money_management_strategy_id_matches(
@@ -43,7 +39,7 @@ pub fn validate_all(
         short_ops,
         expected_mms_id,
     )
-        .map_err(|_| CombinedValidationError::MoneyManagementStrategyMismatch)?;
+    .map_err(|_| CombinedValidationError::MoneyManagementStrategyMismatch)?;
 
     same_timestamp_validation::validate_timestamps_match(resampled_points, long_ops, short_ops)
         .map_err(|_| CombinedValidationError::TimestampMismatch)?;

@@ -150,6 +150,16 @@ CombinedValidationError {
 
 ```
 src/
+├── cli/                       # CLI command tree (clap, one file per group)
+│   ├── mod.rs                 # Coordinator: AppCommand enum, build_cli(), parse()
+│   ├── dev.rs                 # dev create_indicators, create_strategies
+│   ├── indicator.rs           # i/indicator create (macd/rsi), delete, delete_unused
+│   ├── money_management_strategy.rs  # mms/money-management-strategy create, delete
+│   ├── operation_point.rs     # o/operation-point align, create, delete
+│   ├── raw_point.rs           # r/raw-point create, delete
+│   ├── redis.rs               # redis get, delete
+│   ├── resampled_point.rs     # rr/resampled-point create, delete
+│   └── strategy.rs            # s/strategy create, create_one, delete, display_table, terminate, filters
 ├── domain/                    # Pure domain logic — no I/O, no frameworks
 │   ├── indicator.rs           # Indicator entity + repository trait
 │   ├── operation_point.rs     # OperationPoint entity + long/short repo traits
@@ -168,8 +178,8 @@ src/
 │   └── environment.rs
 ├── bin/
 │   └── server.rs              # Actix-web HTTP server (health check only)
-├── main.rs                    # CLI entry point (placeholder)
-└── lib.rs                     # Crate root — re-exports domain, infrastructure, config
+├── main.rs                    # CLI entry point: build → parse → execute
+└── lib.rs                     # Crate root — re-exports all modules
 ```
 
 ---
