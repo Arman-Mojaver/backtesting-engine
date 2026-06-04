@@ -1,50 +1,51 @@
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 pub fn build_indicator_cli() -> Command {
-fn build_create_cli() -> Command {
-    Command::new("create")
-        .about("Create Indicators")
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .subcommand(
-            Command::new("macd")
-                .about("Create MACD Indicators")
-                .trailing_var_arg(true)
-                .arg(
-                    Arg::new("args")
-                        .num_args(0..)
-                        .allow_hyphen_values(true)
-                        .help("options forwarded to Python CLI"),
-                )
-                .arg(
-                    Arg::new("example")
-                        .short('e')
-                        .long("example")
-                        .action(ArgAction::SetTrue)
-                        .help("Display an example"),
-                ),
-        )
-        .subcommand(
-            Command::new("rsi")
-                .about("Create RSI Indicators")
-                .trailing_var_arg(true)
-                .arg(
-                    Arg::new("args")
-                        .num_args(0..)
-                        .allow_hyphen_values(true)
-                        .help("options forwarded to Python CLI"),
-                )
-                .arg(
-                    Arg::new("example")
-                        .short('e')
-                        .long("example")
-                        .action(ArgAction::SetTrue)
-                        .help("Display an example"),
-                ),
-        )
-}
+    fn build_create_cli() -> Command {
+        Command::new("create")
+            .about("Create Indicators")
+            .subcommand_required(true)
+            .arg_required_else_help(true)
+            .subcommand(
+                Command::new("macd")
+                    .about("Create MACD Indicators")
+                    .trailing_var_arg(true)
+                    .arg(
+                        Arg::new("args")
+                            .num_args(0..)
+                            .allow_hyphen_values(true)
+                            .help("options forwarded to Python CLI"),
+                    )
+                    .arg(
+                        Arg::new("example")
+                            .short('e')
+                            .long("example")
+                            .action(ArgAction::SetTrue)
+                            .help("Display an example"),
+                    ),
+            )
+            .subcommand(
+                Command::new("rsi")
+                    .about("Create RSI Indicators")
+                    .trailing_var_arg(true)
+                    .arg(
+                        Arg::new("args")
+                            .num_args(0..)
+                            .allow_hyphen_values(true)
+                            .help("options forwarded to Python CLI"),
+                    )
+                    .arg(
+                        Arg::new("example")
+                            .short('e')
+                            .long("example")
+                            .action(ArgAction::SetTrue)
+                            .help("Display an example"),
+                    ),
+            )
+    }
 
-    Command::new("indicator").visible_alias("i")
+    Command::new("indicator")
+        .visible_alias("i")
         .about("Indicator CLI")
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -104,14 +105,16 @@ pub fn parse_indicator(m: &ArgMatches) -> IndicatorCommand {
 fn parse_create(m: &ArgMatches) -> CreateIndicator {
     match m.subcommand() {
         Some(("macd", sub)) => CreateIndicator::Macd(Macd {
-            args: sub.get_many::<String>("args")
+            args: sub
+                .get_many::<String>("args")
                 .unwrap_or_default()
                 .map(|s| s.to_owned())
                 .collect(),
             example: sub.get_flag("example"),
         }),
         Some(("rsi", sub)) => CreateIndicator::Rsi(Rsi {
-            args: sub.get_many::<String>("args")
+            args: sub
+                .get_many::<String>("args")
                 .unwrap_or_default()
                 .map(|s| s.to_owned())
                 .collect(),
@@ -126,7 +129,9 @@ impl IndicatorCommand {
         match self {
             IndicatorCommand::Create(cmd) => cmd.execute(),
             IndicatorCommand::Delete(cmd) => cmd.execute(),
-            IndicatorCommand::DeleteUnused => super::exec_python_cli(&["i".to_string(), "delete_unused".to_string()]),
+            IndicatorCommand::DeleteUnused => {
+                super::exec_python_cli(&["i".to_string(), "delete_unused".to_string()])
+            }
         }
     }
 }
@@ -139,7 +144,6 @@ impl CreateIndicator {
         }
     }
 }
-
 
 impl Macd {
     fn execute(self) -> anyhow::Result<()> {

@@ -1,7 +1,8 @@
 use clap::{ArgMatches, Command};
 
 pub fn build_resampled_point_cli() -> Command {
-    Command::new("resampled-point").visible_alias("rr")
+    Command::new("resampled-point")
+        .visible_alias("rr")
         .about("Resampled Point CLI")
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -25,8 +26,12 @@ pub fn parse_resampled_point(m: &ArgMatches) -> ResampledPointCommand {
 impl ResampledPointCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            ResampledPointCommand::Create => super::exec_python_cli(&["rr".to_string(), "create".to_string()]),
-            ResampledPointCommand::Delete => super::exec_python_cli(&["rr".to_string(), "delete".to_string()]),
+            ResampledPointCommand::Create => {
+                super::exec_python_cli(&["rr".to_string(), "create".to_string()])
+            }
+            ResampledPointCommand::Delete => {
+                super::exec_python_cli(&["rr".to_string(), "delete".to_string()])
+            }
         }
     }
 }

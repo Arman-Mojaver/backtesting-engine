@@ -51,7 +51,6 @@ impl RedisCommand {
     }
 }
 
-
 impl RedisGet {
     fn execute(self) -> anyhow::Result<()> {
         let mut args = vec!["redis".to_string(), "get".to_string()];

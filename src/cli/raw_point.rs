@@ -1,7 +1,8 @@
 use clap::{ArgMatches, Command};
 
 pub fn build_raw_point_cli() -> Command {
-    Command::new("raw-point").visible_alias("r")
+    Command::new("raw-point")
+        .visible_alias("r")
         .about("Raw Point CLI")
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -25,8 +26,12 @@ pub fn parse_raw_point(m: &ArgMatches) -> RawPointCommand {
 impl RawPointCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            RawPointCommand::Create => super::exec_python_cli(&["r".to_string(), "create".to_string()]),
-            RawPointCommand::Delete => super::exec_python_cli(&["r".to_string(), "delete".to_string()]),
+            RawPointCommand::Create => {
+                super::exec_python_cli(&["r".to_string(), "create".to_string()])
+            }
+            RawPointCommand::Delete => {
+                super::exec_python_cli(&["r".to_string(), "delete".to_string()])
+            }
         }
     }
 }

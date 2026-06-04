@@ -65,7 +65,6 @@ impl DevCommand {
     }
 }
 
-
 impl CreateIndicators {
     fn execute(self) -> anyhow::Result<()> {
         let args = vec![

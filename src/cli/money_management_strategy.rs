@@ -1,7 +1,8 @@
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
 pub fn build_money_management_strategy_cli() -> Command {
-    Command::new("money-management-strategy").visible_alias("mms")
+    Command::new("money-management-strategy")
+        .visible_alias("mms")
         .about("Money Management Strategy CLI")
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -52,7 +53,8 @@ pub fn parse_money_management_strategy(m: &ArgMatches) -> MoneyManagementStrateg
     match m.subcommand() {
         Some(("create", sub)) => {
             MoneyManagementStrategyCommand::Create(CreateMoneyManagementStrategy {
-                args: sub.get_many::<String>("args")
+                args: sub
+                    .get_many::<String>("args")
                     .unwrap_or_default()
                     .map(|s| s.to_owned())
                     .collect(),
@@ -80,7 +82,6 @@ impl MoneyManagementStrategyCommand {
         }
     }
 }
-
 
 impl CreateMoneyManagementStrategy {
     fn execute(self) -> anyhow::Result<()> {

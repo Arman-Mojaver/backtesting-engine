@@ -1,7 +1,8 @@
 use clap::{Arg, ArgMatches, Command};
 
 pub fn build_operation_point_cli() -> Command {
-    Command::new("operation-point").visible_alias("o")
+    Command::new("operation-point")
+        .visible_alias("o")
         .about("Operation Point CLI")
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -39,20 +40,19 @@ impl OperationPointCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
             OperationPointCommand::Align(cmd) => cmd.execute(),
-            OperationPointCommand::Create => super::exec_python_cli(&["o".to_string(), "create".to_string()]),
-            OperationPointCommand::Delete => super::exec_python_cli(&["o".to_string(), "delete".to_string()]),
+            OperationPointCommand::Create => {
+                super::exec_python_cli(&["o".to_string(), "create".to_string()])
+            }
+            OperationPointCommand::Delete => {
+                super::exec_python_cli(&["o".to_string(), "delete".to_string()])
+            }
         }
     }
 }
 
-
 impl AlignOperationPoint {
     fn execute(self) -> anyhow::Result<()> {
-        let args = vec![
-            "o".to_string(),
-            "align".to_string(),
-            self.instrument,
-        ];
+        let args = vec!["o".to_string(), "align".to_string(), self.instrument];
         super::exec_python_cli(&args)
     }
 }
