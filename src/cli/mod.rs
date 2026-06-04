@@ -7,7 +7,7 @@ mod redis;
 mod resampled_point;
 mod strategy;
 
-use clap::{ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command};
 use std::process::Command as ProcessCommand;
 
 pub enum AppCommand {
@@ -19,6 +19,7 @@ pub enum AppCommand {
     Redis(redis::RedisCommand),
     ResampledPoint(resampled_point::ResampledPointCommand),
     Strategy(strategy::StrategyCommand),
+    Engine(Vec<String>),
 }
 
 pub fn build_cli() -> Command {
@@ -34,6 +35,17 @@ pub fn build_cli() -> Command {
         .subcommand(redis::build_redis_cli())
         .subcommand(resampled_point::build_resampled_point_cli())
         .subcommand(strategy::build_strategy_cli())
+        .subcommand(
+            Command::new("engine")
+                .about("Execute Rust engine CLI commands inside the engine container")
+                .trailing_var_arg(true)
+                .arg(
+                    Arg::new("args")
+                        .help("Engine CLI arguments (flat commands)")
+                        .num_args(0..)
+                        .value_parser(clap::value_parser!(String)),
+                ),
+        )
 }
 
 pub fn parse(matches: ArgMatches) -> AppCommand {
@@ -43,11 +55,23 @@ pub fn parse(matches: ArgMatches) -> AppCommand {
         Some(("money-management-strategy", m)) => AppCommand::MoneyManagementStrategy(
             money_management_strategy::parse_money_management_strategy(m),
         ),
-        Some(("operation-point", m)) => AppCommand::OperationPoint(operation_point::parse_operation_point(m)),
+        Some(("operation-point", m)) => {
+            AppCommand::OperationPoint(operation_point::parse_operation_point(m))
+        }
         Some(("raw-point", m)) => AppCommand::RawPoint(raw_point::parse_raw_point(m)),
         Some(("redis", m)) => AppCommand::Redis(redis::parse_redis(m)),
-        Some(("resampled-point", m)) => AppCommand::ResampledPoint(resampled_point::parse_resampled_point(m)),
+        Some(("resampled-point", m)) => {
+            AppCommand::ResampledPoint(resampled_point::parse_resampled_point(m))
+        }
         Some(("strategy", m)) => AppCommand::Strategy(strategy::parse_strategy(m)),
+        Some(("engine", m)) => {
+            let args = m
+                .get_many::<String>("args")
+                .unwrap_or_default()
+                .map(|s| s.to_string())
+                .collect();
+            AppCommand::Engine(args)
+        }
         _ => unreachable!("invalid top-level command"),
     }
 }
@@ -63,6 +87,7 @@ impl AppCommand {
             AppCommand::Redis(cmd) => cmd.execute(),
             AppCommand::ResampledPoint(cmd) => cmd.execute(),
             AppCommand::Strategy(cmd) => cmd.execute(),
+            AppCommand::Engine(args) => exec_engine_cli(&args),
         }
     }
 }
@@ -84,6 +109,26 @@ pub fn exec_python_cli(args: &[String]) -> anyhow::Result<()> {
     if !status.success() {
         let code = status.code().unwrap_or(-1);
         anyhow::bail!("Python CLI exited with non-zero status: {}", code);
+    }
+    Ok(())
+}
+
+/// Execute the Rust engine CLI inside the engine container via `docker exec`.
+pub fn exec_engine_cli(args: &[String]) -> anyhow::Result<()> {
+    let status = ProcessCommand::new("docker")
+        .arg("exec")
+        .arg("-i")
+        .arg("engine")
+        .arg("bt-engine")
+        .args(args)
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute docker exec: {}", e))?;
+
+    if !status.success() {
+        let code = status.code().unwrap_or(-1);
+        anyhow::bail!("bt-engine exited with non-zero status: {}", code);
     }
     Ok(())
 }

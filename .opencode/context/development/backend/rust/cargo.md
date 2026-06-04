@@ -53,7 +53,6 @@ default-run = "backtesting-engine"
 doctest = false
 
 [dependencies]
-actix-web = "4.11.0"
 chrono = "0.4.42"
 log = "0.4.28"
 serde_json = "1.0.145"
@@ -109,4 +108,3 @@ cargo run --bin cli -- <args>
 ## Related Context
 
 - **Testing** → `testing.md`
-- **Actix-web patterns** → `actix-patterns.md`

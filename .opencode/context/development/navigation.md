@@ -21,7 +21,6 @@ development/
 ├── backend/                   # Rust server-side
 │   ├── navigation.md
 │   └── rust/
-│       ├── actix-patterns.md
 │       ├── testing.md
 │       ├── cargo.md
 │       └── errors/            # Rust compiler error reference
@@ -51,7 +50,6 @@ development/
 
 | Task | Path |
 |------|------|
-| **Actix-web / Backend** | `backend-navigation.md` |
 | **Clean code** | `principles/clean-code.md` |
 | **API design** | `principles/api-design.md` |
 | **SQLAlchemy / Oracle DB** | `data/sqlalchemy-oracle.md` |
@@ -70,7 +68,6 @@ development/
 ## By Concern
 
 **Principles** → Universal development practices (language-agnostic)
-**Backend** → Actix-web, Rust patterns, cargo test, cargo
 **Data** → SQLAlchemy, Oracle DB patterns
 **Rust Errors** → Compiler error lookup by code (E0XXX → category file → exact fix)
 **Integration** → APIs, third-party services

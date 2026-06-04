@@ -251,7 +251,6 @@ cargo fmt --check
 // ✅ Imports — group by std, external, local
 use std::collections::HashMap;
 
-use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::Backtest;

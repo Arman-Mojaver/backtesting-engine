@@ -12,7 +12,6 @@
 development/backend/
 ├── navigation.md
 └── rust/
-    ├── actix-patterns.md   # Routes, handlers, app data, error handling
     ├── testing.md          # cargo test, unit/integration tests, fakes
     └── cargo.md            # Cargo commands, Cargo.toml structure
 ```
@@ -23,7 +22,6 @@ development/backend/
 
 | Task | Path |
 |------|------|
-| **Actix-web patterns** | `backend/rust/actix-patterns.md` |
 | **Testing (cargo test)** | `backend/rust/testing.md` |
 | **Package management (cargo)** | `backend/rust/cargo.md` |
 | **API design principles** | `principles/api-design.md` |
@@ -32,7 +30,6 @@ development/backend/
 
 ## By Concern
 
-**API / Routes** → `backend/rust/actix-patterns.md`
 **Testing** → `backend/rust/testing.md`
 **Dependencies** → `backend/rust/cargo.md`
 

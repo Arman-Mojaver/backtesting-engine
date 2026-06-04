@@ -323,4 +323,3 @@ See `lifetimes.md` → E0597.
 
 - **Lifetimes** → `lifetimes.md` (dangling refs, lifetime annotations)
 - **Traits** → `traits.md` (Copy, Clone, Drop impls)
-- **Actix patterns** → `../actix-patterns.md`

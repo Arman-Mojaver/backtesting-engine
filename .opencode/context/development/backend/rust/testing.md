@@ -2,7 +2,6 @@
 
 # Rust Testing Patterns
 
-**Stack**: cargo test · actix-web test utilities · Rust 2021 edition
 
 ---
 
@@ -52,34 +51,6 @@ mod tests {
     #[should_panic]
     fn test_zero_start_panics() {
         calculate_return(0.0, 100.0);
-    }
-}
-```
-
----
-
-## Async Tests
-
-Use `#[actix_web::test]` for async handler tests:
-
-```rust
-#[cfg(test)]
-mod tests {
-    use actix_web::{test, web, App};
-    use super::*;
-
-    #[actix_web::test]
-    async fn test_get_backtest_returns_200() {
-        let app = test::init_service(
-            App::new().route("/backtests/{id}", web::get().to(get_backtest))
-        ).await;
-
-        let req = test::TestRequest::get()
-            .uri("/backtests/1")
-            .to_request();
-
-        let resp = test::call_service(&app, req).await;
-        assert_eq!(resp.status(), 200);
     }
 }
 ```
@@ -191,5 +162,4 @@ mod tests {
 
 ## Related Context
 
-- **Actix-web patterns** → `actix-patterns.md`
 - **Cargo commands** → `cargo.md`

@@ -307,4 +307,3 @@ fn foo(x: Box<dyn std::fmt::Debug>) {}
 
 - **Generics** → `generics.md` (associated types, type params)
 - **Ownership** → `ownership-borrow.md` (Copy, Clone, Drop)
-- **Actix patterns** → `../actix-patterns.md` (ResponseError trait)

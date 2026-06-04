@@ -284,4 +284,3 @@ tokio::select! {
 
 - **Traits** → `traits.md` (async fn in traits, Send/Sync)
 - **Lifetimes** → `lifetimes.md` (lifetimes in async contexts)
-- **Actix patterns** → `../actix-patterns.md` (async handlers)

@@ -13,5 +13,4 @@ frameworks/
 └── navigation.md
 ```
 
-> This project uses actix-web (see `../backend/rust/actix-patterns.md`).
 > Add framework-specific deep-dives here as needed.

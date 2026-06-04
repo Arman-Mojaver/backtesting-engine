@@ -2,7 +2,6 @@
 
 # Data Layer Patterns
 
-**Stack**: Rust 2021 edition · actix-web 4.x
 
 > ⚠️ This project does not currently have a database dependency in `Cargo.toml`.
 > Add patterns here when a DB crate is introduced (e.g. `sqlx`, `diesel`, `sea-orm`).
@@ -61,7 +60,6 @@ pub async fn create_pool(database_url: &str) -> PgPool {
         .expect("failed to connect to database")
 }
 
-// Register with actix-web
 App::new()
     .app_data(web::Data::new(pool))
 ```
@@ -70,5 +68,4 @@ App::new()
 
 ## Related Context
 
-- **Actix-web patterns** → `../backend/rust/actix-patterns.md`
 - **Backend navigation** → `../backend/navigation.md`

@@ -26,7 +26,7 @@ up:  ## Start containers
 	docker compose -f docker-compose.yaml up -d
 
 in:  ## Start a bash shell in started container
-	docker compose -f docker-compose.yaml exec -it webapp /bin/bash
+	docker compose -f docker-compose.yaml exec -it engine /bin/bash
 
 down:  ## Remove containers
 	docker compose -f docker-compose.yaml down

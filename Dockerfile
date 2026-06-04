@@ -2,7 +2,8 @@ FROM rust:1.94 AS fetcher
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN mkdir -p src/bin && echo "fn main() {}" > src/main.rs && echo "" > src/lib.rs
+RUN echo "fn main() {}" > src/bin/bt-engine.rs
 RUN cargo fetch
 
 
@@ -29,4 +30,4 @@ COPY --from=builder /app/target/release /usr/local/bin/
 
 WORKDIR /usr/src/app
 
-CMD ["cargo", "watch", "-i", "logs/", "-x", "run --bin server"]
+CMD cargo watch -i logs/ -x "build --bin bt-engine" -s "cp target/debug/bt-engine /usr/local/bin/bt-engine"

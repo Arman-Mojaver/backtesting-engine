@@ -8,7 +8,7 @@
 **One lever**: `RUST_LOG` env var. `info` → INFO. `debug` → DEBUG everywhere.
 
 **Where logging lives** (the only three surfaces):
-1. **HTTP edge** — actix-web middleware + error handlers
+1. **API edge** — request/response middleware + error handlers
 2. **DB edge** — query execution events
 3. **Domain warnings** — only for self-healed conditions (e.g. div-by-zero skip)
 
@@ -61,7 +61,6 @@
 | testing | `debug` | DEBUG (debug a failing test) |
 
 Hard-coded silencers (independent of `RUST_LOG`):
-- `actix_web` → INFO (set via `RUST_LOG=actix_web=info`)
 - `sqlx` or DB driver → WARN (project's own query events handle the rest)
 
 ## Logger Naming
@@ -157,9 +156,7 @@ Use `env_logger` or `test-log` crate to capture log output in tests. No mocking 
 ```rust
 #[cfg(test)]
 mod tests {
-    use actix_web::test;
 
-    #[actix_web::test]
     async fn test_request_is_logged() {
         // Use test::init_service and assert on response status
         // Log capture via RUST_LOG=debug in test environment
