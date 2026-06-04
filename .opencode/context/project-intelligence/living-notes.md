@@ -31,7 +31,7 @@
 | Question | Stakeholders | Status | Next Action |
 |----------|--------------|--------|-------------|
 | Should engine commands be extended with strategy delete/update? | Arman Mojaver | Open | Add commands as needed |
-| Should the bt binary forward engine commands to bt-engine? | Arman Mojaver | Open | Currently separate binaries |
+| Should the cc binary forward engine commands to bt-engine? | Arman Mojaver | Open | Currently separate binaries |
 
 ### Open Question Details
 
@@ -40,7 +40,7 @@
 *Stakeholders*: Arman Mojaver
 *Options*:
 - Option A: Add all strategy commands to `bt-engine` (Rust-native)
-- Option B: Keep `bt` as the frontend that dispatches to either Python CLI or `bt-engine`
+- Option B: Keep `cc` as the frontend that dispatches to either Python `bt` CLI or `bt-engine`
 - Option C: Keep them separate
 *Timeline*: No deadline
 *Status*: Open
@@ -66,7 +66,7 @@
 ### What Works Well
 - **`build -> parse -> execute` pattern** -- Consistent across both binaries. Simple, predictable, easy to test.
 - **Pure validators as free functions** -- No object construction needed. Compose well in `combined_validation::validate_all()`.
-- **Separate engine binary** -- Clear line between Python-wrapping CLI (`bt`) and native Rust engine (`bt-engine`).
+- **Separate engine binary** -- Clear line between Python-wrapping CLI (`bc`) and native Rust engine (`bt-engine`).
 
 ### What Could Be Better
 - **Test coverage** -- No tests for the engine module yet. Should have at minimum unit tests for `StrategyCommand::execute()`.
@@ -84,8 +84,8 @@
 - **Fixture module** -- `domain::fixtures.rs` provides reusable test data across all test modules. Single source of truth.
 
 ### Gotchas for Maintainers
-- **Two binaries to install** -- After changes to `engine/`, run `cargo install --path . --bin bt-engine --force`. After changes to `cli/`, run `cargo install --path . --bin bt --force`. Or use `--all` to install both.
-- **Python CLI dependency** -- `bt` commands (dev, indicator, etc.) forward to a Python Docker container. The `bt-engine` binary does NOT depend on Docker.
+- **Two binaries to install** -- After changes to `engine/`, run `cargo install --path . --bin bt-engine --force`. After changes to `cli/`, run `cargo install --path . --bin cc --force`. Or use `--all` to install both.
+- **Python CLI dependency** -- `cc` commands (dev, indicator, etc.) forward to a Python Docker container. The `bt-engine` binary does NOT depend on Docker.
 
 ## Active Projects
 

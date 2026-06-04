@@ -7,7 +7,7 @@ edition = "2021"
 doctest = false
 
 [[bin]]
-name = "bt"
+name = "cc"
 path = "src/main.rs"
 
 [[bin]]
