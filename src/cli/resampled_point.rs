@@ -27,10 +27,10 @@ impl ResampledPointCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
             ResampledPointCommand::Create => {
-                super::exec_python_cli(&["rr".to_string(), "create".to_string()])
+                super::exec_python_cli(&["resampled-point".to_string(), "create".to_string()])
             }
             ResampledPointCommand::Delete => {
-                super::exec_python_cli(&["rr".to_string(), "delete".to_string()])
+                super::exec_python_cli(&["resampled-point".to_string(), "delete".to_string()])
             }
         }
     }

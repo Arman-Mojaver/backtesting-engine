@@ -130,7 +130,7 @@ impl IndicatorCommand {
             IndicatorCommand::Create(cmd) => cmd.execute(),
             IndicatorCommand::Delete(cmd) => cmd.execute(),
             IndicatorCommand::DeleteUnused => {
-                super::exec_python_cli(&["i".to_string(), "delete_unused".to_string()])
+                super::exec_python_cli(&["indicator".to_string(), "delete_unused".to_string()])
             }
         }
     }

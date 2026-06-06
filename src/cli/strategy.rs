@@ -40,7 +40,7 @@ impl StrategyCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
             StrategyCommand::Delete => {
-                super::exec_python_cli(&["s".to_string(), "delete".to_string()])
+                super::exec_python_cli(&["strategy".to_string(), "delete".to_string()])
             }
             StrategyCommand::Create {
                 money_management_strategy_id,
