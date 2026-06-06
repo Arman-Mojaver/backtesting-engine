@@ -55,6 +55,7 @@
     },
     "read": "allow",
     "edit": {
+      "**/Backtesting-4.0/**": "ask",
       "**/backtesting-engine/**": "ask",
       "*": "deny"
     },
@@ -62,6 +63,7 @@
     "webfetch": "ask",
     "task": "ask",
     "external_directory": {
+      "**/Backtesting-4.0/**": "allow",
       "**/backtesting-engine/**": "allow",
       "*": "deny"
     }

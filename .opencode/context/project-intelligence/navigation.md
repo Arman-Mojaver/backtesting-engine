@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/nav | Priority: high | Version: 1.1 | Updated: 2026-05-23 -->
+<!-- Context: project-intelligence/nav | Priority: high | Version: 1.1 | Updated: 2026-06-06 -->
 
 # Project Intelligence
 
@@ -8,12 +8,13 @@
 
 ```
 .opencode/context/project-intelligence/
-├── navigation.md              # This file - quick overview
-├── domain-model.md            # Ubiquitous language, entities, validations, architecture
-├── business-domain.md         # Business context and problem statement
-├── business-tech-bridge.md    # How business concepts map to code files
-├── decisions-log.md           # Major decisions with rationale
-└── living-notes.md            # Active issues, debt, open questions
+├── navigation.md                  # This file - quick overview
+├── domain-model.md                # Ubiquitous language, entities, validations, architecture
+├── business-domain.md             # Business context and problem statement
+├── business-tech-bridge.md        # How business concepts map to code files
+├── decisions-log.md               # Major decisions with rationale
+├── companion-backtesting-4.0.md   # Companion repo reference
+└── living-notes.md                # Active issues, debt, open questions
 ```
 
 ## Quick Routes
@@ -25,6 +26,7 @@
 | Find the right file | `business-tech-bridge.md` | Business concept → Rust file mapping |
 | Know the context | `decisions-log.md` | Why decisions were made |
 | Current state | `living-notes.md` | Active issues and open questions |
+| **Companion repo** | `companion-backtesting-4.0.md` | Backtesting-4.0 Django backend reference |
 
 ## For Agents
 
