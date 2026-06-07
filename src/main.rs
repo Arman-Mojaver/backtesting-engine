@@ -1,11 +1,7 @@
-mod cli;
-
 fn main() -> anyhow::Result<()> {
-    let cli = cli::build_cli();
+    let cli = backtesting_engine::cli::build_cli();
     let matches = cli.get_matches();
-
-    let command = cli::parse(matches);
+    let command = backtesting_engine::cli::parse(matches);
     command.execute()?;
-
     Ok(())
 }

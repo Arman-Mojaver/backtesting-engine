@@ -12,8 +12,10 @@ pub struct OperationPoint {
 
 pub trait LongOperationPointRepository {
     fn get_all(&self) -> Vec<OperationPoint>;
+    fn get_by_mms_id_and_instrument(&self, mms_id: i32, instrument: &str) -> Vec<OperationPoint>;
 }
 
 pub trait ShortOperationPointRepository {
     fn get_all(&self) -> Vec<OperationPoint>;
+    fn get_by_mms_id_and_instrument(&self, mms_id: i32, instrument: &str) -> Vec<OperationPoint>;
 }

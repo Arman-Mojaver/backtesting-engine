@@ -1,6 +1,6 @@
-use crate::domain::indicator::Indicator;
+use crate::domain::indicator::{Indicator, IndicatorParameters};
 use crate::domain::operation_point::OperationPoint;
-use crate::domain::resampled_point::ResampledPointD1;
+use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
 
 // Operation Point fixtures
 
@@ -218,6 +218,7 @@ pub fn resampled_points_default() -> Vec<ResampledPointD1> {
             close: 1.05,
             volume: 1000,
             timestamp: 1000,
+            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 2,
@@ -228,6 +229,7 @@ pub fn resampled_points_default() -> Vec<ResampledPointD1> {
             close: 1.22,
             volume: 800,
             timestamp: 1001,
+            high_low_order: HighLowOrder::HighFirst,
         },
     ]
 }
@@ -243,6 +245,7 @@ pub fn resampled_points_ts_123() -> Vec<ResampledPointD1> {
             close: 1.05,
             volume: 1000,
             timestamp: 1,
+            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 2,
@@ -253,6 +256,7 @@ pub fn resampled_points_ts_123() -> Vec<ResampledPointD1> {
             close: 1.22,
             volume: 800,
             timestamp: 2,
+            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 3,
@@ -263,6 +267,7 @@ pub fn resampled_points_ts_123() -> Vec<ResampledPointD1> {
             close: 1.22,
             volume: 800,
             timestamp: 3,
+            high_low_order: HighLowOrder::HighFirst,
         },
     ]
 }
@@ -278,6 +283,7 @@ pub fn resampled_points_usdcad() -> Vec<ResampledPointD1> {
             close: 1.05,
             volume: 1000,
             timestamp: 1000,
+            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 2,
@@ -288,6 +294,7 @@ pub fn resampled_points_usdcad() -> Vec<ResampledPointD1> {
             close: 1.10,
             volume: 900,
             timestamp: 1001,
+            high_low_order: HighLowOrder::HighFirst,
         },
     ]
 }
@@ -302,6 +309,7 @@ pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
             close: 1.05,
             volume: 1000,
             timestamp: 1000,
+            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 2,
@@ -312,6 +320,7 @@ pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
             close: 1.22,
             volume: 800,
             timestamp: 1001,
+            high_low_order: HighLowOrder::HighFirst,
         },
     ]
 }
@@ -326,11 +335,25 @@ pub fn indicators_default() -> Vec<Indicator> {
     vec![
         Indicator {
             id: 1,
-            r#type: "a".to_string(),
+            r#type: "macd".to_string(),
+            parameters: IndicatorParameters::Macd {
+                slow_type: "ema".to_string(),
+                slow_n: 26,
+                fast_type: "ema".to_string(),
+                fast_n: 12,
+            },
+            identifier: "macd_1".to_string(),
         },
         Indicator {
             id: 2,
-            r#type: "a".to_string(),
+            r#type: "macd".to_string(),
+            parameters: IndicatorParameters::Macd {
+                slow_type: "ema".to_string(),
+                slow_n: 26,
+                fast_type: "ema".to_string(),
+                fast_n: 12,
+            },
+            identifier: "macd_2".to_string(),
         },
     ]
 }
@@ -339,11 +362,24 @@ pub fn indicators_different_type() -> Vec<Indicator> {
     vec![
         Indicator {
             id: 1,
-            r#type: "a".to_string(),
+            r#type: "macd".to_string(),
+            parameters: IndicatorParameters::Macd {
+                slow_type: "ema".to_string(),
+                slow_n: 26,
+                fast_type: "ema".to_string(),
+                fast_n: 12,
+            },
+            identifier: "macd_1".to_string(),
         },
         Indicator {
             id: 2,
-            r#type: "b".to_string(),
+            r#type: "rsi".to_string(),
+            parameters: IndicatorParameters::Rsi {
+                n: 14,
+                high_threshold: 70,
+                low_threshold: 30,
+            },
+            identifier: "rsi_1".to_string(),
         },
     ]
 }

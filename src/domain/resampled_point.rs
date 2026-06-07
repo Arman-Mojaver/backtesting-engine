@@ -1,3 +1,10 @@
+#[derive(Debug, Clone, PartialEq)]
+pub enum HighLowOrder {
+    HighFirst,
+    LowFirst,
+    Undefined,
+}
+
 #[derive(Debug, Clone)]
 pub struct ResampledPointD1 {
     pub id: i32,
@@ -8,8 +15,10 @@ pub struct ResampledPointD1 {
     pub close: f64,
     pub volume: i32,
     pub timestamp: i32,
+    pub high_low_order: HighLowOrder,
 }
 
 pub trait ResampledPointD1Repository {
     fn get_all(&self) -> Vec<ResampledPointD1>;
+    fn get_by_instrument(&self, instrument: &str) -> Vec<ResampledPointD1>;
 }

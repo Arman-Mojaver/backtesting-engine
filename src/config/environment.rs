@@ -32,7 +32,7 @@ pub struct DbConfig {
 impl DbConfig {
     pub fn production() -> Self {
         DbConfig {
-            host: "db-production".into(),
+            host: "host.docker.internal".into(),
             port: 5432,
             user: "postgres".into(),
             password: "postgres".into(),
@@ -42,7 +42,7 @@ impl DbConfig {
 
     pub fn development() -> Self {
         DbConfig {
-            host: "db-development".into(),
+            host: "host.docker.internal".into(),
             port: 54320,
             user: "postgres".into(),
             password: "postgres".into(),
@@ -52,7 +52,7 @@ impl DbConfig {
 
     pub fn testing() -> Self {
         DbConfig {
-            host: "db-testing".into(),
+            host: "host.docker.internal".into(),
             port: 54321,
             user: "postgres".into(),
             password: "postgres".into(),
@@ -68,9 +68,9 @@ impl DbConfig {
         }
     }
 
-    pub fn url(&self) -> String {
+    pub fn connection_string(&self) -> String {
         format!(
-            "postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}",
+            "postgresql://{user}:{password}@{host}:{port}/{database}",
             user = self.user,
             password = self.password,
             host = self.host,
@@ -123,15 +123,15 @@ mod tests {
     #[test]
     fn dbconfig_factory_methods_return_expected_values() {
         let prod = DbConfig::production();
-        assert_eq!(prod.host, "db-production");
+        assert_eq!(prod.host, "host.docker.internal");
         assert_eq!(prod.port, 5432);
 
         let dev = DbConfig::development();
-        assert_eq!(dev.host, "db-development");
+        assert_eq!(dev.host, "host.docker.internal");
         assert_eq!(dev.port, 54320);
 
         let test = DbConfig::testing();
-        assert_eq!(test.host, "db-testing");
+        assert_eq!(test.host, "host.docker.internal");
         assert_eq!(test.port, 54321);
     }
 
@@ -139,22 +139,23 @@ mod tests {
     fn dbconfig_from_env_returns_correct_config() {
         let env = Environment::from_str("production").unwrap();
         let config = DbConfig::from_env(env);
-        assert_eq!(config.host, "db-production");
+        assert_eq!(config.database, "db-production");
 
         let env = Environment::from_str("development").unwrap();
         let config = DbConfig::from_env(env);
-        assert_eq!(config.host, "db-development");
+        assert_eq!(config.database, "db-development");
 
         let env = Environment::from_str("testing").unwrap();
         let config = DbConfig::from_env(env);
-        assert_eq!(config.host, "db-testing");
+        assert_eq!(config.database, "db-testing");
     }
 
     #[test]
-    fn dbconfig_url_generates_correct_string() {
+    fn dbconfig_connection_string_generates_correct_string() {
         let config = DbConfig::production();
-        let expected = "postgresql+psycopg2://postgres:postgres@db-production:5432/db-production";
-        assert_eq!(config.url(), expected);
+        let expected =
+            "postgresql://postgres:postgres@host.docker.internal:5432/db-production";
+        assert_eq!(config.connection_string(), expected);
     }
 
     #[test]
@@ -165,7 +166,7 @@ mod tests {
         let config = DbConfig::from_env(env);
 
         assert_eq!(env, Environment::Development);
-        assert_eq!(config.host, "db-development");
+        assert_eq!(config.database, "db-development");
 
         clear_env();
     }
