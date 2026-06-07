@@ -102,17 +102,20 @@ fn row_to_indicator(row: &Row) -> Indicator {
     }
 }
 
+fn connect(connection_string: &str) -> anyhow::Result<Client> {
+    Client::connect(connection_string, NoTls).map_err(anyhow::Error::from)
+}
+
 pub struct PgLongOperationPointAdapter {
     conn: RefCell<Client>,
 }
 
 impl PgLongOperationPointAdapter {
-    pub fn new(connection_string: &str) -> Self {
-        let conn =
-            Client::connect(connection_string, NoTls).expect("failed to connect to PostgreSQL");
-        Self {
+    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
+        let conn = connect(connection_string)?;
+        Ok(Self {
             conn: RefCell::new(conn),
-        }
+        })
     }
 }
 
@@ -150,12 +153,11 @@ pub struct PgShortOperationPointAdapter {
 }
 
 impl PgShortOperationPointAdapter {
-    pub fn new(connection_string: &str) -> Self {
-        let conn =
-            Client::connect(connection_string, NoTls).expect("failed to connect to PostgreSQL");
-        Self {
+    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
+        let conn = connect(connection_string)?;
+        Ok(Self {
             conn: RefCell::new(conn),
-        }
+        })
     }
 }
 
@@ -193,12 +195,11 @@ pub struct PgResampledPointAdapter {
 }
 
 impl PgResampledPointAdapter {
-    pub fn new(connection_string: &str) -> Self {
-        let conn =
-            Client::connect(connection_string, NoTls).expect("failed to connect to PostgreSQL");
-        Self {
+    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
+        let conn = connect(connection_string)?;
+        Ok(Self {
             conn: RefCell::new(conn),
-        }
+        })
     }
 }
 
@@ -235,12 +236,11 @@ pub struct PgIndicatorAdapter {
 }
 
 impl PgIndicatorAdapter {
-    pub fn new(connection_string: &str) -> Self {
-        let conn =
-            Client::connect(connection_string, NoTls).expect("failed to connect to PostgreSQL");
-        Self {
+    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
+        let conn = connect(connection_string)?;
+        Ok(Self {
             conn: RefCell::new(conn),
-        }
+        })
     }
 }
 
