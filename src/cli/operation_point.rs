@@ -52,7 +52,11 @@ impl OperationPointCommand {
 
 impl AlignOperationPoint {
     fn execute(self) -> anyhow::Result<()> {
-        let args = vec!["operation-point".to_string(), "align".to_string(), self.instrument];
+        let args = vec![
+            "operation-point".to_string(),
+            "align".to_string(),
+            self.instrument,
+        ];
         super::exec_python_cli(&args)
     }
 }

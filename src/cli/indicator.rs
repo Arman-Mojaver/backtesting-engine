@@ -59,13 +59,11 @@ pub fn build_indicator_cli() -> Command {
                         .help("Indicator identifiers to delete"),
                 ),
         )
-        .subcommand(Command::new("delete_unused").about("Delete Unused Indicators"))
 }
 
 pub enum IndicatorCommand {
     Create(CreateIndicator),
     Delete(DeleteIndicators),
-    DeleteUnused,
 }
 
 pub enum CreateIndicator {
@@ -97,7 +95,6 @@ pub fn parse_indicator(m: &ArgMatches) -> IndicatorCommand {
                 .map(|s| s.to_owned())
                 .collect(),
         }),
-        Some(("delete_unused", _)) => IndicatorCommand::DeleteUnused,
         _ => unreachable!("invalid indicator command"),
     }
 }
@@ -129,9 +126,6 @@ impl IndicatorCommand {
         match self {
             IndicatorCommand::Create(cmd) => cmd.execute(),
             IndicatorCommand::Delete(cmd) => cmd.execute(),
-            IndicatorCommand::DeleteUnused => {
-                super::exec_python_cli(&["indicator".to_string(), "delete_unused".to_string()])
-            }
         }
     }
 }
@@ -147,7 +141,11 @@ impl CreateIndicator {
 
 impl Macd {
     fn execute(self) -> anyhow::Result<()> {
-        let mut args = vec!["i".to_string(), "create".to_string(), "macd".to_string()];
+        let mut args = vec![
+            "indicator".to_string(),
+            "create".to_string(),
+            "macd".to_string(),
+        ];
         if self.example {
             args.push("--example".to_string());
         }
@@ -158,7 +156,11 @@ impl Macd {
 
 impl Rsi {
     fn execute(self) -> anyhow::Result<()> {
-        let mut args = vec!["i".to_string(), "create".to_string(), "rsi".to_string()];
+        let mut args = vec![
+            "indicator".to_string(),
+            "create".to_string(),
+            "rsi".to_string(),
+        ];
         if self.example {
             args.push("--example".to_string());
         }
@@ -169,7 +171,7 @@ impl Rsi {
 
 impl DeleteIndicators {
     fn execute(self) -> anyhow::Result<()> {
-        let mut args = vec!["i".to_string(), "delete".to_string()];
+        let mut args = vec!["indicator".to_string(), "delete".to_string()];
         args.extend(self.identifiers);
         super::exec_python_cli(&args)
     }

@@ -85,7 +85,10 @@ impl MoneyManagementStrategyCommand {
 
 impl CreateMoneyManagementStrategy {
     fn execute(self) -> anyhow::Result<()> {
-        let mut args = vec!["money-management-strategy".to_string(), "create".to_string()];
+        let mut args = vec![
+            "money-management-strategy".to_string(),
+            "create".to_string(),
+        ];
         if self.example {
             args.push("--example".to_string());
         }
@@ -96,7 +99,10 @@ impl CreateMoneyManagementStrategy {
 
 impl DeleteMoneyManagementStrategies {
     fn execute(self) -> anyhow::Result<()> {
-        let mut args = vec!["money-management-strategy".to_string(), "delete".to_string()];
+        let mut args = vec![
+            "money-management-strategy".to_string(),
+            "delete".to_string(),
+        ];
         args.extend(self.identifiers);
         super::exec_python_cli(&args)
     }
