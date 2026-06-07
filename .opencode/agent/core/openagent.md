@@ -5,10 +5,21 @@ mode: primary
 model: github-copilot/claude-sonnet-4.6
 temperature: 0.2
 permission:
-  read: "allow"
-  external_directory:
+  read:
+    "**/Backtesting-4.0/**": "allow"
+    "**/Backtesting-4.0": "allow"
     "**/backtesting-engine/**": "allow"
-    "*": "deny"
+    "**/backtesting-engine": "allow"
+    "/Users/armanmojaver/Backtesting-4.0/**": "allow"
+    "/Users/armanmojaver/backtesting-engine/**": "allow"
+    "*": "allow"
+  external_directory:
+    "**/Backtesting-4.0/**": "allow"
+    "**/Backtesting-4.0": "allow"
+    "**/backtesting-engine/**": "allow"
+    "**/backtesting-engine": "allow"
+    "/Users/armanmojaver/Backtesting-4.0/**": "allow"
+    "/Users/armanmojaver/backtesting-engine/**": "allow"
   bash:
     "ls": "allow"
     "ls *": "allow"
@@ -22,7 +33,12 @@ permission:
     "rm -rf *": "deny"
     "rm -rf /*": "deny"
   edit:
+    "**/Backtesting-4.0/**": "ask"
+    "**/Backtesting-4.0": "ask"
     "**/backtesting-engine/**": "ask"
+    "**/backtesting-engine": "ask"
+    "/Users/armanmojaver/Backtesting-4.0/**": "ask"
+    "/Users/armanmojaver/backtesting-engine/**": "ask"
     "**/*.env*": "deny"
     "**/*.key": "deny"
     "**/*.secret": "deny"

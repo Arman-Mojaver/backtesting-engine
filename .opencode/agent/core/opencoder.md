@@ -5,10 +5,21 @@ mode: primary
 model: github-copilot/claude-opus-4.6
 temperature: 0.1
 permission:
-  read: "allow"
-  external_directory:
+  read:
+    "**/Backtesting-4.0/**": "allow"
+    "**/Backtesting-4.0": "allow"
     "**/backtesting-engine/**": "allow"
-    "*": "deny"
+    "**/backtesting-engine": "allow"
+    "/Users/armanmojaver/Backtesting-4.0/**": "allow"
+    "/Users/armanmojaver/backtesting-engine/**": "allow"
+    "*": "allow"
+  external_directory:
+    "**/Backtesting-4.0/**": "allow"
+    "**/Backtesting-4.0": "allow"
+    "**/backtesting-engine/**": "allow"
+    "**/backtesting-engine": "allow"
+    "/Users/armanmojaver/Backtesting-4.0/**": "allow"
+    "/Users/armanmojaver/backtesting-engine/**": "allow"
   bash:
     "ls": "allow"
     "ls *": "allow"
@@ -22,7 +33,12 @@ permission:
     "rm -rf *": "deny"
     "rm -rf /*": "deny"
   edit:
+    "**/Backtesting-4.0/**": "allow"
+    "**/Backtesting-4.0": "allow"
     "**/backtesting-engine/**": "allow"
+    "**/backtesting-engine": "allow"
+    "/Users/armanmojaver/Backtesting-4.0/**": "allow"
+    "/Users/armanmojaver/backtesting-engine/**": "allow"
     "**/*.env*": "deny"
     "**/*.key": "deny"
     "**/*.secret": "deny"

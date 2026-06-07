@@ -53,7 +53,15 @@
       "rm -rf /*": "deny"
 
     },
-    "read": "allow",
+    "read": {
+      "**/Backtesting-4.0/**": "allow",
+      "**/Backtesting-4.0": "allow",
+      "**/backtesting-engine/**": "allow",
+      "**/backtesting-engine": "allow",
+      "/Users/armanmojaver/Backtesting-4.0/**": "allow",
+      "/Users/armanmojaver/backtesting-engine/**": "allow",
+      "*": "allow"
+    },
     "edit": {
       "**/Backtesting-4.0/**": "ask",
       "**/backtesting-engine/**": "ask",
@@ -64,8 +72,11 @@
     "task": "ask",
     "external_directory": {
       "**/Backtesting-4.0/**": "allow",
+      "**/Backtesting-4.0": "allow",
       "**/backtesting-engine/**": "allow",
-      "*": "deny"
+      "**/backtesting-engine": "allow",
+      "/Users/armanmojaver/Backtesting-4.0/**": "allow",
+      "/Users/armanmojaver/backtesting-engine/**": "allow"
     }
   }
 }
