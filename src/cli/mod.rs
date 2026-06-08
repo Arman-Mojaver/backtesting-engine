@@ -3,7 +3,6 @@ mod indicator;
 mod money_management_strategy;
 mod operation_point;
 mod raw_point;
-mod redis;
 mod resampled_point;
 mod strategy;
 
@@ -16,7 +15,6 @@ pub enum AppCommand {
     MoneyManagementStrategy(money_management_strategy::MoneyManagementStrategyCommand),
     OperationPoint(operation_point::OperationPointCommand),
     RawPoint(raw_point::RawPointCommand),
-    Redis(redis::RedisCommand),
     ResampledPoint(resampled_point::ResampledPointCommand),
     Strategy(strategy::StrategyCommand),
 }
@@ -31,7 +29,6 @@ pub fn build_cli() -> Command {
         .subcommand(money_management_strategy::build_money_management_strategy_cli())
         .subcommand(operation_point::build_operation_point_cli())
         .subcommand(raw_point::build_raw_point_cli())
-        .subcommand(redis::build_redis_cli())
         .subcommand(resampled_point::build_resampled_point_cli())
         .subcommand(strategy::build_strategy_cli())
 }
@@ -47,7 +44,6 @@ pub fn parse(matches: ArgMatches) -> AppCommand {
             AppCommand::OperationPoint(operation_point::parse_operation_point(m))
         }
         Some(("raw-point", m)) => AppCommand::RawPoint(raw_point::parse_raw_point(m)),
-        Some(("redis", m)) => AppCommand::Redis(redis::parse_redis(m)),
         Some(("resampled-point", m)) => {
             AppCommand::ResampledPoint(resampled_point::parse_resampled_point(m))
         }
@@ -64,7 +60,6 @@ impl AppCommand {
             AppCommand::MoneyManagementStrategy(cmd) => cmd.execute(),
             AppCommand::OperationPoint(cmd) => cmd.execute(),
             AppCommand::RawPoint(cmd) => cmd.execute(),
-            AppCommand::Redis(cmd) => cmd.execute(),
             AppCommand::ResampledPoint(cmd) => cmd.execute(),
             AppCommand::Strategy(cmd) => cmd.execute(),
         }

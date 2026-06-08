@@ -157,7 +157,6 @@ src/
 │   ├── money_management_strategy.rs  # mms/money-management-strategy create, delete
 │   ├── operation_point.rs     # o/operation-point align, create, delete
 │   ├── raw_point.rs           # r/raw-point create, delete
-│   ├── redis.rs               # redis get, delete
 │   ├── resampled_point.rs     # rr/resampled-point create, delete
 │   └── strategy.rs            # s/strategy create, create_one, delete, display_table, terminate, filters
 ├── engine/                    # Standalone Rust CLI engine (own binary)

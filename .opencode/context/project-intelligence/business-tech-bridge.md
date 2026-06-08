@@ -31,7 +31,6 @@
 | CLI MMS | `ct money-management-strategy/mms create`, `ct mms delete` | `src/cli/money_management_strategy.rs` | |
 | CLI operation point | `ct operation-point/o align`, `ct o create`, `ct o delete` | `src/cli/operation_point.rs` | |
 | CLI raw point | `ct raw-point/r create`, `ct r delete` | `src/cli/raw_point.rs` | |
-| CLI redis | `ct redis get`, `ct redis delete` | `src/cli/redis.rs` | |
 | CLI resampled point | `ct resampled-point/rr create`, `ct rr delete` | `src/cli/resampled_point.rs` | |
 | CLI strategy | `ct strategy/s create/create_one`, `ct s delete/display_table/terminate` | `src/cli/strategy.rs` | Nested `filters` subcommand with `custom` and `global` leaves |
 | CLI strategy filters | `ct s filters custom/global` | `src/cli/strategy.rs` | Internal `build_strategy_filters_cli()`, `parse_strategy_filters()` |

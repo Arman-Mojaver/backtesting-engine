@@ -41,7 +41,7 @@ The engine is in **early development**:
 - ✅ Domain model defined (entities, repository traits)
 - ✅ Five validation rules implemented and tested
 - ✅ In-memory repository adapters for testing
-- ✅ CLI structure (`ct` binary with dev, indicator, mms, operation-point, raw-point, redis, resampled-point, strategy commands)
+- ✅ CLI structure (`ct` binary with dev, indicator, mms, operation-point, raw-point, resampled-point, strategy commands)
 - ✅ Engine CLI module extracted (`bt-engine` binary with its own command tree)
 - ✅ Environment/DB configuration
 - ⬜ Backtest execution logic (not yet implemented)
