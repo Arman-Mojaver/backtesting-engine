@@ -1,6 +1,10 @@
 use clap::{value_parser, Arg, ArgMatches, Command};
 
-use crate::application::strategy_data::{fetch_strategy_data, StrategyData, StrategyQuery};
+use crate::application::strategy_data::{fetch_strategy_data, StrategyQuery};
+use crate::application::strategy_generator::generate_random_strategies;
+use crate::config::environment::{parquet_base_dir, Environment};
+use crate::domain::validation::combined_validation::{validate_all, CombinedValidationError};
+use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
 
 pub enum StrategyCommand {
     Create {
@@ -60,95 +64,49 @@ impl StrategyCommand {
             } => {
                 let query = StrategyQuery {
                     money_management_strategy_id,
-                    instrument,
+                    instrument: instrument.clone(),
                 };
+
+                eprintln!("Fetching data from database ...");
                 let data = fetch_strategy_data(&query)?;
-                print_strategy_data(&data);
+
+                eprintln!("Validating data ...");
+                validate_all(
+                    &data.long_operation_points,
+                    &data.short_operation_points,
+                    &data.indicators,
+                    &data.resampled_points,
+                    money_management_strategy_id,
+                )
+                .map_err(|e: CombinedValidationError| {
+                    anyhow::anyhow!("Validation failed: {:?}", e)
+                })?;
+
+                eprintln!("Generating random strategies ...");
+                let strategies = generate_random_strategies(
+                    &data.indicators,
+                    &data.long_operation_points,
+                    &data.short_operation_points,
+                );
+
+                let env: Environment = std::env::var("ENVIRONMENT")
+                    .unwrap_or_else(|_| "development".to_string())
+                    .parse()
+                    .unwrap_or(Environment::Development);
+                let base_dir = parquet_base_dir(env);
+                let repo = ParquetStrategyRepository::new(base_dir);
+
+                eprintln!("Writing {} strategies to parquet ...", strategies.len());
+                repo.write(&instrument, money_management_strategy_id, &strategies)?;
+
+                eprintln!(
+                    "Done. Wrote {} strategies for {} (mms_id={})",
+                    strategies.len(),
+                    instrument,
+                    money_management_strategy_id,
+                );
                 Ok(())
             }
         }
     }
-}
-
-/// Print a formatted summary of the given [`StrategyData`] to stdout.
-fn print_strategy_data(data: &StrategyData) {
-    println!("=== Indicators ({}) ===", data.indicators.len());
-    for ind in data.indicators.iter().take(5) {
-        println!(
-            "  #{} type={} id={} params={:?}",
-            ind.id, ind.r#type, ind.identifier, ind.parameters
-        );
-    }
-
-    println!("=== Resampled Points ({}) ===", data.resampled_points.len());
-    for rp in data.resampled_points.iter().take(5) {
-        println!(
-            "  #{} {} O={} H={} L={} C={} V={} ts={} hlo={:?}",
-            rp.id,
-            rp.instrument,
-            rp.open,
-            rp.high,
-            rp.low,
-            rp.close,
-            rp.volume,
-            rp.timestamp,
-            rp.high_low_order
-        );
-    }
-
-    let mms_id = data
-        .long_operation_points
-        .first()
-        .map(|op| op.money_management_strategy_id);
-    println!(
-        "=== Long Operation Points (mms_id={}) ===",
-        mms_id.map_or("n/a".to_string(), |id| id.to_string())
-    );
-    for op in data.long_operation_points.iter().take(5) {
-        println!(
-            "  #{} {} result={} tp={} sl={} risk={} mms={} ts={}",
-            op.id,
-            op.instrument,
-            op.result,
-            op.tp,
-            op.sl,
-            op.risk,
-            op.money_management_strategy_id,
-            op.timestamp
-        );
-    }
-
-    println!(
-        "=== Short Operation Points (mms_id={}) ===",
-        data.short_operation_points
-            .first()
-            .map_or("n/a".to_string(), |op| op
-                .money_management_strategy_id
-                .to_string())
-    );
-    for op in data.short_operation_points.iter().take(5) {
-        println!(
-            "  #{} {} result={} tp={} sl={} risk={} mms={} ts={}",
-            op.id,
-            op.instrument,
-            op.result,
-            op.tp,
-            op.sl,
-            op.risk,
-            op.money_management_strategy_id,
-            op.timestamp
-        );
-    }
-
-    println!();
-    println!("Indicators: {}", data.indicators.len());
-    println!("Resampled Points: {}", data.resampled_points.len());
-    println!(
-        "Long Operation Points: {}",
-        data.long_operation_points.len()
-    );
-    println!(
-        "Short Operation Points: {}",
-        data.short_operation_points.len()
-    );
 }

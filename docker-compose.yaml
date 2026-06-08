@@ -6,7 +6,10 @@ services:
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
     volumes:
-      - .:/app
+      - ./src:/app/src
+      - ./Cargo.toml:/app/Cargo.toml
+      - ./Cargo.lock:/app/Cargo.lock
+      - ${PARQUET_FILES_PATH}:/app/parquet_files
       - cargo-registry:/usr/local/cargo/registry
       - cargo-git:/usr/local/cargo/git
       - target:/app/target

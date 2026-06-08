@@ -30,3 +30,4 @@ debug
 .DS_Store
 **/node_modules/
 .opencode/.tmp/
+**/parquet_files/**

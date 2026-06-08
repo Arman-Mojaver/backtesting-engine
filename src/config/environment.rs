@@ -80,6 +80,18 @@ impl DbConfig {
     }
 }
 
+/// The root directory for parquet files inside the container.
+const PARQUET_FILES_PATH: &str = "/app/parquet_files";
+
+pub fn parquet_base_dir(env: Environment) -> String {
+    let subdirectory = match env {
+        Environment::Production => "production",
+        Environment::Development => "development",
+        Environment::Testing => "testing",
+    };
+    format!("{PARQUET_FILES_PATH}/{subdirectory}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,7 +119,6 @@ mod tests {
             "testing".parse::<Environment>().unwrap(),
             Environment::Testing
         );
-        // Case-insensitive
         assert_eq!(
             "Production".parse::<Environment>().unwrap(),
             Environment::Production
@@ -168,5 +179,23 @@ mod tests {
         assert_eq!(config.database, "db-development");
 
         clear_env();
+    }
+
+    #[test]
+    fn parquet_base_dir_development() {
+        let dir = parquet_base_dir(Environment::Development);
+        assert_eq!(dir, "/app/parquet_output/development");
+    }
+
+    #[test]
+    fn parquet_base_dir_production() {
+        let dir = parquet_base_dir(Environment::Production);
+        assert_eq!(dir, "/app/parquet_output/production");
+    }
+
+    #[test]
+    fn parquet_base_dir_testing() {
+        let dir = parquet_base_dir(Environment::Testing);
+        assert_eq!(dir, "/app/parquet_output/testing");
     }
 }
