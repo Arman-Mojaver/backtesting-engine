@@ -153,8 +153,7 @@ mod tests {
     #[test]
     fn dbconfig_connection_string_generates_correct_string() {
         let config = DbConfig::production();
-        let expected =
-            "postgresql://postgres:postgres@host.docker.internal:5432/db-production";
+        let expected = "postgresql://postgres:postgres@host.docker.internal:5432/db-production";
         assert_eq!(config.connection_string(), expected);
     }
 

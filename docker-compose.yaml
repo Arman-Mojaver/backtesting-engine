@@ -13,7 +13,17 @@ services:
     working_dir: /app
     command: cargo watch -i logs/ -x "build --bin bt-engine" -s "cp target/debug/bt-engine /usr/local/bin/bt-engine"
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
 volumes:
   cargo-registry:
   cargo-git:
   target:
+  redis-data:

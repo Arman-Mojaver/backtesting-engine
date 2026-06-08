@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.1 | Updated: 2026-06-04 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.2 | Updated: 2026-06-08 -->
 
 # Domain Model — Backtesting Engine
 
@@ -22,6 +22,10 @@
 | **Risk** | The fraction of capital risked on a single trade (e.g. `0.01` = 1%). | `f64` field | `domain::operation_point` |
 | **Result** | The outcome of a trade: `1` = win, `-1` = loss. | `i32` field | `domain::operation_point` |
 | **Timestamp** | An integer epoch identifying when a data point or trade occurred. Used to align operation points with resampled market data. | `i32` field | multiple |
+| **Signal Group** | A collection of long and short signal timestamps for a single indicator. Maps an indicator ID to its signal timestamps. | `SignalGroup` | `infrastructure::redis` |
+| **Signal Groups Cache** | An ephemeral Redis cache storing the complete mapping of indicator IDs to their signal groups. Prevents redundant computation across CLI invocations. | `SignalGroups` (HashMap) | `infrastructure::redis` |
+| **Cache HIT** | The Redis key exists — engine can skip computation and deserialize the cached value. | CLI output: "Cache: HIT" | `engine::redis` |
+| **Cache MISS** | The Redis key does not exist — engine must compute signal groups from scratch. | CLI output: "Cache: MISS" | `engine::redis` |
 
 ---
 
@@ -72,6 +76,17 @@ Indicator {
 }
 ```
 
+### SignalGroup
+
+A group of signal timestamps (long and short) for a single indicator. Stored in Redis as JSON.
+
+```
+SignalGroup {
+    long_signals:  Vec<i64>   — timestamps of long (buy) signals
+    short_signals: Vec<i64>   — timestamps of short (sell) signals
+}
+```
+
 ---
 
 ## Repository Traits (Ports)
@@ -88,6 +103,26 @@ The domain defines **four repository traits** — these are the ports in a ports
 Each trait has a single method: `get_all() -> Vec<T>`.
 
 Infrastructure provides `InMemory*Repo` implementations for testing.
+
+---
+
+## Infrastructure Adapters
+
+| Adapter | Purpose | File |
+|---------|---------|------|
+| `Pg*Adapter` | PostgreSQL persistence (production) | `src/infrastructure/pg_adapter.rs` |
+| `InMemory*Repo` | In-memory storage (testing) | `src/infrastructure/in_memory_repos.rs` |
+| `Redis` module | Ephemeral cache for signal groups | `src/infrastructure/redis.rs` |
+
+### Redis Cache
+
+The Redis module provides three operations operating on a single key (`signal_groups`):
+
+| Operation | Signature | Behavior |
+|-----------|-----------|----------|
+| `read_signal_groups` | `(conn) -> Result<Option<SignalGroups>>` | GET + JSON deserialize. Hard fail on connection/serialization error. |
+| `write_signal_groups` | `(conn, groups) -> Result<()>` | JSON serialize + SET. Hard fail on connection/serialization error. |
+| `delete_signal_groups` | `(conn) -> Result<()>` | DEL. Hard fail on connection error. |
 
 ---
 
@@ -157,10 +192,12 @@ src/
 │   ├── money_management_strategy.rs  # mms/money-management-strategy create, delete
 │   ├── operation_point.rs     # o/operation-point align, create, delete
 │   ├── raw_point.rs           # r/raw-point create, delete
+│   ├── redis.rs               # ct redis — delegates to bt-engine redis via Docker exec
 │   ├── resampled_point.rs     # rr/resampled-point create, delete
 │   └── strategy.rs            # s/strategy create, create_one, delete, display_table, terminate, filters
 ├── engine/                    # Standalone Rust CLI engine (own binary)
 │   ├── mod.rs                 # EngineCommand enum, build_cli(), parse(), execute()
+│   ├── redis.rs               # bt-engine redis — check HIT/MISS, verbose dump, --clean
 │   └── strategy.rs            # strategy create subcommand
 ├── domain/                    # Pure domain logic — no I/O, no frameworks
 │   ├── indicator.rs           # Indicator entity + repository trait
@@ -174,13 +211,15 @@ src/
 │   │   ├── same_timestamp_validation.rs
 │   │   └── combined_validation.rs
 │   └── fixtures.rs            # Test data builders
-├── infrastructure/            # Adapters (in-memory repos)
-│   └── in_memory_repos.rs
+├── infrastructure/            # Adapters (PG, memory, Redis)
+│   ├── in_memory_repos.rs     # In-memory repo implementations for testing
+│   ├── pg_adapter.rs          # PostgreSQL adapters implementing domain repo traits
+│   └── redis.rs               # SignalGroup types, SIGNAL_GROUPS_KEY constant, read/write/delete functions
 ├── config/                    # Environment + DB configuration
 │   └── environment.rs
 ├── bin/
 │   └── bt-engine.rs           # bt-engine binary entry: engine::build_cli() → parse() → execute()
-├── main.rs                    # bt binary entry: cli::build_cli() → parse() → execute()
+├── main.rs                    # ct binary entry: cli::build_cli() → parse() → execute()
 └── lib.rs                     # Crate root — re-exports all modules (cli, config, domain, engine, infrastructure)
 ```
 
@@ -199,12 +238,18 @@ src/
 5. **Ports-and-adapters**: Repository traits live in the domain; implementations live in infrastructure. The domain has zero dependencies on infrastructure.
 
 6. **Dual binary layout**: The project produces two binaries:
-   - **`ct`** (`src/main.rs`) — the full backtesting CLI (dev, indicator, strategy, etc.). Uses `cli::build_cli()` -> `cli::parse()` -> `cli::execute()`.
+   - **`ct`** (`src/main.rs`) — the full backtesting CLI (dev, indicator, strategy, redis, etc.). Uses `cli::build_cli()` -> `cli::parse()` -> `cli::execute()`.
    - **`bt-engine`** (`src/bin/bt-engine.rs`) — the standalone Rust engine CLI. Uses `engine::build_cli()` -> `engine::parse()` -> `engine::execute()`.
    
    Both entry points follow the same `build -> parse -> execute` pattern and return `anyhow::Result<()>`.
 
 7. **Engine module separation**: The `engine/` module was extracted from `cli/mod.rs` to give the Rust engine its own command tree independent of the Python-wrapping `bt` CLI. Engine commands run directly in the `bt-engine` binary.
+
+8. **Simple Redis key constant**: The cache key `SIGNAL_GROUPS_KEY` is a plain `&str` constant (`"signal_groups"`). No generic type parameter or PhantomData overhead — runtime checking is sufficient.
+
+9. **Hard fail on Redis errors**: All Redis connection and serialization errors use `anyhow::bail!` — no silent fallback. Cache problems are surfaced immediately.
+
+10. **Single Redis key, no TTL**: Only the `signal_groups` key is used. No TTL, no eviction, no connection pooling. Clean is explicit via `--clean` flag.
 
 ---
 
@@ -214,4 +259,5 @@ src/
 - **When discussing market data**: Use "resampled point" or "D1 candle", not "price bar" or "OHLC".
 - **When discussing risk rules**: Use "money management strategy" (MMS), not "position sizing" or "risk model".
 - **When discussing validation**: Reference the specific invariant by name (e.g. "same-instrument validation").
+- **When discussing cache**: Use "signal groups cache", "cache HIT/MISS". The cache is ephemeral — not a persistent store.
 - **When adding new entities**: Follow the pattern — struct + repository trait in domain, in-memory impl in infrastructure, fixtures in `domain::fixtures`.

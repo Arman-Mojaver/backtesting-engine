@@ -8,7 +8,6 @@ use crate::domain::operation_point::{
 };
 use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1, ResampledPointD1Repository};
 
-
 fn json_extract_str(json: &str, key: &str) -> String {
     let search = format!("\"{key}\":\"");
     let start = json
