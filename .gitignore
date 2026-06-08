@@ -29,3 +29,4 @@ debug
 .docker_password
 .DS_Store
 **/node_modules/
+.opencode/.tmp/
