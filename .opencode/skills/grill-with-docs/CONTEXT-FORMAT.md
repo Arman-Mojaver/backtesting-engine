@@ -1,17 +1,18 @@
-# CONTEXT.md Format
+# Glossary Format (for `domain-model.md`)
 
-A `CONTEXT.md` is a living glossary of the bounded context's domain language. It captures terms as they are resolved during a grilling session. Keep it close to the domain experts' language — no implementation details.
+The glossary in `.opencode/context/project-intelligence/domain-model.md` is a living dictionary of the project's domain language. It captures terms as they are resolved during a grilling session. Keep it close to the domain experts' language — no implementation details.
 
 ---
 
 ## Format
 
+Each glossary term in `domain-model.md`'s **Ubiquitous Language** section follows this pattern:
+
 ```markdown
-# [Context Name] Context
+| **Term** | Definition in domain language. Precise. |
+|-----------|------------------------------------------|
 
-> One sentence describing what this context is responsible for.
-
-## Glossary
+Or, for terms needing deeper explanation:
 
 ### [Term]
 
@@ -19,90 +20,74 @@ A `CONTEXT.md` is a living glossary of the bounded context's domain language. It
 
 **Distinguishes from**: [Other terms it might be confused with, and how]
 **Example**: [A concrete, realistic example]
-
-### [Term]
-...
 ```
 
 ---
 
 ## Worked Example
 
-The following is a real example from this project's KPI domain:
+The following is drawn from this project's `domain-model.md`:
 
 ```markdown
-# SF1000 Context
+### OperationPoint
 
-> Calculates the SF1000 KPI: a warranty claims rate per 1000 vehicles
-> for a given Months in Service (MIS) window.
+A single recorded trade operation (long or short) for a specific instrument.
+Contains the trade direction (result), take-profit and stop-loss levels,
+risk allocation, and the Money Management Strategy it belongs to.
 
-## Glossary
+**Distinguishes from**: ResampledPointD1 — an OperationPoint is a trade event;
+a ResampledPointD1 is a price observation.
+**Example**: Long EURUSD, result=+1, tp=10, sl=5, risk=0.01, mms_id=1, timestamp=1000.
 
-### Warranty Part
+### ResampledPointD1
 
-A single warranty claim event for a specific part on a specific vehicle,
-filed by a partner in a specific country.
+A daily resampled OHLCV candle for a single instrument. Captures the open,
+high, low, close prices, volume, and the order in which high/low occurred.
 
-**Distinguishes from**: Vehicle — one Vehicle may have many Warranty Parts.
-**Example**: VIN ABC123, partner P1, claimed in Germany on 2023-07-02, MIS 8.
+**Distinguishes from**: OperationPoint — ResampledPointD1 represents market data,
+not trade decisions.
+**Example**: EURUSD O=1.05 H=1.10 L=0.95 C=1.08 V=1000, ts=1000, HighLowOrder::HighFirst.
 
-### Vehicle
+### Instrument
 
-A unique vehicle identified by its VIN hash, derived by grouping all
-Warranty Parts that share the same VIN hash.
+A tradable forex pair or CFD (e.g. EURUSD, USDCAD). Every OperationPoint and
+ResampledPointD1 is tagged with an instrument string, and cross-instrument
+mixing is a validation error.
 
-**Distinguishes from**: Warranty Part — a Vehicle is a logical grouping,
-not a raw claim record.
+**Distinguishes from**: Underlying Asset — the Instrument is the trading pair
+identifier, not the economic asset behind it.
+**Example**: EURUSD, USDCAD.
 
-### MIS (Months In Service)
+### MMS (Money Management Strategy)
 
-The number of months between a vehicle's delivery date and its claim date.
-Determines which "age band" a vehicle falls into for the SF1000 calculation.
+A strategy configuration that defines how capital is allocated across operations.
+Each OperationPoint belongs to exactly one MMS, identified by
+`money_management_strategy_id`. Strategy creation requires selecting which MMS
+to use.
 
-**Distinguishes from**: Delay — MIS measures vehicle age; Delay measures
-reporting lag.
-**Example**: Delivered Jan 2023, claimed Jul 2023 → MIS = 6.
+**Distinguishes from**: Trading Strategy — MMS governs risk allocation;
+Trading Strategy governs entry/exit rules.
+**Example**: mms_id=1 uses 1% risk per trade; mms_id=2 uses 2%.
 
-### Delay
+### Indicator
 
-The average lag (in months) between a claim date and the date the data
-was uploaded into the system. Used to adjust the censoring date per vehicle.
+A technical analysis indicator (MACD, RSI) with its parameters, used as a
+signal source for strategy decisions. Indicators are identified by type and
+a unique identifier string.
 
-**Distinguishes from**: MIS — Delay is about data latency, not vehicle age.
+**Distinguishes from**: IndicatorParameters — Indicator is the entity with id/type/identifier;
+IndicatorParameters is its embedded configuration variant.
+**Example**: MACD(ema 26, ema 12), RSI(n=14, threshold=70/30).
 
-### Censoring Date
+### Validation
 
-The effective observation cutoff date for a vehicle. A vehicle's warranty
-claims after its censoring date are not yet observable and must be excluded.
+A pipeline of checks that ensures input data is consistent before strategy
+computation. Validates that: no repo is empty, all indicators are the same type,
+operation points and resampled points share the same instrument, all operations
+belong to the expected MMS, and timestamps are aligned.
 
-Computed as: max(current_date − delay, newest_claim_date_for_vehicle).
-
-**Distinguishes from**: Data Upload Date — the censoring date is a derived
-per-vehicle value; the upload date is a raw field on each Warranty Part.
-
-### Modified MIS
-
-The fractional MIS a vehicle has been exposed to, calculated from its
-censoring date and delivery date. Used to determine whether a vehicle is
-eligible to enter the reference population for a given MIS band.
-
-**Example**: Delivered Jan 2023, censoring date Aug 2023 → modified MIS ≈ 7.
-
-### Reference Population
-
-The set of vehicles that have been "on the road" long enough to have had
-the opportunity to generate a claim at a given MIS. A vehicle enters the
-reference population for MIS N when its modified MIS ≥ N.
-
-**Distinguishes from**: Dynamical Reference Population — the vehicles in
-the reference population that actually have a Warranty Part at exactly MIS N.
-
-### SF1000
-
-The KPI value: number of claims at MIS N per 1000 vehicles in the reference
-population for MIS N.
-
-Formula: (dynamical_reference_population_count / vehicle_reference_population_count) × 1000
-
-Computed per MIS value; the total SF1000 is the sum across all MIS values.
+**Distinguishes from**: Business Logic — validation gates inputs; strategy
+logic computes results.
+**Example**: If long_ops use EURUSD but resampled points use USDCAD,
+CombinedValidationError::InstrumentMismatch is returned.
 ```
