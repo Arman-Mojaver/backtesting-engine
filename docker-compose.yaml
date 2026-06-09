@@ -14,7 +14,7 @@ services:
       - cargo-git:/usr/local/cargo/git
       - target:/app/target
     working_dir: /app
-    command: cargo watch -i logs/ -x "build --bin bt-engine" -s "cp target/debug/bt-engine /usr/local/bin/bt-engine"
+    command: ["sleep", "infinity"]
 
   redis:
     image: redis:7-alpine
