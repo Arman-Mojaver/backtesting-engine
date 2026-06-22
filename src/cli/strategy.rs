@@ -75,6 +75,24 @@ pub fn build_strategy_cli() -> Command {
                 .about("Generate purely-random strategies")
                 .args(build_common_generate_args()),
         )
+        .subcommand(
+            Command::new("display")
+                .about("Display a strategy with its iteration table")
+                .arg(
+                    Arg::new("strategy_id")
+                        .required(true)
+                        .value_parser(value_parser!(i64))
+                        .help("Strategy ID to display"),
+                )
+                .arg(
+                    Arg::new("verbose")
+                        .short('v')
+                        .long("verbose")
+                        .required(false)
+                        .num_args(0)
+                        .help("Show result, tp, sl columns in iteration table"),
+                ),
+        )
 }
 
 pub enum StrategyCommand {
@@ -89,6 +107,10 @@ pub enum StrategyCommand {
         max_op_points: u32,
         seed: Option<u64>,
         parquet_dir: Option<String>,
+    },
+    Display {
+        strategy_id: i64,
+        verbose: bool,
     },
 }
 
@@ -126,6 +148,10 @@ pub fn parse_strategy(m: &ArgMatches) -> StrategyCommand {
                 .unwrap_or_else(|| "EURUSD".to_string()),
         },
         Some(("generate", sub_m)) => parse_generate(sub_m),
+        Some(("display", sub_m)) => StrategyCommand::Display {
+            strategy_id: *sub_m.get_one::<i64>("strategy_id").unwrap(),
+            verbose: sub_m.get_flag("verbose"),
+        },
         _ => unreachable!("invalid strategy command"),
     }
 }
@@ -180,6 +206,20 @@ impl StrategyCommand {
                 }
 
                 super::exec_engine_cli(&args)
+            }
+            StrategyCommand::Display {
+                strategy_id,
+                verbose,
+            } => {
+                let mut args = vec![
+                    "strategy".to_string(),
+                    "display".to_string(),
+                    strategy_id.to_string(),
+                ];
+                if verbose {
+                    args.push("--verbose".to_string());
+                }
+                super::exec_python_cli(&args)
             }
         }
     }
