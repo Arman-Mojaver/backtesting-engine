@@ -2,7 +2,7 @@ use std::fs;
 use std::fs::File;
 use std::sync::Arc;
 
-use arrow::array::{Float64Array, Int32Array, Int32Builder, Int64Array, ListBuilder};
+use arrow::array::{Decimal128Array, Int32Array, Int64Array, ListArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
@@ -20,16 +20,11 @@ pub struct ParquetStrategyRepository {
 }
 
 impl ParquetStrategyRepository {
-    /// Create a new repository rooted at `base_dir` (from `parquet_base_dir()`).
     pub fn new(base_dir: String) -> Self {
         ParquetStrategyRepository { base_dir }
     }
 
-    /// Write the given strategies to a parquet file at the correct partition path.
-    ///
-    /// The write is safe: data is first written to a `.tmp` file, then atomically
-    /// renamed over the final path. If the process crashes mid-write, the original
-    /// file is untouched.
+    /// Write strategies directly to a parquet file at the correct partition path.
     pub fn write(
         &self,
         instrument: &str,
@@ -42,10 +37,9 @@ impl ParquetStrategyRepository {
         );
         fs::create_dir_all(&partition_dir)?;
 
-        let final_path = format!("{}/strategies.parquet", partition_dir);
-        let tmp_path = format!("{}.tmp", final_path);
+        let path = format!("{}/strategies.parquet", partition_dir);
 
-        let file = File::create(&tmp_path)?;
+        let file = File::create(&path)?;
         let batch = build_record_batch(strategies)?;
         let schema = batch.schema();
 
@@ -57,19 +51,17 @@ impl ParquetStrategyRepository {
         writer.write(&batch)?;
         writer.close()?;
 
-        fs::rename(&tmp_path, &final_path)?;
         Ok(())
     }
 }
 
-/// Build a single `RecordBatch` from a slice of `Strategy` values.
 fn build_record_batch(strategies: &[Strategy]) -> anyhow::Result<RecordBatch> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("strategy_id", DataType::Int64, false),
         Field::new("indicator_id", DataType::Int32, false),
-        Field::new("annual_roi", DataType::Float64, false),
-        Field::new("max_draw_down", DataType::Float64, false),
-        Field::new("annual_operation_count", DataType::Float64, false),
+        Field::new("annual_roi", DataType::Decimal128(10, 2), false),
+        Field::new("max_draw_down", DataType::Decimal128(10, 2), false),
+        Field::new("annual_operation_count", DataType::Decimal128(10, 2), false),
         Field::new(
             "long_operation_point_ids",
             DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
@@ -84,12 +76,24 @@ fn build_record_batch(strategies: &[Strategy]) -> anyhow::Result<RecordBatch> {
 
     let strategy_ids: Int64Array = strategies.iter().map(|s| s.strategy_id).collect();
     let indicator_ids: Int32Array = strategies.iter().map(|s| s.indicator_id).collect();
-    let rois: Float64Array = strategies.iter().map(|s| s.annual_roi).collect();
-    let draw_downs: Float64Array = strategies.iter().map(|s| s.max_draw_down).collect();
-    let op_counts: Float64Array = strategies
-        .iter()
-        .map(|s| s.annual_operation_count)
-        .collect();
+    let rois = Decimal128Array::from_iter_values(
+        strategies
+            .iter()
+            .map(|s| (s.annual_roi * 100.0).round() as i128),
+    )
+    .with_precision_and_scale(10, 2)?;
+    let draw_downs = Decimal128Array::from_iter_values(
+        strategies
+            .iter()
+            .map(|s| (s.max_draw_down * 100.0).round() as i128),
+    )
+    .with_precision_and_scale(10, 2)?;
+    let op_counts = Decimal128Array::from_iter_values(
+        strategies
+            .iter()
+            .map(|s| (s.annual_operation_count * 100.0).round() as i128),
+    )
+    .with_precision_and_scale(10, 2)?;
 
     let long_ids = build_list_column(strategies, |s| &s.long_operation_point_ids);
     let short_ids = build_list_column(strategies, |s| &s.short_operation_point_ids);
@@ -108,23 +112,91 @@ fn build_record_batch(strategies: &[Strategy]) -> anyhow::Result<RecordBatch> {
     )?)
 }
 
-/// Build an Arrow `List<Int32>` column from a slice of strategies, extracting
-/// the ID list via the given closure.
-fn build_list_column(
-    strategies: &[Strategy],
-    extract: fn(&Strategy) -> &[i32],
-) -> arrow::array::ListArray {
-    let mut builder = ListBuilder::new(Int32Builder::new());
+fn build_list_column(strategies: &[Strategy], extract: fn(&Strategy) -> &[i32]) -> ListArray {
+    use arrow::array::Int32Builder;
+    let mut values_builder = Int32Builder::new();
+    let mut offsets: Vec<i32> = vec![0];
     for s in strategies {
         let ids = extract(s);
-        if ids.is_empty() {
-            builder.append(false);
-        } else {
-            builder.append(true);
-            for id in ids {
-                builder.values().append_value(*id);
-            }
+        for id in ids {
+            values_builder.append_value(*id);
         }
+        offsets.push(offsets.last().unwrap() + ids.len() as i32);
     }
-    builder.finish()
+    let values = values_builder.finish();
+    let offset_buf = arrow::buffer::OffsetBuffer::new(arrow::buffer::ScalarBuffer::from(offsets));
+    ListArray::new(
+        arrow::datatypes::Field::new("item", arrow::datatypes::DataType::Int32, true).into(),
+        offset_buf,
+        Arc::new(values),
+        None,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::strategy::Strategy;
+    use tempfile::TempDir;
+
+    fn sample_strategies() -> Vec<Strategy> {
+        vec![
+            Strategy {
+                strategy_id: 10001,
+                indicator_id: 2001,
+                annual_roi: 12.34,
+                max_draw_down: 25.67,
+                annual_operation_count: 15.2,
+                long_operation_point_ids: vec![1, 2, 3],
+                short_operation_point_ids: vec![4, 5],
+            },
+            Strategy {
+                strategy_id: 10002,
+                indicator_id: 2002,
+                annual_roi: -5.10,
+                max_draw_down: 35.0,
+                annual_operation_count: 12.8,
+                long_operation_point_ids: vec![6],
+                short_operation_point_ids: vec![7, 8],
+            },
+        ]
+    }
+
+    #[test]
+    fn write_does_not_error() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let strategies = sample_strategies();
+
+        repo.write("EURUSD", 390, &strategies).unwrap();
+
+        let parquet_path = tmp
+            .path()
+            .join("instrument=EURUSD/money_management_strategy_id=390/strategies.parquet");
+        assert!(parquet_path.exists());
+    }
+
+    #[test]
+    fn write_multiple_partitions() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let strategies = sample_strategies();
+
+        repo.write("EURUSD", 390, &strategies).unwrap();
+        repo.write("EURUSD", 391, &strategies).unwrap();
+        repo.write("USDJPY", 400, &strategies).unwrap();
+
+        assert!(tmp
+            .path()
+            .join("instrument=EURUSD/money_management_strategy_id=390/strategies.parquet")
+            .exists());
+        assert!(tmp
+            .path()
+            .join("instrument=EURUSD/money_management_strategy_id=391/strategies.parquet")
+            .exists());
+        assert!(tmp
+            .path()
+            .join("instrument=USDJPY/money_management_strategy_id=400/strategies.parquet")
+            .exists());
+    }
 }

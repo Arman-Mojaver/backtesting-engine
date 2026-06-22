@@ -24,3 +24,6 @@ serde_json = "1"
 rand = "0.10"
 arrow = "58"
 parquet = { version = "58", features = ["arrow"] }
+
+[dev-dependencies]
+tempfile = "3"

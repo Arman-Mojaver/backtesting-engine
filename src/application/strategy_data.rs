@@ -33,8 +33,8 @@ pub fn fetch_strategy_data(query: &StrategyQuery) -> anyhow::Result<StrategyData
 
     eprintln!("Connecting to {} ...", config.database);
 
-    let indicator_adapter = PgIndicatorAdapter::new(&conn_string)
-        .with_context(|| connection_diagnostics(&config))?;
+    let indicator_adapter =
+        PgIndicatorAdapter::new(&conn_string).with_context(|| connection_diagnostics(&config))?;
     let long_adapter = PgLongOperationPointAdapter::new(&conn_string)
         .with_context(|| connection_diagnostics(&config))?;
     let short_adapter = PgShortOperationPointAdapter::new(&conn_string)
