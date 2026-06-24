@@ -1,3 +1,4 @@
+mod bench;
 mod dev;
 mod indicator;
 mod money_management_strategy;
@@ -11,6 +12,7 @@ use clap::{ArgMatches, Command};
 use std::process::Command as ProcessCommand;
 
 pub enum AppCommand {
+    Bench(bench::BenchCommand),
     Dev(dev::DevCommand),
     Indicator(indicator::IndicatorCommand),
     MoneyManagementStrategy(money_management_strategy::MoneyManagementStrategyCommand),
@@ -26,6 +28,7 @@ pub fn build_cli() -> Command {
         .about("Backtesting Engine CLI")
         .subcommand_required(true)
         .arg_required_else_help(true)
+        .subcommand(bench::build_bench_cli())
         .subcommand(dev::build_dev_cli())
         .subcommand(indicator::build_indicator_cli())
         .subcommand(money_management_strategy::build_money_management_strategy_cli())
@@ -38,6 +41,7 @@ pub fn build_cli() -> Command {
 
 pub fn parse(matches: ArgMatches) -> AppCommand {
     match matches.subcommand() {
+        Some(("bench", m)) => AppCommand::Bench(bench::parse_bench(m)),
         Some(("dev", m)) => AppCommand::Dev(dev::parse_dev(m)),
         Some(("indicator", m)) => AppCommand::Indicator(indicator::parse_indicator(m)),
         Some(("money-management-strategy", m)) => AppCommand::MoneyManagementStrategy(
@@ -59,6 +63,7 @@ pub fn parse(matches: ArgMatches) -> AppCommand {
 impl AppCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
+            AppCommand::Bench(cmd) => cmd.execute(),
             AppCommand::Dev(cmd) => cmd.execute(),
             AppCommand::Indicator(cmd) => cmd.execute(),
             AppCommand::MoneyManagementStrategy(cmd) => cmd.execute(),
