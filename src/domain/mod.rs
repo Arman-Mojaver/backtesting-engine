@@ -1,3 +1,4 @@
+pub mod annual_operation_count;
 pub mod fixtures;
 pub mod indicator;
 pub mod operation_point;
