@@ -1,6 +1,7 @@
 pub mod annual_operation_count;
 pub mod fixtures;
 pub mod indicator;
+pub mod max_draw_down;
 pub mod operation_point;
 pub mod resampled_point;
 pub mod strategy;
