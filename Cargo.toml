@@ -24,6 +24,7 @@ serde_json = "1"
 rand = "0.10"
 arrow = "58"
 parquet = { version = "58", features = ["arrow"] }
+rustc-hash = "2.1.2"
 
 [dev-dependencies]
 tempfile = "3"
