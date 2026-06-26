@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/business | Priority: high | Version: 1.1 | Updated: 2026-06-04 -->
+<!-- Context: project-intelligence/business | Priority: high | Version: 1.2 | Updated: 2026-06-26 -->
 
 # Business Domain
 
@@ -37,16 +37,22 @@ Solution: A Rust engine that loads historical OHLCV candles, long/short trade re
 
 ## Current State
 
-The engine is in **early development**:
+The engine is in **active development**:
 - ✅ Domain model defined (entities, repository traits)
 - ✅ Five validation rules implemented and tested
 - ✅ In-memory repository adapters for testing
 - ✅ CLI structure (`ct` binary with dev, indicator, mms, operation-point, raw-point, resampled-point, strategy commands)
 - ✅ Engine CLI module extracted (`bt-engine` binary with its own command tree)
 - ✅ Environment/DB configuration
+- ✅ PostgreSQL adapters for indicators, operation points, resampled points
+- ✅ `Strategy` entity + `GlobalStrategyFilter` + `filter_strategies()`
+- ✅ Strategy generation (`create` from DB, `generate` synthetic) with partitioned parquet persistence
+- ✅ Application layer (`fetch_strategy_data`, `generate_random_strategies[_bulk]`)
+- ✅ Performance metric functions: `max_draw_down()`, `annual_operation_count()` (pure domain functions)
+- ✅ Redis signal-groups cache infrastructure (read/write/delete)
 - ⬜ Backtest execution logic (not yet implemented)
-- ⬜ Performance metrics calculation
-- ⬜ Persistent storage adapters (PostgreSQL)
+- ⬜ Wire real metrics into the strategy generator (currently random placeholders)
+- ⬜ Cache integration in the engine compute path
 - ⬜ API endpoints for running backtests
 
 ## Business Constraints

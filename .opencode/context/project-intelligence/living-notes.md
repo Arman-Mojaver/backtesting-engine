@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/notes | Priority: high | Version: 1.2 | Updated: 2026-06-08 -->
+<!-- Context: project-intelligence/notes | Priority: high | Version: 1.3 | Updated: 2026-06-26 -->
 
 # Living Notes
 
@@ -16,6 +16,9 @@
 |------|--------|----------|------------|
 | Server scaffold removed (no API layer) | HTTP endpoints must be built from scratch if needed | Low | Not needed until API consumers exist |
 | Engine module has no unit tests | Regression risk for engine CLI commands | Medium | Add tests for StrategyCommand::execute() and RedisCommand::execute() |
+| Strategy generator uses random placeholder metrics | `annual_roi`/`max_draw_down`/`annual_operation_count` on generated `Strategy` records are random, not computed from real operation points | High | Wire `max_draw_down()` and `annual_operation_count()` domain functions into the generator; compute real metrics from the operation points each strategy references |
+| `ct strategy display` forwards to Python CLI | Display logic lives in Backtesting-4.0, not the Rust engine | Medium | Port display logic to Rust engine if/when Python dependency is dropped |
+| PG adapter hand-parses indicator JSON | `json_extract_str`/`json_extract_i32` are panic-on-miss string scanners, not a real JSON parser | Medium | Replace with `serde_json` parsing once `serde` is on the hot path, or keep for performance |
 
 ### Technical Debt Details
 
@@ -29,11 +32,19 @@
 
 **Engine module has no unit tests**
 *Priority*: Medium
-*Impact*: `bt-engine` CLI commands (strategy create, redis check/clean) are untested at the integration level. Regression risk when adding new engine commands.
-*Root Cause*: Engine module is newly extracted (commits 1f646c9, b3930c6, 2026-06-08). Tests not yet written.
-*Proposed Solution*: Add integration tests that exercise engine commands against a real Redis instance (in CI) or use mocks for the Redis connection.
+*Impact*: `bt-engine` CLI commands (strategy create/generate, redis check/clean) are untested at the integration level. Regression risk when adding new engine commands.
+*Root Cause*: Engine module is newly extracted. Tests not yet written.
+*Proposed Solution*: Add integration tests that exercise engine commands against a real Redis/PG instance (in CI) or use mocks.
 *Effort*: Medium
 *Status*: Known
+
+**Random placeholder strategy metrics**
+*Priority*: High
+*Impact*: `generate_random_strategies` and `generate_random_strategies_bulk` fill `annual_roi`, `max_draw_down`, and `annual_operation_count` with random values rather than computing them from the operation points each strategy references. Downstream consumers reading parquet output see synthetic numbers.
+*Root Cause*: The pure metric functions (`max_draw_down()`, `annual_operation_count()`) exist in `domain/` but are not yet wired into the generator.
+*Proposed Solution*: For each generated strategy, gather its referenced operation points (by `long_operation_point_ids` / `short_operation_point_ids`) and compute real metrics via the domain functions.
+*Effort*: Medium
+*Status*: Known — next iteration
 
 ## Open Questions
 
@@ -42,11 +53,13 @@
 | Should engine commands be extended with strategy delete/update? | Arman Mojaver | Open | Add commands as needed |
 | Should the ct binary forward engine commands to bt-engine? | Arman Mojaver | Open | Currently separate binaries |
 | Should the engine's compute path check Redis cache before computing signal groups? | Arman Mojaver | Open | Follow-up after cache infrastructure is complete |
+| Should `ct strategy display` be ported to the Rust engine? | Arman Mojaver | Open | Currently forwards to Python `bt strategy display` |
+| Should strategy metrics be computed at generation time or lazily on read? | Arman Mojaver | Open | Decide when wiring real metrics into the generator |
 
 ### Open Question Details
 
 **Engine command scope**
-*Context*: Currently `bt-engine strategy` only has `create`. The `bt strategy` CLI group (Python) has more commands (delete, display_table, terminate, filters). Should these be duplicated in the Rust engine?
+*Context*: Currently `bt-engine strategy` has `create` and `generate`. The `ct strategy` CLI group (Python) has more commands (delete, display_table, terminate, filters). Should these be duplicated in the Rust engine?
 *Stakeholders*: Arman Mojaver
 *Options*:
 - Option A: Add all strategy commands to `bt-engine` (Rust-native)
@@ -64,21 +77,31 @@
 *Timeline*: Next iteration
 *Status*: Open
 
+**Strategy display ownership**
+*Context*: `ct strategy display <id> [-v]` forwards to the Python CLI (`bt strategy display`) via Docker exec. The Rust engine has no display command. If the Python dependency is dropped, display logic must be ported.
+*Stakeholders*: Arman Mojaver
+*Options*:
+- Option A: Port display (iteration table rendering) to the Rust engine
+- Option B: Keep display in Python indefinitely
+*Timeline*: No deadline
+*Status*: Open
+
 ## Known Issues
 
 | Issue | Severity | Workaround | Status |
 |-------|----------|------------|--------|
 | No integration tests for engine module | Medium | Manual verification | Known |
 | Redis connection hard-fails if container is down | Low | Start Redis container first | By design |
+| Generated strategy metrics are random, not computed | High | None yet — consumers see synthetic numbers | Known |
 
 ### Issue Details
 
 **Engine module has no integration tests**
 *Severity*: Medium
-*Impact*: `bt-engine` CLI commands (strategy create, redis check/clean) are untested at the integration level.
+*Impact*: `bt-engine` CLI commands (strategy create/generate, redis check/clean) are untested at the integration level.
 *Reproduction*: N/A -- missing test coverage.
 *Root Cause*: Engine module is newly extracted. Tests not yet written.
-*Fix Plan*: Add integration tests that spin up a Redis instance (or use a mock) and exercise the engine CLI flow.
+*Fix Plan*: Add integration tests that spin up a Redis/PG instance (or use a mock) and exercise the engine CLI flow.
 *Status*: Known
 
 **Redis connection hard-fail**
@@ -87,36 +110,53 @@
 *Root Cause*: By design — hard fail on connection error ensures cache problems are surfaced immediately rather than silently ignored.
 *Status*: By design (documented in decisions-log.md)
 
+**Generated strategy metrics are random**
+*Severity*: High
+*Impact*: `Strategy` records written to parquet carry random `annual_roi`/`max_draw_down`/`annual_operation_count` rather than values computed from their referenced operation points.
+*Root Cause*: The generator predates the metric functions; wiring is a follow-up.
+*Fix Plan*: Compute metrics via `max_draw_down()` and `annual_operation_count()` from each strategy's referenced operation points during generation.
+*Status*: Known — next iteration
+
 ## Insights & Lessons Learned
 
 ### What Works Well
 - **`build -> parse -> execute` pattern** -- Consistent across both binaries. Simple, predictable, easy to test.
 - **Pure validators as free functions** -- No object construction needed. Compose well in `combined_validation::validate_all()`.
+- **Pure metric functions** -- `max_draw_down()` and `annual_operation_count()` follow the same free-function-over-slices pattern as validators. Independently unit-tested, no I/O.
 - **Separate engine binary** -- Clear line between Python-wrapping CLI (`ct`) and native Rust engine (`bt-engine`).
-- **TypedKey pattern** -- Compile-time type safety for Redis keys prevents serialization drift. Zero runtime overhead.
+- **Application layer** -- `fetch_strategy_data()` + `generate_random_strategies*()` keep `engine/` CLI handlers thin and reusable across binaries.
+- **Parquet partitioning by (instrument, mms_id)** -- Mirrors the single-instrument/single-MMS backtest constraint; enables partition pruning.
+- **Reproducible generation** -- Optional `seed` on `generate_random_strategies_bulk` enables deterministic test fixtures.
 
 ### What Could Be Better
-- **Test coverage** -- No integration tests for the engine module yet. Should have tests for both `StrategyCommand::execute()` and `RedisCommand::execute()`.
+- **Test coverage** -- No integration tests for the engine module yet. Should have tests for `StrategyCommand::execute()` and `RedisCommand::execute()`.
 - **Cache integration** -- The Redis cache infrastructure exists but is not yet integrated into the engine's compute path. Requires a follow-up.
+- **Real metrics in generator** -- The pure metric functions exist but are not yet wired into the strategy generator. Generated strategies carry random metrics.
 
 ### Lessons Learned
 - **Keep context files in sync with code** -- After major refactors, update `.opencode/context/` immediately. Outdated context misleads AI agents.
 - **Delete dead code early** -- Removing the server scaffold saved ~1700 lines from Cargo.lock and eliminated misleading references to Actix-web dependencies.
 - **Simple key constants** -- Using a plain `&str` key constant kept a class of runtime bugs (wrong type written to wrong key) at zero performance cost.
+- **One file per metric** -- `max_draw_down.rs` and `annual_operation_count.rs` are each independently readable and testable. Avoids a monolithic `metrics.rs`.
 
 ## Patterns & Conventions
 
 ### Code Patterns Worth Preserving
 - **`build -> parse -> execute`** -- Every binary follows this 3-step pattern. Lives in `cli/mod.rs` and `engine/mod.rs`. Consistent, predictable.
 - **Pure validation functions** -- `src/domain/validation/*.rs`. Each is a free function taking slices, returning `Result`. Composable.
+- **Pure metric functions** -- `src/domain/max_draw_down.rs`, `src/domain/annual_operation_count.rs`. Free functions over `&[OperationPoint]`. Composable, unit-tested in-file.
+- **`GlobalStrategyFilter::default()`** -- Encodes the baseline quality bar in code (DD≤30%, ROI≥10%, ops≥10). Override per-call, default for convenience.
 - **Fixture module** -- `domain::fixtures.rs` provides reusable test data across all test modules. Single source of truth.
-- **`TypedKey<T>` pattern** -- Simple `&str` key constant with no generic overhead. Implemented in `src/infrastructure/redis.rs`.
+- **Application orchestration** -- `src/application/{name}.rs` — one file per use case. Keeps `engine/` thin.
+- **Parquet partition layout** -- `instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. Matches backtest constraints.
 
 ### Gotchas for Maintainers
 - **Two binaries to install** -- After changes to `engine/`, run `cargo install --path . --bin bt-engine --force`. After changes to `cli/`, run `cargo install --path . --bin ct --force`. Or use `--all` to install both.
-- **Python CLI dependency** -- `ct` commands (dev, indicator, etc.) forward to a Python Docker container. The `bt-engine` binary does NOT depend on Docker.
+- **Python CLI dependency** -- `ct` commands (dev, indicator, display, etc.) forward to a Python Docker container. The `bt-engine` binary does NOT depend on Docker.
 - **Redis must be running** -- Before using `ct redis` or `bt-engine redis`, ensure the Redis container is up: `docker compose up -d redis`.
 - **Redis is hardcoded** -- The Redis connection string `redis://redis:6379/0` is hardcoded, not configurable via environment. Works via Docker Compose network.
+- **Parquet base dir is environment-scoped** -- `/app/parquet_files/{env}/strategy`. Override with `--parquet-dir` when running outside Docker.
+- **Generated metrics are placeholders** -- Until the generator is wired to the metric functions, parquet output carries random metric values, not computed ones.
 
 ## Active Projects
 
@@ -124,7 +164,12 @@
 |---------|------|-------|----------|
 | Engine CLI extraction | Move Rust engine commands into standalone `bt-engine` binary | Arman Mojaver | Complete (2026-06-04) |
 | Redis signal groups cache | Add Redis-backed ephemeral cache for signal group computation | Arman Mojaver | Complete (2026-06-08) |
+| Strategy generation + parquet persistence | Generate `Strategy` records and write partitioned parquet files | Arman Mojaver | Complete (2026-06-08) |
+| Application layer | Orchestrate fetch → validate → generate → persist in `src/application/` | Arman Mojaver | Complete (2026-06-07) |
+| Domain metric functions | `max_draw_down()` + `annual_operation_count()` as pure domain functions | Arman Mojaver | Complete (2026-06-24) |
+| Strategy filtering | `filter_strategies()` + `GlobalStrategyFilter` with baseline defaults | Arman Mojaver | Complete (2026-06-22) |
 | Cache integration in compute path | Wire engine's compute logic to check Redis before computing | Arman Mojaver | Next iteration |
+| Wire real metrics into generator | Replace random placeholder metrics with computed `max_draw_down`/`annual_operation_count` | Arman Mojaver | Next iteration |
 
 ## Archive (Resolved Items)
 
@@ -145,6 +190,21 @@ Moved here for historical reference. Current team should refer to current notes 
 - **Resolution**: Redis container added to Docker Compose, `src/infrastructure/redis.rs` with typed cache, `bt-engine redis` and `ct redis` CLI commands. Cache infrastructure complete — compute path integration is a follow-up.
 - **Learnings**: Simple key constants prevent serialization bugs. Hard fail on connection errors is the right choice for this use case.
 
+### Resolved: Strategy generation + parquet persistence
+- **Resolved**: 2026-06-08
+- **Resolution**: `Strategy` entity, `strategy_generator` application module, `ParquetStrategyRepository`, and `strategy create`/`generate` CLI commands added. Pipeline now persists output to partitioned parquet files.
+- **Learnings**: Partitioning by (instrument, mms_id) mirrors backtest constraints and enables partition pruning. A DB-free generate mode enables reproducible test fixtures.
+
+### Resolved: Application layer introduction
+- **Resolved**: 2026-06-07
+- **Resolution**: `src/application/` module added with `strategy_data.rs` (fetch) and `strategy_generator.rs` (generate). `engine/` CLI handlers kept thin.
+- **Learnings**: A dedicated application layer keeps CLI handlers thin and use-case logic reusable across binaries.
+
+### Resolved: Domain metric functions
+- **Resolved**: 2026-06-24
+- **Resolution**: `max_draw_down()` and `annual_operation_count()` added as pure free functions over `&[OperationPoint]` in `src/domain/`. `filter_strategies()` + `GlobalStrategyFilter` added to `src/domain/strategy.rs`.
+- **Learnings**: One file per metric keeps each independently readable and testable. `GlobalStrategyFilter::default()` documents the baseline quality bar in code.
+
 ## Onboarding Checklist
 
 - [ ] Review known technical debt and understand impact
@@ -158,5 +218,4 @@ Moved here for historical reference. Current team should refer to current notes 
 
 - `decisions-log.md` - Past decisions that inform current state
 - `business-domain.md` - Business context for current priorities
-- `technical-domain.md` - Technical context for current state
 - `business-tech-bridge.md` - Context for current trade-offs
