@@ -26,8 +26,7 @@ pub fn generate_random_strategies(
 
     indicators
         .iter()
-        .enumerate()
-        .map(|(i, indicator)| {
+        .map(|indicator| {
             let annual_roi = round_to_2(rng.random_range(-20.0..50.0));
             let max_draw_down = round_to_2(rng.random_range(5.0..40.0));
             let annual_operation_count = rng.random_range(10..=20) as f64;
@@ -36,7 +35,6 @@ pub fn generate_random_strategies(
             let short_ids = pick_random_subset(&mut rng, &all_short_ids, 0.7..=1.0);
 
             Strategy {
-                strategy_id: i as i64 + 1,
                 indicator_id: indicator.id,
                 annual_roi,
                 max_draw_down,
@@ -84,7 +82,6 @@ pub fn generate_random_strategies_bulk(
         let money_management_strategy_id = partitions[idx].1;
 
         let strategy = Strategy {
-            strategy_id: i as i64 + 1,
             indicator_id: rng.random_range(1..=indicator_count as i32),
             annual_roi: round_to_2(rng.random_range(-30.0..60.0)),
             max_draw_down: round_to_2(rng.random_range(1.0..50.0)),

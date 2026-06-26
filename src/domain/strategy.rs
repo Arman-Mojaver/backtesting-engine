@@ -2,7 +2,6 @@ use std::default::Default;
 
 #[derive(Debug, Clone)]
 pub struct Strategy {
-    pub strategy_id: i64,
     pub indicator_id: i32,
     pub annual_roi: f64,
     pub max_draw_down: f64,
@@ -50,10 +49,9 @@ pub fn filter_strategies(
 mod tests {
     use super::*;
 
-    fn make_strategy(id: i64, roi: f64, dd: f64, ops: f64) -> Strategy {
+    fn make_strategy(indicator_id: i32, roi: f64, dd: f64, ops: f64) -> Strategy {
         Strategy {
-            strategy_id: id,
-            indicator_id: 1,
+            indicator_id,
             annual_roi: roi,
             max_draw_down: dd,
             annual_operation_count: ops,
@@ -117,8 +115,8 @@ mod tests {
         ];
         let filter = GlobalStrategyFilter::default();
         let result = filter_strategies(strategies, &filter);
-        let ids: Vec<i64> = result.iter().map(|s| s.strategy_id).collect();
+        let indicator_ids: Vec<i32> = result.iter().map(|s| s.indicator_id).collect();
         assert_eq!(result.len(), 2);
-        assert_eq!(ids, vec![1, 5]);
+        assert_eq!(indicator_ids, vec![1, 5]);
     }
 }
