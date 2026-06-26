@@ -72,6 +72,7 @@ fn build_record_batch(strategies: &[Strategy]) -> anyhow::Result<RecordBatch> {
             DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
             false,
         ),
+        Field::new("money_management_strategy_id", DataType::Int32, false),
     ]));
 
     let strategy_ids: Int64Array = strategies.iter().map(|s| s.strategy_id).collect();
@@ -94,6 +95,10 @@ fn build_record_batch(strategies: &[Strategy]) -> anyhow::Result<RecordBatch> {
             .map(|s| (s.annual_operation_count * 100.0).round() as i128),
     )
     .with_precision_and_scale(10, 2)?;
+    let mms_ids: Int32Array = strategies
+        .iter()
+        .map(|s| s.money_management_strategy_id)
+        .collect();
 
     let long_ids = build_list_column(strategies, |s| &s.long_operation_point_ids);
     let short_ids = build_list_column(strategies, |s| &s.short_operation_point_ids);
@@ -108,6 +113,7 @@ fn build_record_batch(strategies: &[Strategy]) -> anyhow::Result<RecordBatch> {
             Arc::new(op_counts),
             Arc::new(long_ids),
             Arc::new(short_ids),
+            Arc::new(mms_ids),
         ],
     )?)
 }
@@ -149,6 +155,7 @@ mod tests {
                 annual_operation_count: 15.2,
                 long_operation_point_ids: vec![1, 2, 3],
                 short_operation_point_ids: vec![4, 5],
+                money_management_strategy_id: 390,
             },
             Strategy {
                 strategy_id: 10002,
@@ -158,6 +165,7 @@ mod tests {
                 annual_operation_count: 12.8,
                 long_operation_point_ids: vec![6],
                 short_operation_point_ids: vec![7, 8],
+                money_management_strategy_id: 390,
             },
         ]
     }

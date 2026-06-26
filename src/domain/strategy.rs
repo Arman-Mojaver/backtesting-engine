@@ -9,6 +9,7 @@ pub struct Strategy {
     pub annual_operation_count: f64,
     pub long_operation_point_ids: Vec<i32>,
     pub short_operation_point_ids: Vec<i32>,
+    pub money_management_strategy_id: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +59,7 @@ mod tests {
             annual_operation_count: ops,
             long_operation_point_ids: vec![],
             short_operation_point_ids: vec![],
+            money_management_strategy_id: 1,
         }
     }
 

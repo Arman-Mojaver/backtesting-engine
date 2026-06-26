@@ -18,6 +18,7 @@ pub fn generate_random_strategies(
     indicators: &[Indicator],
     long_ops: &[OperationPoint],
     short_ops: &[OperationPoint],
+    money_management_strategy_id: i32,
 ) -> Vec<Strategy> {
     let mut rng = rand::rng();
     let all_long_ids: Vec<i32> = long_ops.iter().map(|op| op.id).collect();
@@ -42,6 +43,7 @@ pub fn generate_random_strategies(
                 annual_operation_count,
                 long_operation_point_ids: long_ids,
                 short_operation_point_ids: short_ids,
+                money_management_strategy_id,
             }
         })
         .collect()
@@ -79,6 +81,7 @@ pub fn generate_random_strategies_bulk(
 
     for i in 0..count {
         let idx = i % partitions.len();
+        let money_management_strategy_id = partitions[idx].1;
 
         let strategy = Strategy {
             strategy_id: i as i64 + 1,
@@ -88,6 +91,7 @@ pub fn generate_random_strategies_bulk(
             annual_operation_count: round_to_2(rng.random_range(5.0..365.0)),
             long_operation_point_ids: pick_random_subset(&mut rng, &available_op_ids, 0.0..=1.0),
             short_operation_point_ids: pick_random_subset(&mut rng, &available_op_ids, 0.0..=1.0),
+            money_management_strategy_id,
         };
 
         partition_strategies[idx].push(strategy);

@@ -180,6 +180,7 @@ impl StrategyCommand {
                     &data.indicators,
                     &data.long_operation_points,
                     &data.short_operation_points,
+                    money_management_strategy_id,
                 );
 
                 let env = resolve_environment();
