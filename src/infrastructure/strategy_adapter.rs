@@ -10,7 +10,6 @@ use arrow::datatypes::{DataType, Decimal128Type, Field, Int32Type, Int64Type, Sc
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
-use parquet::arrow::ProjectionMask;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 
@@ -66,8 +65,7 @@ impl ParquetStrategyRepository {
 
         let path = PathBuf::from(format!("{}/strategies.parquet", partition_dir));
 
-        let global_max = query_global_max_strategy_id(&self.base_dir)?;
-        let next_id = global_max + 1;
+        let next_id = self.find_max_strategy_id()? + 1;
 
         let mut new_rows: Vec<StrategyRow> = strategies
             .iter()
@@ -75,9 +73,8 @@ impl ParquetStrategyRepository {
             .map(|(i, s)| StrategyRow::from_strategy(s, next_id + i as i64))
             .collect();
 
-        // Append: read existing rows from the target partition (if any).
         let mut combined: Vec<StrategyRow> = if path.exists() {
-            read_rows_from_parquet(&path)?
+            self.read_rows(&path)?
         } else {
             Vec::new()
         };
@@ -97,68 +94,44 @@ impl ParquetStrategyRepository {
 
         Ok(())
     }
-}
 
-fn query_global_max_strategy_id(base_dir: &str) -> anyhow::Result<i64> {
-    Ok(collect_strategies_parquet_files(base_dir)
-        .into_iter()
-        .filter_map(|p| read_strategy_ids(&p).ok())
-        .flatten()
-        .max()
-        .unwrap_or(0))
-}
-
-fn read_strategy_ids(path: &Path) -> anyhow::Result<Vec<i64>> {
-    let file = File::open(path)?;
-    let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
-    let schema = builder.parquet_schema().clone();
-    let projection = ProjectionMask::leaves(&schema, [0usize]);
-    let mut reader = builder.with_projection(projection).build()?;
-    let mut ids = Vec::new();
-    while let Some(batch) = reader.next().transpose()? {
-        ids.extend(
-            batch
-                .column(0)
-                .as_primitive::<Int64Type>()
-                .values()
-                .iter()
-                .copied(),
-        );
-    }
-    Ok(ids)
-}
-
-/// Recursively collect every `strategies.parquet` file path under `base_dir`.
-fn collect_strategies_parquet_files(base_dir: &str) -> Vec<PathBuf> {
-    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-        let Ok(entries) = fs::read_dir(dir) else {
-            return;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                walk(&path, out);
-            } else if path.file_name().is_some_and(|n| n == "strategies.parquet") {
-                out.push(path);
+    fn find_max_strategy_id(&self) -> anyhow::Result<i64> {
+        let mut max_id: i64 = 0;
+        let mut dirs: Vec<PathBuf> = vec![PathBuf::from(&self.base_dir)];
+        while let Some(dir) = dirs.pop() {
+            for entry in fs::read_dir(&dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.is_dir() {
+                    dirs.push(path);
+                } else if path.file_name().is_some_and(|n| n == "strategies.parquet") {
+                    let file = File::open(&path)?;
+                    let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
+                    let mut reader = builder.build()?;
+                    while let Some(batch) = reader.next().transpose()? {
+                        for id in batch.column(0).as_primitive::<Int64Type>().values() {
+                            max_id = max_id.max(*id);
+                        }
+                    }
+                }
             }
         }
+        Ok(max_id)
     }
-    let mut out = Vec::new();
-    walk(Path::new(base_dir), &mut out);
-    out
+
+    fn read_rows(&self, path: &Path) -> anyhow::Result<Vec<StrategyRow>> {
+        let file = File::open(path)?;
+        let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
+        let mut reader = builder.build()?;
+
+        let mut rows: Vec<StrategyRow> = Vec::new();
+        while let Some(batch) = reader.next().transpose()? {
+            rows.extend(decode_batch(&batch)?);
+        }
+        Ok(rows)
+    }
 }
 
-fn read_rows_from_parquet(path: &Path) -> anyhow::Result<Vec<StrategyRow>> {
-    let file = File::open(path)?;
-    let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
-    let mut reader = builder.build()?;
-
-    let mut rows: Vec<StrategyRow> = Vec::new();
-    while let Some(batch) = reader.next().transpose()? {
-        rows.extend(decode_batch(&batch)?);
-    }
-    Ok(rows)
-}
 
 fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
     let schema = batch.schema();
@@ -210,7 +183,6 @@ fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
     Ok(out)
 }
 
-/// Decode element `i` of a `List<Int32>` column into `Vec<i32>`.
 fn decode_list_value(list: &ListArray, i: usize) -> Vec<i32> {
     let values = list.value(i);
     let prim: &PrimitiveArray<Int32Type> = values.as_primitive();
@@ -330,7 +302,7 @@ mod tests {
             "{}/instrument={}/money_management_strategy_id={}/strategies.parquet",
             repo.base_dir, instrument, mms_id
         ));
-        let rows = read_rows_from_parquet(&path).expect("read back");
+        let rows = repo.read_rows(&path).expect("read back");
         rows.into_iter().map(|r| r.strategy_id).collect()
     }
 
