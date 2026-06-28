@@ -40,7 +40,6 @@ pub fn filter_strategies(
         .filter(|s| {
             s.max_draw_down <= filter.max_draw_down_max
                 && s.annual_roi >= filter.min_annual_roi
-                && s.annual_operation_count >= filter.min_operation_count
         })
         .collect()
 }
@@ -97,26 +96,18 @@ mod tests {
     }
 
     #[test]
-    fn excludes_low_operation_count() {
-        let s = make_strategy(1, 0.15, 0.20, 2.0);
-        let filter = GlobalStrategyFilter::default();
-        let result = filter_strategies(vec![s], &filter);
-        assert!(result.is_empty());
-    }
-
-    #[test]
     fn filters_mixed_bag() {
         let strategies = vec![
             make_strategy(1, 0.15, 0.20, 10.0), // passes
             make_strategy(2, 0.05, 0.20, 10.0), // low ROI
             make_strategy(3, 0.15, 0.50, 10.0), // high DD
-            make_strategy(4, 0.15, 0.20, 3.0),  // low ops
+            make_strategy(4, 0.15, 0.20, 3.0),  // passes
             make_strategy(5, 0.25, 0.10, 20.0), // passes
         ];
         let filter = GlobalStrategyFilter::default();
         let result = filter_strategies(strategies, &filter);
         let indicator_ids: Vec<i32> = result.iter().map(|s| s.indicator_id).collect();
-        assert_eq!(result.len(), 2);
-        assert_eq!(indicator_ids, vec![1, 5]);
+        assert_eq!(result.len(), 3);
+        assert_eq!(indicator_ids, vec![1, 4, 5]);
     }
 }
