@@ -1,6 +1,7 @@
 use crate::application::strategy_data::{fetch_strategy_data, StrategyQuery};
 use crate::application::strategy_generator::generate_random_strategies;
 use crate::config::environment::parquet_base_dir;
+use crate::domain::operation_point::OperationPoints;
 use crate::domain::validation::combined_validation::{validate_all, CombinedValidationError};
 use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
 
@@ -25,11 +26,19 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
     )
     .map_err(|e: CombinedValidationError| anyhow::anyhow!("Validation failed: {:?}", e))?;
 
+    let operation_points = OperationPoints{
+        long_operation_points: data.long_operation_points,
+        short_operation_points:data.short_operation_points,
+    };
+
+    let (start_timestamp, end_timestamp) = operation_points.start_end_timestamps();
+    eprintln!("start_timestamp {}:, end_timestamp: {}.", start_timestamp, end_timestamp);
+
     eprintln!("Generating random strategies ...");
     let strategies = generate_random_strategies(
         &data.indicators,
-        &data.long_operation_points,
-        &data.short_operation_points,
+        &operation_points.long_operation_points,
+        &operation_points.short_operation_points,
         money_management_strategy_id,
     );
 
