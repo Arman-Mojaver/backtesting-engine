@@ -4,5 +4,6 @@ pub mod indicator;
 pub mod max_draw_down;
 pub mod operation_point;
 pub mod resampled_point;
+pub mod signal_group;
 pub mod strategy;
 pub mod validation;

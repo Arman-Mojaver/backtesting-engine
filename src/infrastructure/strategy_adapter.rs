@@ -132,7 +132,6 @@ impl ParquetStrategyRepository {
     }
 }
 
-
 fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
     let schema = batch.schema();
     let col = |name: &str| -> anyhow::Result<usize> {

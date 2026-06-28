@@ -1,10 +1,7 @@
-use std::collections::HashMap;
+use crate::domain::signal_group::SignalGroup;
+use crate::infrastructure::redis::{delete_signal_groups, read_signal_groups, write_signal_groups};
 
 use clap::{Arg, ArgAction, ArgMatches, Command};
-
-use crate::infrastructure::redis::{
-    delete_signal_groups, read_signal_groups, write_signal_groups, SignalGroup, SignalGroups,
-};
 
 const REDIS_URL: &str = "redis://redis:6379/0";
 
@@ -66,7 +63,7 @@ impl RedisCommand {
                             .map_err(|e| anyhow::anyhow!("Serialization error: {}", e))?;
                         println!("{}", json);
                     } else {
-                        let mut ids: Vec<_> = groups.keys().collect();
+                        let mut ids: Vec<_> = groups.iter().map(|g| g.indicator_id).collect();
                         ids.sort();
                         println!("Cached indicator IDs: {:?}", ids);
                     }
@@ -99,28 +96,22 @@ fn connect() -> anyhow::Result<redis::Connection> {
     Ok(conn)
 }
 
-fn sample_signal_groups() -> SignalGroups {
-    HashMap::from([
-        (
-            1,
-            SignalGroup {
-                long_signals: vec![1704067200, 1704153600, 1704240000, 1704326400, 1704412800],
-                short_signals: vec![1704499200, 1704585600, 1704672000],
-            },
-        ),
-        (
-            2,
-            SignalGroup {
-                long_signals: vec![1704067200, 1704240000, 1704412800],
-                short_signals: vec![1704153600, 1704326400, 1704499200, 1704585600],
-            },
-        ),
-        (
-            3,
-            SignalGroup {
-                long_signals: vec![1704067200],
-                short_signals: vec![],
-            },
-        ),
-    ])
+fn sample_signal_groups() -> Vec<SignalGroup> {
+    vec![
+        SignalGroup {
+            indicator_id: 1,
+            long_signals: vec![1704067200, 1704153600, 1704240000, 1704326400, 1704412800],
+            short_signals: vec![1704499200, 1704585600, 1704672000],
+        },
+        SignalGroup {
+            indicator_id: 2,
+            long_signals: vec![1704067200, 1704240000, 1704412800],
+            short_signals: vec![1704153600, 1704326400, 1704499200, 1704585600],
+        },
+        SignalGroup {
+            indicator_id: 3,
+            long_signals: vec![1704067200],
+            short_signals: vec![],
+        },
+    ]
 }
