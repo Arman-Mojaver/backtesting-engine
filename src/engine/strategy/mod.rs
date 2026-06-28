@@ -1,12 +1,9 @@
+mod create;
+mod generate;
+
 use clap::{value_parser, Arg, ArgMatches, Command};
 
-use crate::application::strategy_data::{fetch_strategy_data, StrategyQuery};
-use crate::application::strategy_generator::{
-    generate_random_strategies, generate_random_strategies_bulk,
-};
-use crate::config::environment::{parquet_base_dir, Environment};
-use crate::domain::validation::combined_validation::{validate_all, CombinedValidationError};
-use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
+use crate::config::environment::Environment;
 
 pub enum StrategyCommand {
     Create {
@@ -141,7 +138,7 @@ pub fn parse_strategy(m: &ArgMatches) -> StrategyCommand {
     }
 }
 
-fn resolve_environment() -> Environment {
+pub fn resolve_environment() -> Environment {
     std::env::var("ENVIRONMENT")
         .unwrap_or_else(|_| "development".to_string())
         .parse()
@@ -154,50 +151,7 @@ impl StrategyCommand {
             StrategyCommand::Create {
                 money_management_strategy_id,
                 instrument,
-            } => {
-                let query = StrategyQuery {
-                    money_management_strategy_id,
-                    instrument: instrument.clone(),
-                };
-
-                eprintln!("Fetching data from database ...");
-                let data = fetch_strategy_data(&query)?;
-
-                eprintln!("Validating data ...");
-                validate_all(
-                    &data.long_operation_points,
-                    &data.short_operation_points,
-                    &data.indicators,
-                    &data.resampled_points,
-                    money_management_strategy_id,
-                )
-                .map_err(|e: CombinedValidationError| {
-                    anyhow::anyhow!("Validation failed: {:?}", e)
-                })?;
-
-                eprintln!("Generating random strategies ...");
-                let strategies = generate_random_strategies(
-                    &data.indicators,
-                    &data.long_operation_points,
-                    &data.short_operation_points,
-                    money_management_strategy_id,
-                );
-
-                let env = resolve_environment();
-                let base_dir = parquet_base_dir(env);
-                let repo = ParquetStrategyRepository::new(base_dir.clone());
-
-                eprintln!("Writing {} strategies to parquet ...", strategies.len());
-                repo.write(&instrument, money_management_strategy_id, &strategies)?;
-
-                eprintln!(
-                    "Done. Wrote {} strategies for {} (mms_id={})",
-                    strategies.len(),
-                    instrument,
-                    money_management_strategy_id,
-                );
-                Ok(())
-            }
+            } => create::execute(money_management_strategy_id, instrument),
             StrategyCommand::Generate {
                 count,
                 instruments,
@@ -205,44 +159,14 @@ impl StrategyCommand {
                 max_op_points,
                 seed,
                 parquet_dir,
-            } => {
-                let base_dir = match parquet_dir {
-                    Some(dir) => dir,
-                    None => parquet_base_dir(resolve_environment()),
-                };
-                let repo = ParquetStrategyRepository::new(base_dir.clone());
-
-                let partitions = generate_random_strategies_bulk(
-                    count as usize,
-                    &instruments,
-                    mms_count as usize,
-                    max_op_points as usize,
-                    seed,
-                );
-
-                let total_strategies: usize = partitions.iter().map(|(_, _, s)| s.len()).sum();
-                let total_partitions = partitions.len();
-
-                eprintln!(
-                    "Generating {} strategies across {} partitions ...",
-                    total_strategies, total_partitions,
-                );
-
-                for (instrument, mms_id, strategies) in &partitions {
-                    repo.write(instrument, *mms_id, strategies)?;
-                }
-
-                println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                println!("  Generate complete");
-                println!("  Base dir:       {}", base_dir);
-                println!("  Total rows:     {}", total_strategies);
-                println!("  Partitions:     {}", total_partitions);
-                for (inst, mms, strs) in &partitions {
-                    println!("    {}/mms_id={}: {} rows", inst, mms, strs.len());
-                }
-                println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                Ok(())
-            }
+            } => generate::execute(
+                count,
+                instruments,
+                mms_count,
+                max_op_points,
+                seed,
+                parquet_dir,
+            ),
         }
     }
 }
