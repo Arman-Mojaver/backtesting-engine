@@ -38,8 +38,7 @@ pub fn filter_strategies(
     strategies
         .into_iter()
         .filter(|s| {
-            s.max_draw_down <= filter.max_draw_down_max
-                && s.annual_roi >= filter.min_annual_roi
+            s.max_draw_down <= filter.max_draw_down_max && s.annual_roi >= filter.min_annual_roi
         })
         .collect()
 }

@@ -1,11 +1,7 @@
 const SECONDS_PER_DAY: f64 = 86400.0;
 const DAYS_PER_YEAR: f64 = 365.25;
 
-pub fn annual_operation_count(
-    total_count: usize,
-    start_timestamp: i32,
-    end_timestamp: i32,
-) -> f64 {
+pub fn annual_operation_count(total_count: usize, start_timestamp: i32, end_timestamp: i32) -> f64 {
     if total_count == 0 {
         return 0.0;
     }

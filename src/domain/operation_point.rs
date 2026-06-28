@@ -32,6 +32,25 @@ impl OperationPoints {
             .map(|p| (p.timestamp, p))
             .collect()
     }
+
+    /// Returns the (start_timestamp, end_timestamp) range for long operation points.
+    /// Both `long_operation_points` and `short_operation_points` share identical timestamps.
+    pub fn start_end_timestamps(&self) -> (i32, i32) {
+        let timestamps: Vec<i32> = self
+            .long_operation_points
+            .iter()
+            .map(|p| p.timestamp)
+            .collect();
+        let start = *timestamps
+            .iter()
+            .min()
+            .expect("long_operation_points should never be empty");
+        let end = *timestamps
+            .iter()
+            .max()
+            .expect("long_operation_points should never be empty");
+        (start, end)
+    }
 }
 
 pub trait LongOperationPointRepository {
@@ -127,5 +146,31 @@ mod tests {
         assert_eq!(short_map.len(), 1);
         assert_eq!(long_map[&100].id, 1);
         assert_eq!(short_map[&100].id, 10);
+    }
+
+    #[test]
+    fn start_end_timestamps_unsorted() {
+        let ops = OperationPoints {
+            long_operation_points: vec![
+                make_point(300, 1, 1),
+                make_point(100, 2, 1),
+                make_point(200, 3, 1),
+            ],
+            short_operation_points: vec![],
+        };
+        let (start, end) = ops.start_end_timestamps();
+        assert_eq!(start, 100);
+        assert_eq!(end, 300);
+    }
+
+    #[test]
+    fn start_end_timestamps_single_point() {
+        let ops = OperationPoints {
+            long_operation_points: vec![make_point(42, 1, 1)],
+            short_operation_points: vec![],
+        };
+        let (start, end) = ops.start_end_timestamps();
+        assert_eq!(start, 42);
+        assert_eq!(end, 42);
     }
 }
