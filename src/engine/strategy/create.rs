@@ -1,3 +1,4 @@
+use crate::application::signal_generator::create_signals;
 use crate::application::strategy_data::{fetch_strategy_data, StrategyQuery};
 use crate::application::strategy_generator::generate_random_strategies;
 use crate::config::environment::parquet_base_dir;
@@ -26,13 +27,27 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
     )
     .map_err(|e: CombinedValidationError| anyhow::anyhow!("Validation failed: {:?}", e))?;
 
-    let operation_points = OperationPoints{
+    let operation_points = OperationPoints {
         long_operation_points: data.long_operation_points,
-        short_operation_points:data.short_operation_points,
+        short_operation_points: data.short_operation_points,
     };
 
     let (start_timestamp, end_timestamp) = operation_points.start_end_timestamps();
-    eprintln!("start_timestamp {}:, end_timestamp: {}.", start_timestamp, end_timestamp);
+    eprintln!(
+        "start_timestamp {}:, end_timestamp: {}.",
+        start_timestamp, end_timestamp
+    );
+
+    eprintln!("Creating signals ...");
+    let signal_groups = create_signals(&data.indicators, &data.resampled_points, 100);
+    eprintln!(
+        "Signal Groups {} signal groups (total operations: {})",
+        signal_groups.len(),
+        signal_groups
+            .iter()
+            .map(|sg| sg.operation_count())
+            .sum::<usize>()
+    );
 
     eprintln!("Generating random strategies ...");
     let strategies = generate_random_strategies(
