@@ -24,7 +24,7 @@ pub fn create_signals(
     let len = resampled_points.len();
     if len > 400 {
         for rp in resampled_points.iter().skip(200).take(len - 400) {
-            eligible.push(rp.timestamp as i64);
+            eligible.push(rp.timestamp);
         }
     }
 

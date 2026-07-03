@@ -1,7 +1,7 @@
 const SECONDS_PER_DAY: f64 = 86400.0;
 const DAYS_PER_YEAR: f64 = 365.25;
 
-pub fn annual_operation_count(total_count: usize, start_timestamp: i32, end_timestamp: i32) -> f64 {
+pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_timestamp: i64) -> f64 {
     if total_count == 0 {
         return 0.0;
     }
@@ -19,8 +19,8 @@ pub fn annual_operation_count(total_count: usize, start_timestamp: i32, end_time
 mod tests {
     use super::*;
 
-    const ONE_YEAR_SECS: i32 = 365 * 86400;
-    const TWO_YEARS_SECS: i32 = 730 * 86400;
+    const ONE_YEAR_SECS: i64 = 365 * 86400;
+    const TWO_YEARS_SECS: i64 = 730 * 86400;
 
     #[test]
     fn zero_count_returns_zero() {
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn near_zero_rounds_to_small_nonzero() {
-        let ten_years_secs: i32 = 3650 * 86400;
+        let ten_years_secs: i64 = 3650 * 86400;
         let result = annual_operation_count(1, 0, ten_years_secs);
         assert_eq!(result, 0.10);
     }

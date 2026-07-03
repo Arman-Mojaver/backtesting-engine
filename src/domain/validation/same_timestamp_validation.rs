@@ -12,9 +12,9 @@ pub fn validate_timestamps_match(
     long: &[OperationPoint],
     short: &[OperationPoint],
 ) -> Result<(), ValidationError> {
-    let resampled_timestamps: HashSet<i32> = resampled.iter().map(|rp| rp.timestamp).collect();
-    let long_timestamps: HashSet<i32> = long.iter().map(|op| op.timestamp).collect();
-    let short_timestamps: HashSet<i32> = short.iter().map(|op| op.timestamp).collect();
+    let resampled_timestamps: HashSet<i64> = resampled.iter().map(|rp| rp.timestamp).collect();
+    let long_timestamps: HashSet<i64> = long.iter().map(|op| op.timestamp).collect();
+    let short_timestamps: HashSet<i64> = short.iter().map(|op| op.timestamp).collect();
 
     if long_timestamps != short_timestamps || !long_timestamps.is_subset(&resampled_timestamps) {
         return Err(ValidationError::TimestampMismatch);

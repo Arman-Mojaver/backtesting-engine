@@ -14,7 +14,7 @@ pub struct ResampledPointD1 {
     pub low: f64,
     pub close: f64,
     pub volume: i32,
-    pub timestamp: i32,
+    pub timestamp: i64,
     pub high_low_order: HighLowOrder,
 }
 

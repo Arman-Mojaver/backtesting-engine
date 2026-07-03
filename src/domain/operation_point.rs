@@ -9,7 +9,7 @@ pub struct OperationPoint {
     pub money_management_strategy_id: i32,
     pub id: i32,
     pub sl: i32,
-    pub timestamp: i32,
+    pub timestamp: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -19,14 +19,14 @@ pub struct OperationPoints {
 }
 
 impl OperationPoints {
-    pub fn long_points_by_timestamp(&self) -> FxHashMap<i32, &OperationPoint> {
+    pub fn long_points_by_timestamp(&self) -> FxHashMap<i64, &OperationPoint> {
         self.long_operation_points
             .iter()
             .map(|p| (p.timestamp, p))
             .collect()
     }
 
-    pub fn short_points_by_timestamp(&self) -> FxHashMap<i32, &OperationPoint> {
+    pub fn short_points_by_timestamp(&self) -> FxHashMap<i64, &OperationPoint> {
         self.short_operation_points
             .iter()
             .map(|p| (p.timestamp, p))
@@ -35,8 +35,8 @@ impl OperationPoints {
 
     /// Returns the (start_timestamp, end_timestamp) range for long operation points.
     /// Both `long_operation_points` and `short_operation_points` share identical timestamps.
-    pub fn start_end_timestamps(&self) -> (i32, i32) {
-        let timestamps: Vec<i32> = self
+    pub fn start_end_timestamps(&self) -> (i64, i64) {
+        let timestamps: Vec<i64> = self
             .long_operation_points
             .iter()
             .map(|p| p.timestamp)
@@ -67,7 +67,7 @@ pub trait ShortOperationPointRepository {
 mod tests {
     use super::*;
 
-    fn make_point(timestamp: i32, id: i32, result: i32) -> OperationPoint {
+    fn make_point(timestamp: i64, id: i32, result: i32) -> OperationPoint {
         OperationPoint {
             instrument: "EURUSD".into(),
             result,
