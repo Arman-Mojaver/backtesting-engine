@@ -3,6 +3,8 @@ use crate::application::strategy_data::{fetch_strategy_data, StrategyQuery};
 use crate::application::strategy_generator::generate_random_strategies;
 use crate::config::environment::parquet_base_dir;
 use crate::domain::operation_point::OperationPoints;
+use crate::domain::signal_group::filter_signal_groups_by_annual_ops;
+use crate::domain::strategy::GlobalStrategyFilter;
 use crate::domain::validation::combined_validation::{validate_all, CombinedValidationError};
 use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
 
@@ -47,6 +49,19 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
             .iter()
             .map(|sg| sg.operation_count())
             .sum::<usize>()
+    );
+
+    let global_strategy_filter = GlobalStrategyFilter::default();
+    let signal_groups = filter_signal_groups_by_annual_ops(
+        signal_groups,
+        global_strategy_filter.min_operation_count,
+        start_timestamp,
+        end_timestamp,
+    );
+    eprintln!(
+        "After annual operation count filter (min {}): {} signal groups",
+        global_strategy_filter.min_operation_count,
+        signal_groups.len()
     );
 
     eprintln!("Generating random strategies ...");
