@@ -4,7 +4,7 @@ use crate::application::strategy_generator::generate_random_strategies;
 use crate::config::environment::parquet_base_dir;
 use crate::domain::operation_point::OperationPoints;
 use crate::domain::signal_group::filter_signal_groups_by_annual_ops;
-use crate::domain::strategy::GlobalStrategyFilter;
+use crate::domain::strategy::{filter_strategies, GlobalStrategyFilter};
 use crate::domain::validation::combined_validation::{validate_all, CombinedValidationError};
 use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
 
@@ -70,6 +70,12 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
         &operation_points.long_operation_points,
         &operation_points.short_operation_points,
         money_management_strategy_id,
+    );
+
+    let strategies = filter_strategies(strategies, &global_strategy_filter);
+    eprintln!(
+        "After strategy filter (min annual ROI {}, max drawdown {}): {} strategies",
+        global_strategy_filter.min_annual_roi, global_strategy_filter.max_draw_down_max, strategies.len()
     );
 
     let env = resolve_environment();
