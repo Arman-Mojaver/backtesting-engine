@@ -24,8 +24,9 @@ pub fn filter_signal_groups_by_annual_ops(
     signal_groups
         .into_iter()
         .filter(|sg| {
-            annual_operation_count(sg.operation_count(), start_timestamp, end_timestamp)
-                >= min_operation_count
+            sg.operation_count() > 0
+                && annual_operation_count(sg.operation_count(), start_timestamp, end_timestamp)
+                    >= min_operation_count
         })
         .collect()
 }
@@ -41,14 +42,6 @@ mod tests {
             indicator_id: 1,
             long_signals: vec![0; long_count],
             short_signals: vec![0; short_count],
-        }
-    }
-
-    fn make_group_with_timestamps(longs: Vec<i64>, shorts: Vec<i64>) -> SignalGroup {
-        SignalGroup {
-            indicator_id: 1,
-            long_signals: longs,
-            short_signals: shorts,
         }
     }
 
