@@ -10,7 +10,7 @@ pub fn max_draw_down(operation_points: &[&OperationPoint]) -> f64 {
     let mut max_dd: f64 = 0.0;
 
     for point in operation_points {
-        let contribution = point.result as f64 * point.risk / point.sl as f64;
+        let contribution = cummax * point.result as f64 * (point.risk / point.sl as f64);
         cumsum += contribution;
         cummax = cummax.max(cumsum);
         let draw_down = (cummax - cumsum) / cummax;
@@ -24,11 +24,11 @@ pub fn max_draw_down(operation_points: &[&OperationPoint]) -> f64 {
 mod tests {
     use super::*;
 
-    fn make_op(result: i32, risk: f64, sl: i32) -> OperationPoint {
+    fn make_op(result: i32, tp: i32, sl: i32, risk: f64) -> OperationPoint {
         OperationPoint {
             instrument: "EURUSD".into(),
             result,
-            tp: 10,
+            tp,
             risk,
             money_management_strategy_id: 1,
             id: 1,
@@ -37,168 +37,138 @@ mod tests {
         }
     }
 
+    fn dd(ops: &[OperationPoint]) -> f64 {
+        let refs: Vec<&OperationPoint> = ops.iter().collect();
+        max_draw_down(&refs)
+    }
+
     #[test]
     fn empty_ops_returns_zero() {
         assert_eq!(max_draw_down(&[]), 0.0);
     }
 
     #[test]
-    fn single_winning_trade_returns_zero() {
-        // contribution = 1 * 0.01 / 5 = 0.002
-        // cumsum = 1.002, cummax = 1.002, dd = 0
-        let ops = vec![make_op(1, 0.01, 5)];
-        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.0);
+    fn only_positive_results_returns_zero_1() {
+        let ops = [make_op(20, 20, 20, 0.02)];
+        assert_eq!(dd(&ops), 0.0);
     }
 
     #[test]
-    fn single_losing_trade_returns_drawdown() {
-        // contribution = -1 * 0.02 / 4 = -0.005
-        // cumsum = 0.995, cummax = 1.0, dd = (1.0 - 0.995) / 1.0 = 0.5%
-        let ops = vec![make_op(-1, 0.02, 4)];
-        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.5);
-    }
-
-    #[test]
-    fn peak_then_drawdown_captures_deepest_trough() {
-        // trade 1: contribution = 1 * 0.01 / 5 = 0.002
-        //          cumsum = 1.002, cummax = 1.002, dd = 0
-        // trade 2: contribution = -5 * 0.01 / 5 = -0.01
-        //          cumsum = 0.992, cummax = 1.002, dd = (1.002 - 0.992) / 1.002 ≈ 1.0%
-        let ops = vec![make_op(1, 0.01, 5), make_op(-5, 0.01, 5)];
-        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 1.0).abs() < 0.1);
-    }
-
-    #[test]
-    fn recovery_to_new_peak_keeps_earlier_max_dd() {
-        // trade 1: contribution = -1 * 0.05 / 5 = -0.01
-        //           cumsum = 0.99, cummax = 1.0, dd = (1.0 - 0.99) / 1.0 = 1.0%
-        // trade 2: contribution = 3 * 0.05 / 5 = 0.03
-        //           cumsum = 1.02, cummax = 1.02, dd = 0
-        // max dd stays at 1.0%
-        let ops = vec![make_op(-1, 0.05, 5), make_op(3, 0.05, 5)];
-        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 1.0).abs() < 0.1);
-    }
-
-    #[test]
-    fn second_drawdown_deeper_than_first() {
-        // trade 1: contribution = 1 * 0.5 / 5 = 0.1
-        //           cumsum = 1.1, cummax = 1.1, dd = 0
-        // trade 2: contribution = -1 * 0.5 / 5 = -0.1
-        //           cumsum = 1.0, cummax = 1.1, dd = (1.1 - 1.0) / 1.1 ≈ 9.09%
-        // trade 3: contribution = 1 * 0.5 / 5 = 0.1
-        //           cumsum = 1.1, cummax = 1.1, dd = 0
-        // trade 4: contribution = -2 * 0.5 / 5 = -0.2
-        //           cumsum = 0.9, cummax = 1.1, dd = (1.1 - 0.9) / 1.1 ≈ 18.18% (deeper)
-        let ops = vec![
-            make_op(1, 0.5, 5),
-            make_op(-1, 0.5, 5),
-            make_op(1, 0.5, 5),
-            make_op(-2, 0.5, 5),
+    fn only_positive_results_returns_zero_2() {
+        let ops = [
+            make_op(20, 20, 20, 0.02),
+            make_op(30, 30, 20, 0.02),
+            make_op(40, 40, 20, 0.02),
         ];
-        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 18.18).abs() < 0.1);
+        assert_eq!(dd(&ops), 0.0);
     }
 
     #[test]
-    fn higher_peak_then_deeper_drawdown() {
-        // trade 1: contribution = 1 * 0.5 / 5 = 0.1
-        //           cumsum = 1.1, cummax = 1.1, dd = 0
-        // trade 2: contribution = -1 * 0.5 / 5 = -0.1
-        //           cumsum = 1.0, cummax = 1.1, dd = (1.1 - 1.0) / 1.1 ≈ 9.09%
-        // trade 3: contribution = 3 * 0.5 / 5 = 0.3
-        //           cumsum = 1.3, cummax = 1.3, dd = 0 (higher peak)
-        // trade 4: contribution = -4 * 0.5 / 5 = -0.4
-        //           cumsum = 0.9, cummax = 1.3, dd = (1.3 - 0.9) / 1.3 ≈ 30.77%
-        let ops = vec![
-            make_op(1, 0.5, 5),
-            make_op(-1, 0.5, 5),
-            make_op(3, 0.5, 5),
-            make_op(-4, 0.5, 5),
+    fn one_negative_result() {
+        // cumsum = 1 + 1*(-20)*(0.02/20) = 0.98; dd = (1-0.98)/1 = 2.0%
+        let ops = [make_op(-20, 30, 20, 0.02)];
+        assert_eq!(dd(&ops), 2.0);
+    }
+
+    #[test]
+    fn three_negative_results() {
+        // each contribution = -0.02 (cummax stays 1); cumsum = 0.94; dd = 6.0%
+        let ops = [
+            make_op(-20, 30, 20, 0.02),
+            make_op(-35, 30, 35, 0.02),
+            make_op(-50, 30, 50, 0.02),
         ];
-        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 30.77).abs() < 0.1);
+        assert_eq!(dd(&ops), 6.0);
     }
 
     #[test]
-    fn all_winners_returns_zero() {
-        // contribution = 1 * 0.01 / 5 = 0.002 each
-        // cumsum = 1.006, cummax = 1.006, dd = 0
-        let ops = vec![
-            make_op(1, 0.01, 5),
-            make_op(1, 0.01, 5),
-            make_op(1, 0.01, 5),
+    fn positive_then_negative() {
+        // t1: cumsum=1.03, cummax=1.03
+        // t2: 1.03*(-0.02)=-0.0206; cumsum=1.0094; dd=(1.03-1.0094)/1.03=2.0%
+        let ops = [make_op(30, 30, 20, 0.02), make_op(-20, 30, 20, 0.02)];
+        assert_eq!(dd(&ops), 2.0);
+    }
+
+    #[test]
+    fn negative_then_positive() {
+        // t1: cumsum=0.98, cummax=1; dd=2.0%
+        // t2: 1*0.03=0.03; cumsum=1.01; dd=0
+        // max dd = 2.0%
+        let ops = [make_op(-20, 30, 20, 0.02), make_op(30, 30, 20, 0.02)];
+        assert_eq!(dd(&ops), 2.0);
+    }
+
+    #[test]
+    fn positive_then_two_negatives() {
+        // t1: cumsum=1.03, cummax=1.03
+        // t2: 1.03*(-0.02)=-0.0206; cumsum=1.0094; dd=2.0%
+        // t3: 1.03*(-0.02)=-0.0206; cumsum=0.9888; dd=(1.03-0.9888)/1.03=4.0%
+        let ops = [
+            make_op(30, 30, 20, 0.02),
+            make_op(-20, 30, 20, 0.02),
+            make_op(-20, 30, 20, 0.02),
         ];
-        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.0);
+        assert_eq!(dd(&ops), 4.0);
     }
 
     #[test]
-    fn all_losers_accumulate_drawdown() {
-        // trade 1: contribution = -1 * 0.02 / 4 = -0.005
-        //           cumsum = 0.995, cummax = 1.0, dd = (1.0 - 0.995) / 1.0 = 0.5%
-        // trade 2: contribution = -1 * 0.02 / 4 = -0.005
-        //           cumsum = 0.99, cummax = 1.0, dd = (1.0 - 0.99) / 1.0 = 1.0%
-        let ops = vec![make_op(-1, 0.02, 4), make_op(-1, 0.02, 4)];
-        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 1.0).abs() < 0.1);
-    }
-
-    #[test]
-    fn larger_losing_trade_after_winner() {
-        // trade 1: contribution = 1 * 0.1 / 2 = 0.05
-        //           cumsum = 1.05, cummax = 1.05, dd = 0
-        // trade 2: contribution = -2 * 0.1 / 2 = -0.1
-        //           cumsum = 0.95, cummax = 1.05, dd = (1.05 - 0.95) / 1.05 ≈ 9.52%
-        let ops = vec![make_op(1, 0.1, 2), make_op(-2, 0.1, 2)];
-        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 9.52).abs() < 0.1);
-    }
-
-    #[test]
-    fn oscillating_pattern_tracks_cumulative_trough() {
-        // trade 1: contribution = 2 * 0.5 / 5 = 0.2
-        //           cumsum = 1.2, cummax = 1.2, dd = 0
-        // trade 2: contribution = -1 * 0.5 / 5 = -0.1
-        //           cumsum = 1.1, cummax = 1.2, dd = (1.2 - 1.1) / 1.2 ≈ 8.33%
-        // trade 3: contribution = 1 * 0.5 / 5 = 0.1
-        //           cumsum = 1.2, cummax = 1.2, dd = 0
-        // trade 4: contribution = -3 * 0.5 / 5 = -0.3
-        //           cumsum = 0.9, cummax = 1.2, dd = (1.2 - 0.9) / 1.2 = 25.0%
-        let ops = vec![
-            make_op(2, 0.5, 5),
-            make_op(-1, 0.5, 5),
-            make_op(1, 0.5, 5),
-            make_op(-3, 0.5, 5),
+    fn two_negatives_then_three_positives() {
+        // t1: cumsum=0.98, dd=2.0%
+        // t2: cumsum=0.96, dd=4.0%
+        // t3: 1*0.03; cumsum=0.99; dd=1.0%
+        // t4: 1*0.025; cumsum=1.015; cummax=1.015; dd=0
+        // t5: 1.015*0.03; cumsum=1.04545; cummax=1.04545; dd=0
+        // max dd = 4.0%
+        let ops = [
+            make_op(-20, 30, 20, 0.02),
+            make_op(-20, 30, 20, 0.02),
+            make_op(30, 30, 20, 0.02),
+            make_op(30, 30, 20, 0.02),
+            make_op(30, 30, 20, 0.02),
         ];
-        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 25.0);
+        assert_eq!(dd(&ops), 4.0);
     }
 
     #[test]
-    fn rounding_to_4_decimal_places() {
-        // contribution = -1 * 0.01 / 7 ≈ -0.001428
-        // cumsum ≈ 0.99857, cummax = 1.0, dd ≈ 0.14%
-        let ops = vec![make_op(-1, 0.01, 7)];
-        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.14);
+    fn mixed_order_case_1() {
+        let ops = [
+            make_op(-20, 30, 20, 0.02),
+            make_op(-20, 30, 20, 0.02),
+            make_op(30, 30, 20, 0.02),
+            make_op(25, 25, 20, 0.02),
+            make_op(-200, 300, 200, 0.02),
+            make_op(300, 300, 250, 0.02),
+        ];
+        assert_eq!(dd(&ops), 4.0);
     }
 
     #[test]
-    fn rounding_up_at_boundary() {
-        // contribution = -1 * 0.01 / 6 ≈ -0.001667
-        // cumsum ≈ 0.99833, cummax = 1.0, dd ≈ 0.17%
-        let ops = vec![make_op(-1, 0.01, 6)];
-        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.17);
+    fn mixed_order_case_2() {
+        let ops = [
+            make_op(-20, 30, 20, 0.02),
+            make_op(-20, 30, 20, 0.02),
+            make_op(30, 30, 20, 0.02),
+            make_op(25, 25, 20, 0.02),
+            make_op(-200, 300, 200, 0.02),
+            make_op(-250, 300, 250, 0.02),
+            make_op(-250, 300, 250, 0.02),
+        ];
+        assert_eq!(dd(&ops), 6.0);
     }
 
     #[test]
-    fn sub_threshold_drawdown_rounds_to_zero() {
-        // contribution = -1 * 0.0001 / 1000 = -0.0000001
-        // cumsum ≈ 0.9999999, cummax = 1.0, dd = 0.00001% → rounds to 0.0
-        let ops = vec![make_op(-1, 0.0001, 1000)];
-        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.0);
-    }
-
-    #[test]
-    fn drawdown_exceeding_100_percent() {
-        // trade 1: contribution = -1 * 0.6 / 1 = -0.6
-        //           cumsum = 0.4, cummax = 1.0, dd = (1.0 - 0.4) / 1.0 = 60.0%
-        // trade 2: contribution = -1 * 0.6 / 1 = -0.6
-        //           cumsum = -0.2, cummax = 1.0, dd = (1.0 - (-0.2)) / 1.0 = 120.0%
-        let ops = vec![make_op(-1, 0.6, 1), make_op(-1, 0.6, 1)];
-        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 120.0).abs() < 0.1);
+    fn mixed_order_case_with_decimals() {
+        let ops = [
+            make_op(-20, 30, 20, 0.02),
+            make_op(-20, 30, 20, 0.02),
+            make_op(30, 30, 20, 0.02),
+            make_op(25, 25, 20, 0.02),
+            make_op(-200, 300, 200, 0.02),
+            make_op(-250, 300, 250, 0.02),
+            make_op(-250, 300, 250, 0.02),
+            make_op(25, 300, 250, 0.02),
+            make_op(-250, 300, 250, 0.02),
+        ];
+        assert_eq!(dd(&ops), 7.8);
     }
 }

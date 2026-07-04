@@ -6,6 +6,8 @@ use rand::SeedableRng;
 use rustc_hash::FxHashMap;
 
 use crate::domain::annual_operation_count::annual_operation_count;
+use crate::domain::annual_roi::annual_roi;
+use crate::domain::global_roi::global_roi;
 use crate::domain::max_draw_down::max_draw_down;
 use crate::domain::operation_point::{OperationPoint, OperationPoints};
 use crate::domain::signal_group::SignalGroup;
@@ -15,9 +17,6 @@ use crate::domain::strategy::Strategy;
 fn round_to_2(x: f64) -> f64 {
     (x * 100.0).round() / 100.0
 }
-
-/// Hardcoded placeholder metric — to be computed from operation points later.
-const PLACEHOLDER_ANNUAL_ROI: f64 = 0.15;
 
 pub fn create_strategies(
     signal_groups: &[SignalGroup],
@@ -75,9 +74,12 @@ pub fn create_strategy(
     all_ops.sort_by_key(|op| op.timestamp);
     let max_draw_down = max_draw_down(&all_ops);
 
+    let global_roi = global_roi(&all_ops);
+    let annual_roi = annual_roi(start_timestamp, end_timestamp, global_roi);
+
     Strategy {
         indicator_id: signal_group.indicator_id,
-        annual_roi: PLACEHOLDER_ANNUAL_ROI,
+        annual_roi,
         max_draw_down,
         annual_operation_count,
         long_operation_point_ids,

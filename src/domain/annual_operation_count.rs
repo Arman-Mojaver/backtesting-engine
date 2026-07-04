@@ -1,17 +1,25 @@
 const SECONDS_PER_DAY: f64 = 86400.0;
 const DAYS_PER_YEAR: f64 = 365.25;
 
+fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
+    let days = (end_timestamp - start_timestamp) as f64 / SECONDS_PER_DAY;
+    if days <= 0.0 {
+        return 0.0;
+    }
+    (days / DAYS_PER_YEAR * 100.0).round() / 100.0
+}
+
 pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_timestamp: i64) -> f64 {
     if total_count == 0 {
         return 0.0;
     }
 
-    let days = (end_timestamp - start_timestamp) as f64 / SECONDS_PER_DAY;
-    if days <= 0.0 {
+    let years = difference_in_years(start_timestamp, end_timestamp);
+    if years <= 0.0 {
         return 0.0;
     }
 
-    let annualized = (total_count as f64 / days) * DAYS_PER_YEAR;
+    let annualized = total_count as f64 / years;
     (annualized * 100.0).round() / 100.0
 }
 
@@ -48,74 +56,77 @@ mod tests {
 
     #[test]
     fn one_year_count_1() {
+        // years = round(365/365.25, 2) = 1.0; 1/1.0 = 1.0
         let result = annual_operation_count(1, 0, ONE_YEAR_SECS);
-        assert!((result - 1.0).abs() < 0.01);
+        assert_eq!(result, 1.0);
     }
 
     #[test]
     fn one_year_count_2() {
         let result = annual_operation_count(2, 0, ONE_YEAR_SECS);
-        assert!((result - 2.0).abs() < 0.01);
+        assert_eq!(result, 2.0);
     }
 
     #[test]
     fn one_year_count_3() {
         let result = annual_operation_count(3, 0, ONE_YEAR_SECS);
-        assert!((result - 3.0).abs() < 0.02);
+        assert_eq!(result, 3.0);
     }
 
     #[test]
     fn one_year_count_4() {
         let result = annual_operation_count(4, 0, ONE_YEAR_SECS);
-        assert!((result - 4.0).abs() < 0.02);
+        assert_eq!(result, 4.0);
     }
 
     #[test]
     fn one_year_count_100() {
         let result = annual_operation_count(100, 0, ONE_YEAR_SECS);
-        assert!((result - 100.0).abs() < 0.1);
+        assert_eq!(result, 100.0);
     }
 
     #[test]
     fn two_years_count_1() {
+        // years = round(730/365.25, 2) = 2.0; 1/2.0 = 0.5
         let result = annual_operation_count(1, 0, TWO_YEARS_SECS);
-        assert!((result - 0.5).abs() < 0.01);
+        assert_eq!(result, 0.5);
     }
 
     #[test]
     fn two_years_count_2() {
         let result = annual_operation_count(2, 0, TWO_YEARS_SECS);
-        assert!((result - 1.0).abs() < 0.01);
+        assert_eq!(result, 1.0);
     }
 
     #[test]
     fn two_years_count_3() {
         let result = annual_operation_count(3, 0, TWO_YEARS_SECS);
-        assert!((result - 1.5).abs() < 0.01);
+        assert_eq!(result, 1.5);
     }
 
     #[test]
     fn two_years_count_4() {
         let result = annual_operation_count(4, 0, TWO_YEARS_SECS);
-        assert!((result - 2.0).abs() < 0.01);
+        assert_eq!(result, 2.0);
     }
 
     #[test]
     fn two_years_count_5() {
         let result = annual_operation_count(5, 0, TWO_YEARS_SECS);
-        assert!((result - 2.5).abs() < 0.01);
+        assert_eq!(result, 2.5);
     }
 
     #[test]
     fn two_years_count_300() {
         let result = annual_operation_count(300, 0, TWO_YEARS_SECS);
-        assert!((result - 150.0).abs() < 0.2);
+        assert_eq!(result, 150.0);
     }
 
     #[test]
-    fn rounding_rounds_up_at_point_five_boundary() {
-        let result = annual_operation_count(8, 0, ONE_YEAR_SECS);
-        assert_eq!(result, 8.01);
+    fn count_equals_days_rounds_years_to_one() {
+        // years = round(365/365.25, 2) = 1.0; 365/1.0 = 365.0
+        let result = annual_operation_count(365, 0, ONE_YEAR_SECS);
+        assert_eq!(result, 365.0);
     }
 
     #[test]
@@ -126,13 +137,8 @@ mod tests {
     }
 
     #[test]
-    fn exact_value_when_count_equals_days() {
-        let result = annual_operation_count(365, 0, ONE_YEAR_SECS);
-        assert_eq!(result, 365.25);
-    }
-
-    #[test]
     fn near_zero_rounds_to_small_nonzero() {
+        // 10 years: years = round(3650/365.25, 2) = 9.99; 1/9.99 = 0.10
         let ten_years_secs: i64 = 3650 * 86400;
         let result = annual_operation_count(1, 0, ten_years_secs);
         assert_eq!(result, 0.10);
