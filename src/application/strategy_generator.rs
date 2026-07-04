@@ -6,6 +6,7 @@ use rand::SeedableRng;
 use rustc_hash::FxHashMap;
 
 use crate::domain::annual_operation_count::annual_operation_count;
+use crate::domain::max_draw_down::max_draw_down;
 use crate::domain::operation_point::{OperationPoint, OperationPoints};
 use crate::domain::signal_group::SignalGroup;
 use crate::domain::strategy::Strategy;
@@ -15,9 +16,8 @@ fn round_to_2(x: f64) -> f64 {
     (x * 100.0).round() / 100.0
 }
 
-/// Hardcoded placeholder metrics — to be computed from operation points later.
+/// Hardcoded placeholder metric — to be computed from operation points later.
 const PLACEHOLDER_ANNUAL_ROI: f64 = 0.15;
-const PLACEHOLDER_MAX_DRAW_DOWN: f64 = 0.20;
 
 pub fn create_strategies(
     signal_groups: &[SignalGroup],
@@ -52,26 +52,33 @@ pub fn create_strategy(
     start_timestamp: i64,
     end_timestamp: i64,
 ) -> Strategy {
-    let long_operation_point_ids: Vec<i32> = signal_group
+    let long_ops: Vec<&OperationPoint> = signal_group
         .long_signals
         .iter()
-        .filter_map(|ts| long_map.get(ts).map(|op| op.id))
+        .filter_map(|ts| long_map.get(ts).copied())
         .collect();
 
-    let short_operation_point_ids: Vec<i32> = signal_group
+    let short_ops: Vec<&OperationPoint> = signal_group
         .short_signals
         .iter()
-        .filter_map(|ts| short_map.get(ts).map(|op| op.id))
+        .filter_map(|ts| short_map.get(ts).copied())
         .collect();
 
-    let total_count = signal_group.operation_count();
+    let long_operation_point_ids: Vec<i32> = long_ops.iter().map(|op| op.id).collect();
+    let short_operation_point_ids: Vec<i32> = short_ops.iter().map(|op| op.id).collect();
+
+    let total_count = long_operation_point_ids.len() + short_operation_point_ids.len();
     let annual_operation_count =
         annual_operation_count(total_count, start_timestamp, end_timestamp);
+
+    let mut all_ops: Vec<&OperationPoint> = long_ops.into_iter().chain(short_ops).collect();
+    all_ops.sort_by_key(|op| op.timestamp);
+    let max_draw_down = max_draw_down(&all_ops);
 
     Strategy {
         indicator_id: signal_group.indicator_id,
         annual_roi: PLACEHOLDER_ANNUAL_ROI,
-        max_draw_down: PLACEHOLDER_MAX_DRAW_DOWN,
+        max_draw_down,
         annual_operation_count,
         long_operation_point_ids,
         short_operation_point_ids,
