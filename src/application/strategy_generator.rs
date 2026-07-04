@@ -5,6 +5,7 @@ use rand::RngExt;
 use rand::SeedableRng;
 use rustc_hash::FxHashMap;
 
+use crate::domain::annual_operation_count::annual_operation_count;
 use crate::domain::operation_point::{OperationPoint, OperationPoints};
 use crate::domain::signal_group::SignalGroup;
 use crate::domain::strategy::Strategy;
@@ -17,19 +18,29 @@ fn round_to_2(x: f64) -> f64 {
 /// Hardcoded placeholder metrics — to be computed from operation points later.
 const PLACEHOLDER_ANNUAL_ROI: f64 = 0.15;
 const PLACEHOLDER_MAX_DRAW_DOWN: f64 = 0.20;
-const PLACEHOLDER_ANNUAL_OPERATION_COUNT: f64 = 12.0;
 
 pub fn create_strategies(
     signal_groups: &[SignalGroup],
     operation_points: &OperationPoints,
     money_management_strategy_id: i32,
+    start_timestamp: i64,
+    end_timestamp: i64,
 ) -> Vec<Strategy> {
     let long_map = operation_points.long_points_by_timestamp();
     let short_map = operation_points.short_points_by_timestamp();
 
     signal_groups
         .iter()
-        .map(|sg| create_strategy(sg, &long_map, &short_map, money_management_strategy_id))
+        .map(|sg| {
+            create_strategy(
+                sg,
+                &long_map,
+                &short_map,
+                money_management_strategy_id,
+                start_timestamp,
+                end_timestamp,
+            )
+        })
         .collect()
 }
 
@@ -38,6 +49,8 @@ pub fn create_strategy(
     long_map: &FxHashMap<i64, &OperationPoint>,
     short_map: &FxHashMap<i64, &OperationPoint>,
     money_management_strategy_id: i32,
+    start_timestamp: i64,
+    end_timestamp: i64,
 ) -> Strategy {
     let long_operation_point_ids: Vec<i32> = signal_group
         .long_signals
@@ -51,11 +64,15 @@ pub fn create_strategy(
         .filter_map(|ts| short_map.get(ts).map(|op| op.id))
         .collect();
 
+    let total_count = signal_group.operation_count();
+    let annual_operation_count =
+        annual_operation_count(total_count, start_timestamp, end_timestamp);
+
     Strategy {
         indicator_id: signal_group.indicator_id,
         annual_roi: PLACEHOLDER_ANNUAL_ROI,
         max_draw_down: PLACEHOLDER_MAX_DRAW_DOWN,
-        annual_operation_count: PLACEHOLDER_ANNUAL_OPERATION_COUNT,
+        annual_operation_count,
         long_operation_point_ids,
         short_operation_point_ids,
         money_management_strategy_id,

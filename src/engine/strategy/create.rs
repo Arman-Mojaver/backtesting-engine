@@ -69,6 +69,8 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
         &signal_groups,
         &operation_points,
         money_management_strategy_id,
+        start_timestamp,
+        end_timestamp,
     );
 
     let strategies = filter_strategies(strategies, &global_strategy_filter);
