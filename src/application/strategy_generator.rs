@@ -3,9 +3,10 @@ use std::ops::RangeInclusive;
 use rand::rngs::StdRng;
 use rand::RngExt;
 use rand::SeedableRng;
+use rustc_hash::FxHashMap;
 
-use crate::domain::indicator::Indicator;
-use crate::domain::operation_point::OperationPoint;
+use crate::domain::operation_point::{OperationPoint, OperationPoints};
+use crate::domain::signal_group::SignalGroup;
 use crate::domain::strategy::Strategy;
 
 /// Round an f64 value to 2 decimal places.
@@ -13,38 +14,52 @@ fn round_to_2(x: f64) -> f64 {
     (x * 100.0).round() / 100.0
 }
 
-/// Generate random strategies from database-sourced indicators and operation points.
-pub fn generate_random_strategies(
-    indicators: &[Indicator],
-    long_ops: &[OperationPoint],
-    short_ops: &[OperationPoint],
+/// Hardcoded placeholder metrics — to be computed from operation points later.
+const PLACEHOLDER_ANNUAL_ROI: f64 = 0.15;
+const PLACEHOLDER_MAX_DRAW_DOWN: f64 = 0.20;
+const PLACEHOLDER_ANNUAL_OPERATION_COUNT: f64 = 12.0;
+
+pub fn create_strategies(
+    signal_groups: &[SignalGroup],
+    operation_points: &OperationPoints,
     money_management_strategy_id: i32,
 ) -> Vec<Strategy> {
-    let mut rng = rand::rng();
-    let all_long_ids: Vec<i32> = long_ops.iter().map(|op| op.id).collect();
-    let all_short_ids: Vec<i32> = short_ops.iter().map(|op| op.id).collect();
+    let long_map = operation_points.long_points_by_timestamp();
+    let short_map = operation_points.short_points_by_timestamp();
 
-    indicators
+    signal_groups
         .iter()
-        .map(|indicator| {
-            let annual_roi = round_to_2(rng.random_range(-20.0..50.0));
-            let max_draw_down = round_to_2(rng.random_range(5.0..40.0));
-            let annual_operation_count = rng.random_range(10..=20) as f64;
-
-            let long_ids = pick_random_subset(&mut rng, &all_long_ids, 0.7..=1.0);
-            let short_ids = pick_random_subset(&mut rng, &all_short_ids, 0.7..=1.0);
-
-            Strategy {
-                indicator_id: indicator.id,
-                annual_roi,
-                max_draw_down,
-                annual_operation_count,
-                long_operation_point_ids: long_ids,
-                short_operation_point_ids: short_ids,
-                money_management_strategy_id,
-            }
-        })
+        .map(|sg| create_strategy(sg, &long_map, &short_map, money_management_strategy_id))
         .collect()
+}
+
+pub fn create_strategy(
+    signal_group: &SignalGroup,
+    long_map: &FxHashMap<i64, &OperationPoint>,
+    short_map: &FxHashMap<i64, &OperationPoint>,
+    money_management_strategy_id: i32,
+) -> Strategy {
+    let long_operation_point_ids: Vec<i32> = signal_group
+        .long_signals
+        .iter()
+        .filter_map(|ts| long_map.get(ts).map(|op| op.id))
+        .collect();
+
+    let short_operation_point_ids: Vec<i32> = signal_group
+        .short_signals
+        .iter()
+        .filter_map(|ts| short_map.get(ts).map(|op| op.id))
+        .collect();
+
+    Strategy {
+        indicator_id: signal_group.indicator_id,
+        annual_roi: PLACEHOLDER_ANNUAL_ROI,
+        max_draw_down: PLACEHOLDER_MAX_DRAW_DOWN,
+        annual_operation_count: PLACEHOLDER_ANNUAL_OPERATION_COUNT,
+        long_operation_point_ids,
+        short_operation_point_ids,
+        money_management_strategy_id,
+    }
 }
 
 /// Generate N purely-synthetic random strategies distributed across
