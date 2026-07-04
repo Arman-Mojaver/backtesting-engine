@@ -1,6 +1,6 @@
 use crate::domain::operation_point::OperationPoint;
 
-pub fn max_draw_down(operation_points: &[OperationPoint]) -> f64 {
+pub fn max_draw_down(operation_points: &[&OperationPoint]) -> f64 {
     if operation_points.is_empty() {
         return 0.0;
     }
@@ -47,7 +47,7 @@ mod tests {
         // contribution = 1 * 0.01 / 5 = 0.002
         // cumsum = 1.002, cummax = 1.002, dd = 0
         let ops = vec![make_op(1, 0.01, 5)];
-        assert_eq!(max_draw_down(&ops), 0.0);
+        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.0);
     }
 
     #[test]
@@ -55,7 +55,7 @@ mod tests {
         // contribution = -1 * 0.02 / 4 = -0.005
         // cumsum = 0.995, cummax = 1.0, dd = (1.0 - 0.995) / 1.0 = 0.5%
         let ops = vec![make_op(-1, 0.02, 4)];
-        assert_eq!(max_draw_down(&ops), 0.5);
+        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.5);
     }
 
     #[test]
@@ -65,7 +65,7 @@ mod tests {
         // trade 2: contribution = -5 * 0.01 / 5 = -0.01
         //          cumsum = 0.992, cummax = 1.002, dd = (1.002 - 0.992) / 1.002 ≈ 1.0%
         let ops = vec![make_op(1, 0.01, 5), make_op(-5, 0.01, 5)];
-        assert!((max_draw_down(&ops) - 1.0).abs() < 0.1);
+        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 1.0).abs() < 0.1);
     }
 
     #[test]
@@ -76,7 +76,7 @@ mod tests {
         //           cumsum = 1.02, cummax = 1.02, dd = 0
         // max dd stays at 1.0%
         let ops = vec![make_op(-1, 0.05, 5), make_op(3, 0.05, 5)];
-        assert!((max_draw_down(&ops) - 1.0).abs() < 0.1);
+        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 1.0).abs() < 0.1);
     }
 
     #[test]
@@ -95,7 +95,7 @@ mod tests {
             make_op(1, 0.5, 5),
             make_op(-2, 0.5, 5),
         ];
-        assert!((max_draw_down(&ops) - 18.18).abs() < 0.1);
+        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 18.18).abs() < 0.1);
     }
 
     #[test]
@@ -114,7 +114,7 @@ mod tests {
             make_op(3, 0.5, 5),
             make_op(-4, 0.5, 5),
         ];
-        assert!((max_draw_down(&ops) - 30.77).abs() < 0.1);
+        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 30.77).abs() < 0.1);
     }
 
     #[test]
@@ -126,7 +126,7 @@ mod tests {
             make_op(1, 0.01, 5),
             make_op(1, 0.01, 5),
         ];
-        assert_eq!(max_draw_down(&ops), 0.0);
+        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.0);
     }
 
     #[test]
@@ -136,7 +136,7 @@ mod tests {
         // trade 2: contribution = -1 * 0.02 / 4 = -0.005
         //           cumsum = 0.99, cummax = 1.0, dd = (1.0 - 0.99) / 1.0 = 1.0%
         let ops = vec![make_op(-1, 0.02, 4), make_op(-1, 0.02, 4)];
-        assert!((max_draw_down(&ops) - 1.0).abs() < 0.1);
+        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 1.0).abs() < 0.1);
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod tests {
         // trade 2: contribution = -2 * 0.1 / 2 = -0.1
         //           cumsum = 0.95, cummax = 1.05, dd = (1.05 - 0.95) / 1.05 ≈ 9.52%
         let ops = vec![make_op(1, 0.1, 2), make_op(-2, 0.1, 2)];
-        assert!((max_draw_down(&ops) - 9.52).abs() < 0.1);
+        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 9.52).abs() < 0.1);
     }
 
     #[test]
@@ -165,7 +165,7 @@ mod tests {
             make_op(1, 0.5, 5),
             make_op(-3, 0.5, 5),
         ];
-        assert_eq!(max_draw_down(&ops), 25.0);
+        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 25.0);
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
         // contribution = -1 * 0.01 / 7 ≈ -0.001428
         // cumsum ≈ 0.99857, cummax = 1.0, dd ≈ 0.14%
         let ops = vec![make_op(-1, 0.01, 7)];
-        assert_eq!(max_draw_down(&ops), 0.14);
+        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.14);
     }
 
     #[test]
@@ -181,7 +181,7 @@ mod tests {
         // contribution = -1 * 0.01 / 6 ≈ -0.001667
         // cumsum ≈ 0.99833, cummax = 1.0, dd ≈ 0.17%
         let ops = vec![make_op(-1, 0.01, 6)];
-        assert_eq!(max_draw_down(&ops), 0.17);
+        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.17);
     }
 
     #[test]
@@ -189,7 +189,7 @@ mod tests {
         // contribution = -1 * 0.0001 / 1000 = -0.0000001
         // cumsum ≈ 0.9999999, cummax = 1.0, dd = 0.00001% → rounds to 0.0
         let ops = vec![make_op(-1, 0.0001, 1000)];
-        assert_eq!(max_draw_down(&ops), 0.0);
+        assert_eq!(max_draw_down(&ops.iter().collect::<Vec<_>>()), 0.0);
     }
 
     #[test]
@@ -199,6 +199,6 @@ mod tests {
         // trade 2: contribution = -1 * 0.6 / 1 = -0.6
         //           cumsum = -0.2, cummax = 1.0, dd = (1.0 - (-0.2)) / 1.0 = 120.0%
         let ops = vec![make_op(-1, 0.6, 1), make_op(-1, 0.6, 1)];
-        assert!((max_draw_down(&ops) - 120.0).abs() < 0.1);
+        assert!((max_draw_down(&ops.iter().collect::<Vec<_>>()) - 120.0).abs() < 0.1);
     }
 }
