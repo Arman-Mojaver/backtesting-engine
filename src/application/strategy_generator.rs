@@ -1,5 +1,7 @@
 use rustc_hash::FxHashMap;
 
+use rayon::prelude::*;
+
 use crate::domain::annual_operation_count::annual_operation_count;
 use crate::domain::annual_roi::annual_roi;
 use crate::domain::global_roi::global_roi;
@@ -19,7 +21,7 @@ pub fn create_strategies(
     let short_map = operation_points.short_points_by_timestamp();
 
     signal_groups
-        .iter()
+        .par_iter()
         .map(|sg| {
             create_strategy(
                 sg,
