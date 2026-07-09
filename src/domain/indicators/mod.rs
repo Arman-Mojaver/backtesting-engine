@@ -1,4 +1,9 @@
+pub mod ao;
+pub mod moving_averages;
 pub mod rsi;
+
+#[cfg(test)]
+pub mod test_support;
 
 use crate::domain::indicator::IndicatorParameters;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -60,6 +65,10 @@ pub fn generate_indicator_values(
         IndicatorParameters::Macd { .. } => Err(IndicatorError::UnsupportedIndicator {
             indicator: "macd".to_string(),
         }),
+        IndicatorParameters::AwesomeOscillator => {
+            let buffer = ao::compute(points)?;
+            Ok(IndicatorValues::One(buffer))
+        }
     }
 }
 
@@ -82,6 +91,26 @@ mod tests {
             timestamp: ts,
             high_low_order: HighLowOrder::HighFirst,
         }
+    }
+
+    /// 34 points with constant median -> exactly one AO value.
+    fn rp_ao_34() -> Vec<ResampledPointD1> {
+        (0..34)
+            .map(|i| {
+                let m = 1.0;
+                ResampledPointD1 {
+                    id: i as i32 + 1,
+                    instrument: "EURUSD".to_string(),
+                    open: m,
+                    high: m + 0.5,
+                    low: m - 0.5,
+                    close: m,
+                    volume: 1000,
+                    timestamp: (i + 1) as i64,
+                    high_low_order: HighLowOrder::HighFirst,
+                }
+            })
+            .collect()
     }
 
     #[test]
@@ -119,6 +148,32 @@ mod tests {
                 indicator: "macd".to_string()
             }
         );
+    }
+
+    #[test]
+    fn awesome_oscillator_dispatch_returns_one_variant() {
+        let params = IndicatorParameters::AwesomeOscillator;
+        let points = rp_ao_34();
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => {
+                // 34 points -> 1 AO value (constant median -> 0.0).
+                assert_eq!(buf.items.len(), 1);
+                assert_eq!(buf.items[0].value, 0.0);
+            }
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn awesome_oscillator_dispatch_with_insufficient_data_yields_empty_one() {
+        let params = IndicatorParameters::AwesomeOscillator;
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            other => panic!("expected One, got {other:?}"),
+        }
     }
 
     #[test]

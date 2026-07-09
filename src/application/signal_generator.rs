@@ -1,8 +1,57 @@
-use crate::domain::indicator::Indicator;
-use crate::domain::indicators::generate_indicator_values;
+use crate::domain::indicator::{Indicator, IndicatorParameters};
+use crate::domain::indicators::{generate_indicator_values, IndicatorError};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::IndicatorValues;
 use crate::domain::signal_group::SignalGroup;
+
+/// Abstraction over the "parameters + points → `IndicatorValues`" step.
+///
+/// Placed at the application layer so that SignalGroup-level tests can
+/// inject a made-up oscillator and verify the full path (injected compute →
+/// `IndicatorValues` → `generate_signals` → `SignalGroup`) — including
+/// crossing-timestamp correctness — without depending on real indicator math.
+pub trait IndicatorComputer {
+    fn compute(
+        &self,
+        parameters: &IndicatorParameters,
+        points: &[ResampledPointD1],
+    ) -> Result<IndicatorValues, IndicatorError>;
+}
+
+/// Default implementation that delegates to the domain dispatch
+/// `generate_indicator_values`.
+pub struct DefaultIndicatorComputer;
+
+impl IndicatorComputer for DefaultIndicatorComputer {
+    fn compute(
+        &self,
+        parameters: &IndicatorParameters,
+        points: &[ResampledPointD1],
+    ) -> Result<IndicatorValues, IndicatorError> {
+        generate_indicator_values(parameters, points)
+    }
+}
+
+/// Create a `SignalGroup` for each indicator using the injected `computer`
+/// to produce indicator values, then deriving long/short signals from them.
+///
+/// Indicators whose computation fails (e.g. unsupported) are skipped silently
+/// rather than aborting the run.
+pub fn create_signals_with_computer(
+    indicators: &[Indicator],
+    resampled_points: &[ResampledPointD1],
+    computer: &dyn IndicatorComputer,
+) -> Vec<SignalGroup> {
+    indicators
+        .iter()
+        .filter_map(|indicator| {
+            let values: IndicatorValues = computer
+                .compute(&indicator.parameters, resampled_points)
+                .ok()?;
+            Some(values.generate_signals(indicator.id))
+        })
+        .collect()
+}
 
 /// Create a `SignalGroup` for each indicator by computing its indicator
 /// values from `resampled_points` and deriving long/short signals from them.
@@ -14,19 +63,15 @@ use crate::domain::signal_group::SignalGroup;
 ///
 /// Indicators whose computation is unsupported (e.g. MACD, out of scope for
 /// this migration) are skipped silently rather than aborting the run.
+///
+/// Delegates to `create_signals_with_computer` with `DefaultIndicatorComputer`,
+/// preserving the original signature and behavior (backward-compatible).
 pub fn create_signals(
     indicators: &[Indicator],
     resampled_points: &[ResampledPointD1],
     _count: usize,
 ) -> Vec<SignalGroup> {
-    indicators
-        .iter()
-        .filter_map(|indicator| {
-            let values: IndicatorValues =
-                generate_indicator_values(&indicator.parameters, resampled_points).ok()?;
-            Some(values.generate_signals(indicator.id))
-        })
-        .collect()
+    create_signals_with_computer(indicators, resampled_points, &DefaultIndicatorComputer)
 }
 
 #[cfg(test)]
@@ -34,7 +79,9 @@ mod tests {
     use super::*;
     use crate::domain::fixtures::{indicators_rsi_single, resampled_points_for_rsi};
     use crate::domain::indicator::{Indicator, IndicatorParameters};
+    use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::domain::signal::{IndicatorValue, OneBuffer};
 
     #[test]
     fn rsi_indicator_produces_a_signal_group_stamped_with_its_id() {
@@ -187,5 +234,74 @@ mod tests {
         // RSI 0 -> 50 crosses above low threshold 30 -> long signal at ts 4000.
         assert_eq!(result[0].long_signals, vec![4000]);
         assert!(result[0].short_signals.is_empty());
+    }
+
+    // --- Level 1: SignalGroup via dependency injection ---
+
+    /// A made-up oscillator that ignores parameters and returns a known
+    /// alternating sequence `[-1, +1, -1, +1, -1]` stamped with the first 5
+    /// resampled-point timestamps. Used to verify signal generation and
+    /// timestamp routing independently of real indicator math.
+    struct CrossingOscillator;
+
+    impl IndicatorComputer for CrossingOscillator {
+        fn compute(
+            &self,
+            _parameters: &IndicatorParameters,
+            points: &[ResampledPointD1],
+        ) -> Result<IndicatorValues, IndicatorError> {
+            let items: Vec<IndicatorValue> = points
+                .iter()
+                .take(5)
+                .enumerate()
+                .map(|(i, p)| IndicatorValue {
+                    timestamp: p.timestamp,
+                    value: if i % 2 == 0 { -1.0 } else { 1.0 },
+                })
+                .collect();
+            Ok(IndicatorValues::One(OneBuffer { items }))
+        }
+    }
+
+    #[test]
+    fn level1_injected_oscillator_produces_expected_crossing_timestamps() {
+        // Uses real EURUSD resampled points from the development DB so the
+        // timestamps are real. Skips gracefully if the DB is unavailable.
+        let points = match test_support::fetch_eurusd_points() {
+            Some(p) => p,
+            None => {
+                eprintln!("skipping level1_di_test: development DB unavailable");
+                return;
+            }
+        };
+        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
+
+        let indicators = vec![Indicator {
+            id: 1,
+            r#type: "awesome_oscillator".to_string(),
+            parameters: IndicatorParameters::AwesomeOscillator,
+            identifier: "ao_1".to_string(),
+        }];
+
+        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].indicator_id, 1);
+        // Alternating [-1, +1, -1, +1, -1]:
+        //   up-crosses (neg→pos) at index 1 and 3 -> long at ts[1], ts[3]
+        //   down-crosses (pos→neg) at index 2 and 4 -> short at ts[2], ts[4]
+        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
+        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
+    }
+
+    #[test]
+    fn default_computer_delegates_to_domain_dispatch() {
+        // The DefaultIndicatorComputer must produce the same result as the
+        // direct domain dispatch — verifying the delegation is correct.
+        let indicators = indicators_rsi_single();
+        let points = resampled_points_for_rsi();
+        let via_default =
+            create_signals_with_computer(&indicators, &points, &DefaultIndicatorComputer);
+        let via_direct = create_signals(&indicators, &points, 100);
+        assert_eq!(via_default, via_direct);
     }
 }

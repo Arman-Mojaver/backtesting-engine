@@ -60,6 +60,7 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> IndicatorParameters 
             high_threshold: json_extract_i32(json_text, "high_threshold"),
             low_threshold: json_extract_i32(json_text, "low_threshold"),
         },
+        "awesome_oscillator" => IndicatorParameters::AwesomeOscillator,
         _ => panic!("unknown indicator type: {indicator_type}"),
     }
 }

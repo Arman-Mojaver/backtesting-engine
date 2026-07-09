@@ -11,6 +11,9 @@ pub enum IndicatorParameters {
         high_threshold: i32,
         low_threshold: i32,
     },
+    /// Awesome Oscillator — fixed 5/34 SMA of the median price, no
+    /// configurable parameters (per the MQL5 source).
+    AwesomeOscillator,
 }
 
 #[derive(Debug, Clone)]
