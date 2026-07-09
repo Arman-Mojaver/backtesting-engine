@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/notes | Priority: high | Version: 1.3 | Updated: 2026-06-26 -->
+<!-- Context: project-intelligence/notes | Priority: high | Version: 1.4 | Updated: 2026-06-28 -->
 
 # Living Notes
 
@@ -16,7 +16,7 @@
 |------|--------|----------|------------|
 | Server scaffold removed (no API layer) | HTTP endpoints must be built from scratch if needed | Low | Not needed until API consumers exist |
 | Engine module has no unit tests | Regression risk for engine CLI commands | Medium | Add tests for StrategyCommand::execute() and RedisCommand::execute() |
-| Strategy generator uses random placeholder metrics | `annual_roi`/`max_draw_down`/`annual_operation_count` on generated `Strategy` records are random, not computed from real operation points | High | Wire `max_draw_down()` and `annual_operation_count()` domain functions into the generator; compute real metrics from the operation points each strategy references |
+| Signal generator uses random timestamps | `create_signals()` picks random timestamps from resampled points — the signals themselves are placeholders, not derived from indicator logic | High | Implement real signal generation from indicator parameters (MACd crossover, RSI threshold crossings, etc.) |
 | `ct strategy display` forwards to Python CLI | Display logic lives in Backtesting-4.0, not the Rust engine | Medium | Port display logic to Rust engine if/when Python dependency is dropped |
 | PG adapter hand-parses indicator JSON | `json_extract_str`/`json_extract_i32` are panic-on-miss string scanners, not a real JSON parser | Medium | Replace with `serde_json` parsing once `serde` is on the hot path, or keep for performance |
 
@@ -38,13 +38,19 @@
 *Effort*: Medium
 *Status*: Known
 
-**Random placeholder strategy metrics**
+**Random placeholder signal timestamps**
 *Priority*: High
-*Impact*: `generate_random_strategies` and `generate_random_strategies_bulk` fill `annual_roi`, `max_draw_down`, and `annual_operation_count` with random values rather than computing them from the operation points each strategy references. Downstream consumers reading parquet output see synthetic numbers.
-*Root Cause*: The pure metric functions (`max_draw_down()`, `annual_operation_count()`) exist in `domain/` but are not yet wired into the generator.
-*Proposed Solution*: For each generated strategy, gather its referenced operation points (by `long_operation_point_ids` / `short_operation_point_ids`) and compute real metrics via the domain functions.
-*Effort*: Medium
+*Impact*: `create_signals()` in `application::signal_generator` generates `SignalGroup`s by picking random timestamps from resampled points (skipping first/last 200 candles). The signals are not derived from actual indicator logic (MACD crossover, RSI threshold crossings, etc.). While the metrics computed FROM these signals are real, the signals themselves are placeholders.
+*Root Cause*: Real signal generation from indicator parameters is not yet implemented.
+*Proposed Solution*: Implement indicator-specific signal generation: MACD crossover signals (fast/slow line intersections), RSI threshold crossing signals (high/low threshold breaches), etc.
+*Effort*: Large
 *Status*: Known — next iteration
+
+**~~Random placeholder strategy metrics~~ (RESOLVED 2026-06-28)**
+*Priority*: ~~High~~ Resolved
+*Impact*: ~~`generate_random_strategies` and `generate_random_strategies_bulk` fill `annual_roi`, `max_draw_down`, and `annual_operation_count` with random values~~
+*Root Cause*: ~~The pure metric functions existed but were not wired into the generator.~~
+*Resolution*: `create_strategies()` now computes real `max_draw_down`, `global_roi` → `annual_roi`, and `annual_operation_count` from each strategy's referenced operation points. Parallelized with rayon. See decisions-log.md "Compute Real Metrics in the Strategy Generator".
 
 ## Open Questions
 
@@ -54,7 +60,7 @@
 | Should the ct binary forward engine commands to bt-engine? | Arman Mojaver | Open | Currently separate binaries |
 | Should the engine's compute path check Redis cache before computing signal groups? | Arman Mojaver | Open | Follow-up after cache infrastructure is complete |
 | Should `ct strategy display` be ported to the Rust engine? | Arman Mojaver | Open | Currently forwards to Python `bt strategy display` |
-| Should strategy metrics be computed at generation time or lazily on read? | Arman Mojaver | Open | Decide when wiring real metrics into the generator |
+| Should signal generation be indicator-specific (MACD/RSI logic) or remain random? | Arman Mojaver | Open | Implement real signal generation from indicator parameters |
 
 ### Open Question Details
 
@@ -92,7 +98,7 @@
 |-------|----------|------------|--------|
 | No integration tests for engine module | Medium | Manual verification | Known |
 | Redis connection hard-fails if container is down | Low | Start Redis container first | By design |
-| Generated strategy metrics are random, not computed | High | None yet — consumers see synthetic numbers | Known |
+| Signal timestamps are random, not indicator-derived | High | None yet — signals are placeholders | Known |
 
 ### Issue Details
 
@@ -110,12 +116,16 @@
 *Root Cause*: By design — hard fail on connection error ensures cache problems are surfaced immediately rather than silently ignored.
 *Status*: By design (documented in decisions-log.md)
 
-**Generated strategy metrics are random**
+**Signal timestamps are random, not indicator-derived**
 *Severity*: High
-*Impact*: `Strategy` records written to parquet carry random `annual_roi`/`max_draw_down`/`annual_operation_count` rather than values computed from their referenced operation points.
-*Root Cause*: The generator predates the metric functions; wiring is a follow-up.
-*Fix Plan*: Compute metrics via `max_draw_down()` and `annual_operation_count()` from each strategy's referenced operation points during generation.
+*Impact*: `SignalGroup`s are generated by picking random timestamps from resampled points. The signals do not reflect actual indicator logic (MACD crossover, RSI threshold crossings). Metrics computed from these signals are real but the signals themselves are placeholders.
+*Root Cause*: Real signal generation from indicator parameters is not yet implemented.
+*Fix Plan*: Implement indicator-specific signal generation logic.
 *Status*: Known — next iteration
+
+**~~Generated strategy metrics are random~~ (RESOLVED 2026-06-28)**
+*Severity*: ~~High~~ Resolved
+*Resolution*: `create_strategies()` now computes real metrics from operation points. See decisions-log.md.
 
 ## Insights & Lessons Learned
 
@@ -124,14 +134,14 @@
 - **Pure validators as free functions** -- No object construction needed. Compose well in `combined_validation::validate_all()`.
 - **Pure metric functions** -- `max_draw_down()` and `annual_operation_count()` follow the same free-function-over-slices pattern as validators. Independently unit-tested, no I/O.
 - **Separate engine binary** -- Clear line between Python-wrapping CLI (`ct`) and native Rust engine (`bt-engine`).
-- **Application layer** -- `fetch_strategy_data()` + `generate_random_strategies*()` keep `engine/` CLI handlers thin and reusable across binaries.
+- **Application layer** -- `fetch_strategy_data()` + `create_signals()` + `create_strategies()` keep `engine/` CLI handlers thin and reusable across binaries.
 - **Parquet partitioning by (instrument, mms_id)** -- Mirrors the single-instrument/single-MMS backtest constraint; enables partition pruning.
-- **Reproducible generation** -- Optional `seed` on `generate_random_strategies_bulk` enables deterministic test fixtures.
+- **Real metrics in generator** -- `create_strategies()` computes real `max_draw_down`/`global_roi`/`annual_roi`/`annual_operation_count` from operation points. Parallelized with rayon.
 
 ### What Could Be Better
 - **Test coverage** -- No integration tests for the engine module yet. Should have tests for `StrategyCommand::execute()` and `RedisCommand::execute()`.
 - **Cache integration** -- The Redis cache infrastructure exists but is not yet integrated into the engine's compute path. Requires a follow-up.
-- **Real metrics in generator** -- The pure metric functions exist but are not yet wired into the strategy generator. Generated strategies carry random metrics.
+- **Real signal generation** -- `create_signals()` picks random timestamps. Real indicator-based signal generation (MACD crossover, RSI thresholds) is the next step.
 
 ### Lessons Learned
 - **Keep context files in sync with code** -- After major refactors, update `.opencode/context/` immediately. Outdated context misleads AI agents.
@@ -156,7 +166,7 @@
 - **Redis must be running** -- Before using `ct redis` or `bt-engine redis`, ensure the Redis container is up: `docker compose up -d redis`.
 - **Redis is hardcoded** -- The Redis connection string `redis://redis:6379/0` is hardcoded, not configurable via environment. Works via Docker Compose network.
 - **Parquet base dir is environment-scoped** -- `/app/parquet_files/{env}/strategy`. Override with `--parquet-dir` when running outside Docker.
-- **Generated metrics are placeholders** -- Until the generator is wired to the metric functions, parquet output carries random metric values, not computed ones.
+- **Signal timestamps are placeholders** -- `create_signals()` picks random timestamps, not indicator-derived signals. Metrics are real given the signals, but the signals themselves are random.
 
 ## Active Projects
 
@@ -169,7 +179,7 @@
 | Domain metric functions | `max_draw_down()` + `annual_operation_count()` as pure domain functions | Arman Mojaver | Complete (2026-06-24) |
 | Strategy filtering | `filter_strategies()` + `GlobalStrategyFilter` with baseline defaults | Arman Mojaver | Complete (2026-06-22) |
 | Cache integration in compute path | Wire engine's compute logic to check Redis before computing | Arman Mojaver | Next iteration |
-| Wire real metrics into generator | Replace random placeholder metrics with computed `max_draw_down`/`annual_operation_count` | Arman Mojaver | Next iteration |
+| Wire real metrics into generator | Replace random placeholder metrics with computed `max_draw_down`/`global_roi`/`annual_roi`/`annual_operation_count` | Arman Mojaver | Complete (2026-06-28) |
 
 ## Archive (Resolved Items)
 
@@ -204,6 +214,16 @@ Moved here for historical reference. Current team should refer to current notes 
 - **Resolved**: 2026-06-24
 - **Resolution**: `max_draw_down()` and `annual_operation_count()` added as pure free functions over `&[OperationPoint]` in `src/domain/`. `filter_strategies()` + `GlobalStrategyFilter` added to `src/domain/strategy.rs`.
 - **Learnings**: One file per metric keeps each independently readable and testable. `GlobalStrategyFilter::default()` documents the baseline quality bar in code.
+
+### Resolved: Real metrics in the strategy generator
+- **Resolved**: 2026-06-28
+- **Resolution**: `create_strategies()` now computes real `max_draw_down`, `global_roi` → `annual_roi`, and `annual_operation_count` from each strategy's referenced operation points. Added `global_roi()` and `annual_roi()` domain functions. Parallelized with rayon. `strategy generate` command removed (no longer useful with real metrics).
+- **Learnings**: Two-stage filtering (signal groups by op count, then strategies by DD + ROI) reduces wasted computation. Rayon `par_iter()` is trivial to add for embarrassingly parallel work.
+
+### Resolved: i64 timestamps + SignalGroup in domain
+- **Resolved**: 2026-06-28
+- **Resolution**: All timestamps converted to `i64`. `SignalGroup` moved to `domain::signal_group` with embedded `indicator_id`. Redis cache now stores `Vec<SignalGroup>`.
+- **Learnings**: Domain concepts belong in the domain layer, even if they're cached in infrastructure. Embedding the ID in the struct survives serialization better than a HashMap key.
 
 ## Onboarding Checklist
 

@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.3 | Updated: 2026-06-26 -->
+<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.4 | Updated: 2026-06-28 -->
 
 # Business ↔ Tech Bridge
 
@@ -20,10 +20,10 @@
 | Indicator collection | `IndicatorRepository` trait | `src/domain/indicator.rs` | Port — `get_all()`, `get_by_type()` |
 | Money management strategy | `money_management_strategy_id` field | `src/domain/operation_point.rs`, `src/domain/strategy.rs` | Integer ID, no dedicated struct yet |
 | A backtested strategy | `Strategy` struct | `src/domain/strategy.rs` | indicator + op-point ID sets + MMS + metrics |
-| Strategy quality bar | `GlobalStrategyFilter` + `filter_strategies()` | `src/domain/strategy.rs` | Default: DD≤30%, ROI≥10%, ops≥10 |
-| Annual return on investment | `annual_roi` field on `Strategy` | `src/domain/strategy.rs` | Randomized by current generator |
-| "How deep did it draw down?" | `max_draw_down()` | `src/domain/max_draw_down.rs` | Pure fn over `&[OperationPoint]`, returns % |
-| "How many trades per year?" | `annual_operation_count()` | `src/domain/annual_operation_count.rs` | Pure fn over `&[OperationPoint]` + time span |
+| Strategy quality bar | `GlobalStrategyFilter` + `filter_strategies()` | `src/domain/strategy.rs` | Default: DD≤30%, ROI≥10% (op count filtered earlier) |
+| Annual return on investment | `annual_roi` field on `Strategy` | `src/domain/strategy.rs` | Computed by `annual_roi()` from global ROI + time span |
+| "How deep did it draw down?" | `max_draw_down()` | `src/domain/max_draw_down.rs` | Pure fn over `&[&OperationPoint]`, returns % |
+| "How many trades per year?" | `annual_operation_count()` | `src/domain/annual_operation_count.rs` | Pure fn over `(count: usize, start_ts: i64, end_ts: i64)` |
 | "Is the data valid?" | `validate_all()` | `src/domain/validation/combined_validation.rs` | Runs 5 checks, fails fast |
 | "Data must not be empty" | `validate_empty_entities()` | `src/domain/validation/empty_validation.rs` | Checks all 4 datasets |
 | "All same instrument" | `validate_same_instrument()` | `src/domain/validation/same_instrument_validation.rs` | Compares against first resampled point |
@@ -35,10 +35,10 @@
 | Environment config | `Environment` enum + `DbConfig` | `src/config/environment.rs` | Production / Development / Testing |
 | Parquet base directory | `parquet_base_dir(env)` | `src/config/environment.rs` | `/app/parquet_files/{env}/strategy` |
 | Fetch strategy inputs from DB | `fetch_strategy_data(query)` | `src/application/strategy_data.rs` | `StrategyQuery{mms_id, instrument}` → `StrategyData` |
-| Generate strategies from DB data | `generate_random_strategies()` | `src/application/strategy_generator.rs` | One strategy per DB indicator |
-| Generate synthetic strategies | `generate_random_strategies_bulk()` | `src/application/strategy_generator.rs` | Distributes across (instrument × mms) partitions; optional seed |
-| Write strategies to parquet | `ParquetStrategyRepository::write()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD |
-| Redis cache (ephemeral) | `SignalGroup`, `SignalGroups`, CRUD functions | `src/infrastructure/redis.rs` | Typed key-value cache for signal groups |
+| Build strategies from signal groups | `create_strategies()` / `create_strategy()` | `src/application/strategy_generator.rs` | One strategy per signal group; computes real metrics; rayon-parallelized |
+| Generate signal groups from indicators | `create_signals()` | `src/application/signal_generator.rs` | Random timestamps from resampled points (skips first/last 200) |
+| Write strategies to parquet | `ParquetStrategyRepository::write()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD; append semantics (reads existing + rewrites); IDs assigned at write time |
+| Redis cache (ephemeral) | `SignalGroup`, CRUD functions | `src/infrastructure/redis.rs` | Stores `Vec<SignalGroup>` (JSON); `SignalGroup` defined in `domain::signal_group` |
 | Redis connection | `redis::Connection` via `redis::Client` | `src/infrastructure/redis.rs` | Sync connection to `redis://redis:6379/0` |
 | Redis cache key constant | `SIGNAL_GROUPS_KEY` (`&str`) | `src/infrastructure/redis.rs` | Plain `"signal_groups"` constant |
 | Read cached signal groups | `read_signal_groups(conn)` | `src/infrastructure/redis.rs` | Returns `Option<SignalGroups>`, hard fail on error |
@@ -53,11 +53,11 @@
 | CLI redis cache | `ct redis` (check), `ct redis -v` (verbose), `ct redis --clean` | `src/cli/redis.rs` | Delegates to `bt-engine redis` via Docker exec |
 | CLI resampled point | `ct resampled-point/rr create`, `ct rr delete` | `src/cli/resampled_point.rs` | |
 | CLI strategy create | `ct strategy/s create -m <mms_id> [-i <instrument>]` | `src/cli/strategy.rs` | Forwards to `bt-engine strategy create` via Docker exec |
-| CLI strategy generate | `ct s generate -c <n> [-i ...] [-m <mms>] [-p <ops>] [-s <seed>] [--parquet-dir <dir>]` | `src/cli/strategy.rs` | Forwards to `bt-engine strategy generate` |
+| ~~CLI strategy generate~~ | _removed_ | `src/cli/strategy.rs` | The `generate` subcommand has been removed from both `ct` and `bt-engine` |
 | CLI strategy display | `ct s display <strategy_id> [-v/--verbose]` | `src/cli/strategy.rs` | Forwards to Python `bt strategy display` via Docker exec |
 | Engine CLI module | Command tree for `bt-engine` | `src/engine/mod.rs` | `EngineCommand` enum + `build_cli()`, `parse()`, `execute()` |
-| Engine strategy create | `bt-engine strategy create -m <mms_id> [-i <instrument>]` | `src/engine/strategy.rs` | Fetches from PG → validates → generates → writes parquet |
-| Engine strategy generate | `bt-engine strategy generate ...` | `src/engine/strategy.rs` | Purely synthetic; no DB; writes partitioned parquet |
+| Engine strategy create | `bt-engine strategy create -m <mms_id> [-i <instrument>]` | `src/engine/strategy/create.rs` | Full pipeline: fetch → validate → create signals → filter signal groups → create strategies → filter → write parquet |
+| ~~Engine strategy generate~~ | _removed_ | — | The `generate` subcommand has been removed from `bt-engine` |
 | Engine redis subcommand | Redis cache under `bt-engine` | `src/engine/redis.rs` | `RedisCommand::Check { verbose }`, `RedisCommand::Clean` |
 | Refresh CLI after changes | `cargo install --path . --bin ct --force` | — | Installs updated `ct` to `~/.cargo/bin/ct` |
 | Refresh engine binary after changes | `cargo install --path . --bin bt-engine --force` | `Cargo.toml` defines both `[[bin]]` entries | Installs updated `bt-engine` to `~/.cargo/bin/bt-engine` |
@@ -74,11 +74,15 @@ Business Question                              Code Path
 "Is this data valid?"                     →   combined_validation::validate_all(long, short, indicators, resampled, mms_id)
 "What instrument are we on?"              →   resampled_points[0].instrument (reference instrument)
 "What MMS are we testing?"                →   expected_mms_id parameter to validate_all()
-"How deep was the worst draw down?"       →   max_draw_down(&operation_points)
-"How many trades per year?"               →   annual_operation_count(&ops, start_ts, end_ts)
+"What is the time span of the data?"      →   operation_points.start_end_timestamps() → (start_ts, end_ts)
+"How deep was the worst draw down?"       →   max_draw_down(&[&operation_points])
+"What is the total return?"               →   global_roi(&[&operation_points])
+"What is the annualized return?"          →   annual_roi(start_ts, end_ts, global_roi)
+"How many trades per year?"               →   annual_operation_count(count, start_ts, end_ts)
+"Generate signal groups?"                 →   create_signals(indicators, resampled_points, count)
+"Which signal groups have enough ops?"    →   filter_signal_groups_by_annual_ops(groups, min_ops, start_ts, end_ts)
 "Which strategies pass the quality bar?"  →   filter_strategies(strategies, &GlobalStrategyFilter::default())
-"Generate strategies from DB data?"       →   fetch_strategy_data() → generate_random_strategies() → ParquetStrategyRepository::write()
-"Generate N synthetic strategies?"        →   generate_random_strategies_bulk(count, instruments, mms_count, ...) → write per partition
+"Create strategies from DB data?"         →   fetch_strategy_data() → validate → create_signals() → filter_signal_groups_by_annual_ops() → create_strategies() → filter_strategies() → ParquetStrategyRepository::write()
 "Is the cache HIT or MISS?"               →   bt-engine redis / ct redis → read_signal_groups()
 "Clear the signal cache?"                 →   bt-engine redis --clean / ct redis --clean → delete_signal_groups()
 ```
@@ -89,7 +93,7 @@ Business Question                              Code Path
 |--------------------|---------------|-------------------|
 | New entity | `src/domain/{entity}.rs` + trait | See `indicator.rs` |
 | New validation rule | `src/domain/validation/{rule}.rs` | See `same_instrument_validation.rs` |
-| New domain metric | `src/domain/{metric}.rs` as a free fn over `&[OperationPoint]` | See `max_draw_down.rs` / `annual_operation_count.rs` |
+| New domain metric | `src/domain/{metric}.rs` as a free fn | See `max_draw_down.rs` (`&[&OperationPoint]`), `annual_operation_count.rs` (count + span), `annual_roi.rs` (span + global ROI) |
 | New data source adapter | `src/infrastructure/{adapter}.rs` | See `in_memory_repos.rs` or `redis.rs` |
 | New application orchestration | `src/application/{name}.rs` | See `strategy_data.rs` / `strategy_generator.rs` |
 | New CLI command group (ct binary) | `src/cli/{name}.rs` | See `src/cli/dev.rs` — 4 sections: builder, types, parse, execute |

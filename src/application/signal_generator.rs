@@ -1,76 +1,191 @@
-use rand::RngExt;
-
 use crate::domain::indicator::Indicator;
+use crate::domain::indicators::generate_indicator_values;
 use crate::domain::resampled_point::ResampledPointD1;
+use crate::domain::signal::IndicatorValues;
 use crate::domain::signal_group::SignalGroup;
 
-/// Create a `SignalGroup` for each indicator, populated with random timestamps
-/// drawn from `resampled_points` (excluding the first and last 200 entries).
+/// Create a `SignalGroup` for each indicator by computing its indicator
+/// values from `resampled_points` and deriving long/short signals from them.
 ///
-/// Timestamps are intercalated between long and short (first → long, second →
-/// short, third → long, …) and never repeated across the two vectors.
+/// The `count` parameter is retained for signature stability with the
+/// previous random-stub implementation but is **not used**: the number of
+/// signals is now determined by the data, not requested. It is marked for
+/// removal in a later cleanup.
 ///
-/// `count` controls how many timestamps land in each of long and short
-/// (default 100).
+/// Indicators whose computation is unsupported (e.g. MACD, out of scope for
+/// this migration) are skipped silently rather than aborting the run.
 pub fn create_signals(
     indicators: &[Indicator],
     resampled_points: &[ResampledPointD1],
-    count: usize,
+    _count: usize,
 ) -> Vec<SignalGroup> {
-    let mut rng = rand::rng();
+    indicators
+        .iter()
+        .filter_map(|indicator| {
+            let values: IndicatorValues =
+                generate_indicator_values(&indicator.parameters, resampled_points).ok()?;
+            Some(values.generate_signals(indicator.id))
+        })
+        .collect()
+}
 
-    // Collect eligible timestamps, skipping the first 200 and last 200.
-    let mut eligible: Vec<i64> = Vec::new();
-    let len = resampled_points.len();
-    if len > 400 {
-        for rp in resampled_points.iter().skip(200).take(len - 400) {
-            eligible.push(rp.timestamp);
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::fixtures::{indicators_rsi_single, resampled_points_for_rsi};
+    use crate::domain::indicator::{Indicator, IndicatorParameters};
+    use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+
+    #[test]
+    fn rsi_indicator_produces_a_signal_group_stamped_with_its_id() {
+        // 5 points (1,2,1,2,1), n=3 -> diffs [+1,-1,+1,-1], 2 RSI windows.
+        // window [+1,-1,+1] -> rsi 67; window [-1,+1,-1] -> rsi 33.
+        // Thresholds 70/30: 67 and 33 never cross 70 or 30 -> no signals.
+        // So this verifies the path runs and returns a group with no signals.
+        let indicators = indicators_rsi_single();
+        let points = resampled_points_for_rsi();
+        let result = create_signals(&indicators, &points, 100);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].indicator_id, 1);
+        // RSI 67/33 sit between 30 and 70 -> no threshold crossing -> no signals.
+        assert!(result[0].long_signals.is_empty());
+        assert!(result[0].short_signals.is_empty());
     }
 
-    let mut signal_groups: Vec<SignalGroup> = Vec::new();
-
-    for indicator in indicators {
-        let mut long_signals: Vec<i64> = Vec::new();
-        let mut short_signals: Vec<i64> = Vec::new();
-
-        // Pick random indices from eligible timestamps, without repeating.
-        let mut used_indices: Vec<usize> = Vec::new();
-        let total_needed = count * 2;
-
-        while long_signals.len() < count || short_signals.len() < count {
-            if eligible.is_empty() {
-                break;
-            }
-
-            let index = rng.random_range(0..eligible.len());
-
-            // Skip if this index was already used.
-            if used_indices.contains(&index) {
-                continue;
-            }
-            used_indices.push(index);
-
-            let timestamp = eligible[index];
-
-            // Intercalate: first goes to long, second to short, third to long, ...
-            if long_signals.len() <= short_signals.len() {
-                long_signals.push(timestamp);
-            } else {
-                short_signals.push(timestamp);
-            }
-
-            if used_indices.len() >= total_needed {
-                break;
-            }
-        }
-
-        signal_groups.push(SignalGroup {
-            indicator_id: indicator.id,
-            long_signals,
-            short_signals,
-        });
+    #[test]
+    fn count_parameter_is_ignored_signal_count_comes_from_data() {
+        let indicators = indicators_rsi_single();
+        let points = resampled_points_for_rsi();
+        let with_count_a = create_signals(&indicators, &points, 0);
+        let with_count_b = create_signals(&indicators, &points, 1000);
+        assert_eq!(with_count_a.len(), with_count_b.len());
     }
 
-    signal_groups
+    #[test]
+    fn unsupported_indicator_is_skipped_not_aborted() {
+        // MACD is unsupported -> produces no group, but RSI still produces one.
+        let indicators = vec![
+            Indicator {
+                id: 1,
+                r#type: "macd".to_string(),
+                parameters: IndicatorParameters::Macd {
+                    slow_type: "ema".to_string(),
+                    slow_n: 26,
+                    fast_type: "ema".to_string(),
+                    fast_n: 12,
+                },
+                identifier: "macd_1".to_string(),
+            },
+            Indicator {
+                id: 2,
+                r#type: "rsi".to_string(),
+                parameters: IndicatorParameters::Rsi {
+                    n: 3,
+                    high_threshold: 70,
+                    low_threshold: 30,
+                },
+                identifier: "rsi_2".to_string(),
+            },
+        ];
+        let points = resampled_points_for_rsi();
+        let result = create_signals(&indicators, &points, 100);
+        // Only the RSI indicator yields a group.
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].indicator_id, 2);
+    }
+
+    #[test]
+    fn no_indicators_yields_no_signal_groups() {
+        let points = resampled_points_for_rsi();
+        let result = create_signals(&[], &points, 100);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn all_unsupported_yields_no_signal_groups() {
+        let indicators = vec![Indicator {
+            id: 1,
+            r#type: "macd".to_string(),
+            parameters: IndicatorParameters::Macd {
+                slow_type: "ema".to_string(),
+                slow_n: 26,
+                fast_type: "ema".to_string(),
+                fast_n: 12,
+            },
+            identifier: "macd_1".to_string(),
+        }];
+        let points = resampled_points_for_rsi();
+        let result = create_signals(&indicators, &points, 100);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn rsi_crossing_thresholds_produces_signals() {
+        // Prices 5,4,3,4 with n=2: diffs [-1,-1,+1], RSI windows:
+        //   window [-1,-1] -> gain 0, loss 2 -> rs 0 -> rsi 0 (ts 3000)
+        //   window [-1,+1] -> gain 1, loss 1 -> rs 1 -> rsi 50 (ts 4000)
+        // Thresholds 70/30: prev rsi 0 < low 30, curr rsi 50 > low 30 -> long.
+        let points = vec![
+            ResampledPointD1 {
+                id: 1,
+                instrument: "EURUSD".into(),
+                open: 5.0,
+                high: 5.1,
+                low: 4.9,
+                close: 5.0,
+                volume: 1000,
+                timestamp: 1000,
+                high_low_order: HighLowOrder::HighFirst,
+            },
+            ResampledPointD1 {
+                id: 2,
+                instrument: "EURUSD".into(),
+                open: 4.0,
+                high: 4.1,
+                low: 3.9,
+                close: 4.0,
+                volume: 1000,
+                timestamp: 2000,
+                high_low_order: HighLowOrder::HighFirst,
+            },
+            ResampledPointD1 {
+                id: 3,
+                instrument: "EURUSD".into(),
+                open: 3.0,
+                high: 3.1,
+                low: 2.9,
+                close: 3.0,
+                volume: 1000,
+                timestamp: 3000,
+                high_low_order: HighLowOrder::HighFirst,
+            },
+            ResampledPointD1 {
+                id: 4,
+                instrument: "EURUSD".into(),
+                open: 4.0,
+                high: 4.1,
+                low: 3.9,
+                close: 4.0,
+                volume: 1000,
+                timestamp: 4000,
+                high_low_order: HighLowOrder::HighFirst,
+            },
+        ];
+        let indicators = vec![Indicator {
+            id: 7,
+            r#type: "rsi".to_string(),
+            parameters: IndicatorParameters::Rsi {
+                n: 2,
+                high_threshold: 70,
+                low_threshold: 30,
+            },
+            identifier: "rsi_2-70-30".to_string(),
+        }];
+        let result = create_signals(&indicators, &points, 100);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].indicator_id, 7);
+        // RSI 0 -> 50 crosses above low threshold 30 -> long signal at ts 4000.
+        assert_eq!(result[0].long_signals, vec![4000]);
+        assert!(result[0].short_signals.is_empty());
+    }
 }

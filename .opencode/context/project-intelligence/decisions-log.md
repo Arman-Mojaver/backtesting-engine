@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.3 | Updated: 2026-06-26 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.4 | Updated: 2026-06-28 -->
 
 # Decisions Log
 
@@ -297,6 +297,190 @@ Define two `[[bin]]` entries in `Cargo.toml`:
 - `Cargo.toml` — `[[bin]]` entries
 - `src/main.rs`, `src/bin/bt-engine.rs`
 
+
+## Decision: i64 Timestamps Across the Domain
+
+**Date**: 2026-06-27
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+All timestamps in the domain (`OperationPoint.timestamp`, `ResampledPointD1.timestamp`, signal timestamps) were `i32`. While sufficient for dates after 1970, `i32` is fragile for far-future dates and inconsistent with the broader Rust ecosystem which favours `i64` for epoch seconds. The PG adapter was reading `i32` columns directly.
+
+### Decision
+Convert all timestamp fields to `i64` across the domain: `OperationPoint`, `ResampledPointD1`, `SignalGroup` signal vectors, `OperationPoints` lookup maps, and validation HashSets. The PG adapter casts the `i32` DB column to `i64` on read (`row.get::<_, i32>("timestamp") as i64`).
+
+### Rationale
+- `i64` is the Rust ecosystem standard for epoch seconds (matches `chrono`, `time`, `std::time`)
+- Future-proofs against Y2038 concerns and far-future backtests
+- Consistent type across domain boundaries (no mixed `i32`/`i64` comparisons)
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep `i32` | No code change | Fragile, inconsistent with ecosystem | Technical debt |
+| `u64` | No negative timestamps | Breaks arithmetic (subtraction can underflow) | `i64` is safer |
+
+### Impact
+**Positive**: Consistent, future-proof timestamps; matches ecosystem conventions
+**Negative**: PG adapter must cast on read
+**Risk**: None — internal type change, no external API impact
+
+### Related
+- Commit `514a846` (chore: convert all timestamps to i64)
+- Implementation: `src/domain/operation_point.rs`, `src/domain/resampled_point.rs`, `src/infrastructure/pg_adapter.rs`
+
+---
+
+## Decision: SignalGroup Moved to Domain + Embeds indicator_id
+
+**Date**: 2026-06-27
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+`SignalGroup` previously lived in `infrastructure::redis` as a HashMap keyed by indicator ID (`SignalGroups = HashMap<i32, SignalGroup>`). The `SignalGroup` struct itself had no `indicator_id` field — the association was implicit via the HashMap key. This meant the domain layer couldn't reference `SignalGroup` without depending on infrastructure, and the HashMap structure was lost when serialized to Redis (JSON array).
+
+### Decision
+Move `SignalGroup` to `domain::signal_group`, add an `indicator_id: i32` field to the struct, and replace `SignalGroups` (HashMap) with `Vec<SignalGroup>`. The Redis cache now stores/reads `Vec<SignalGroup>` directly. Added `operation_count()` method and `filter_signal_groups_by_annual_ops()` free function to the domain module.
+
+### Rationale
+- `SignalGroup` is a domain concept (a set of trade signals for an indicator) — it belongs in the domain layer
+- Embedding `indicator_id` makes the association explicit and survives serialization (no HashMap key loss)
+- `Vec<SignalGroup>` is simpler than `HashMap` and matches the Redis JSON array representation
+- Domain-level `filter_signal_groups_by_annual_ops()` enables pre-filtering signal groups before the expensive strategy-creation stage
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep `SignalGroup` in infrastructure | No domain change | Domain can't reference it; HashMap key lost on serialize | Wrong layer |
+| Keep HashMap, add `indicator_id` field | Redundant key | Duplicates the ID in key and field | Redundancy |
+
+### Impact
+**Positive**: Domain owns `SignalGroup`; explicit ID association; pre-filtering reduces downstream work; simpler Redis schema
+**Negative**: `Vec` lookup by ID is O(n) vs HashMap O(1) — acceptable (signal groups are iterated, not looked up by ID)
+**Risk**: None significant
+
+### Related
+- Commit `a367327` (domain: embed indicator_id in SignalGroup, adapt redis to new structure)
+- Implementation: `src/domain/signal_group.rs`, `src/infrastructure/redis.rs`, `src/engine/redis.rs`
+
+---
+
+## Decision: Compute Real Metrics in the Strategy Generator
+
+**Date**: 2026-06-28
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The strategy generator previously filled `annual_roi`, `max_draw_down`, and `annual_operation_count` with **random placeholder values**. The pure domain metric functions (`max_draw_down()`, `annual_operation_count()`) existed but were not wired in. Downstream consumers reading parquet output saw synthetic numbers, not real performance. This was tracked as high-priority technical debt.
+
+### Decision
+Rewrite the strategy generator (`application::strategy_generator`) to compute real metrics. `create_strategies()` iterates signal groups (parallelized with **rayon** `par_iter()`), and for each signal group `create_strategy()`:
+1. Resolves long/short operation points by timestamp lookup
+2. Sorts all ops by timestamp
+3. Computes `max_draw_down(&all_ops)`, `global_roi(&all_ops)` → `annual_roi(start, end, global)`, and `annual_operation_count(count, start, end)`
+4. Builds a `Strategy` with the computed metrics
+
+Added two new domain metric functions: `global_roi()` (total ROI compounding against cummax) and `annual_roi()` (annualizes global ROI via compounding).
+
+### Rationale
+- Real metrics make parquet output trustworthy for downstream consumers
+- Rayon parallelism scales across many signal groups
+- Two-stage filtering (signal groups by op count, then strategies by DD + ROI) reduces wasted computation
+- `global_roi` + `annual_roi` separation mirrors the `max_draw_down` pattern (pure fn over `&[&OperationPoint]`)
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep random placeholders | No work | Misleading output; high-priority debt | Unacceptable |
+| Compute metrics lazily on read | Defers cost | Complex; parquet is columnar | Premature |
+| Single-threaded computation | Simpler | Slow for many signal groups | Rayon is trivial to add |
+
+### Impact
+**Positive**: Parquet output now carries real, computed metrics; resolves high-priority technical debt; rayon parallelism for performance
+**Negative**: Generator now depends on operation-point data (not purely synthetic)
+**Risk**: Signal generator (`create_signals`) still produces random timestamps — the metrics are real given the signals, but the signals themselves are random placeholders
+
+### Related
+- Commits: `479e3d7` (annual_roi), `cc7ed18` (max_draw_down), `147001a` (operation_count), `5267749` (rayon)
+- Implementation: `src/application/strategy_generator.rs`, `src/domain/annual_roi.rs`, `src/domain/global_roi.rs`
+- Resolves: "Random placeholder strategy metrics" technical debt (see living-notes.md)
+
+---
+
+## Decision: Remove `strategy generate` Command
+
+**Date**: 2026-06-28
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The `strategy generate` command (both `ct s generate` and `bt-engine strategy generate`) produced purely synthetic strategies with random metrics across `(instrument × mms_id)` partitions. With the move to real-metric computation, the synthetic generator (`generate_random_strategies_bulk`) no longer fit — it had no real operation points to compute metrics from. Keeping it would produce strategies with zero/meaningless metrics.
+
+### Decision
+Remove the `generate` subcommand from both `ct` (`src/cli/strategy.rs`) and `bt-engine` (`src/engine/strategy/`). Strategy creation now flows exclusively through `strategy create`, which fetches real data from PG, generates signals, and computes real metrics.
+
+### Rationale
+- Synthetic generation with random metrics is no longer useful — the project now computes real metrics
+- `strategy create` covers the real use case (DB-backed strategy creation)
+- Removes dead code and CLI surface area
+- Simplifies the engine strategy module (now a directory: `mod.rs` + `create.rs`)
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep `generate` with zero metrics | Backward compat | Misleading output | Unacceptable |
+| Keep `generate` but require DB | Reuses create logic | Redundant with `create` | Duplication |
+
+### Impact
+**Positive**: Simpler CLI; no misleading synthetic output; cleaner engine strategy module
+**Negative**: Lost ability to generate test fixtures without a DB
+**Risk**: Low — `strategy create` is the real path
+
+### Related
+- Commit `8475e1a` (chore: remove strategy generate command)
+- Implementation: `src/cli/strategy.rs`, `src/engine/strategy/mod.rs`, `src/engine/strategy/create.rs`
+
+---
+
+## Decision: Parquet Append Semantics + Global strategy_id Assignment
+
+**Date**: 2026-06-28
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The `ParquetStrategyRepository` needed to support multiple writes to the same partition without overwriting previous strategies, and strategy IDs needed to be unique across all partitions. The `Strategy` domain struct had a `strategy_id` field, but assigning it in the domain layer would couple the domain to persistence concerns.
+
+### Decision
+1. Remove `strategy_id` from the `Strategy` domain struct — IDs are persistence-assigned, not domain-owned.
+2. `ParquetStrategyRepository::write()` reads existing rows (if the parquet file exists), appends new rows, and rewrites the whole file.
+3. `find_max_strategy_id()` recursively scans ALL partitions under `base_dir` to find the global max ID. New IDs start at `global_max + 1` and are contiguous within a batch.
+
+### Rationale
+- Domain stays free of persistence concerns (no `strategy_id` on `Strategy`)
+- Append semantics preserve existing strategies across writes
+- Global max scan ensures IDs are unique and contiguous across partitions and appends
+- Rewriting the whole file is simple and correct (parquet files are immutable; append = rewrite)
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| `strategy_id` on domain struct | Domain owns ID | Couples domain to persistence | Violates ports-and-adapters |
+| Append without reading existing | Faster | Loses existing data | Data loss |
+| Per-partition ID counter | Faster scan | IDs not globally unique | Ambiguous across partitions |
+
+### Impact
+**Positive**: Clean domain; append preserves data; globally unique contiguous IDs
+**Negative**: Full file rewrite on each write; recursive scan for max ID (O(all partitions))
+**Risk**: Performance degradation with many partitions — mitigate by caching max ID if needed
+
+### Related
+- Implementation: `src/infrastructure/strategy_adapter.rs`, `src/domain/strategy.rs`
+
+---
 
 ## Deprecated Decisions
 

@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/business | Priority: high | Version: 1.2 | Updated: 2026-06-26 -->
+<!-- Context: project-intelligence/business | Priority: high | Version: 1.3 | Updated: 2026-06-28 -->
 
 # Business Domain
 
@@ -47,11 +47,16 @@ The engine is in **active development**:
 - ✅ PostgreSQL adapters for indicators, operation points, resampled points
 - ✅ `Strategy` entity + `GlobalStrategyFilter` + `filter_strategies()`
 - ✅ Strategy generation (`create` from DB, `generate` synthetic) with partitioned parquet persistence
-- ✅ Application layer (`fetch_strategy_data`, `generate_random_strategies[_bulk]`)
-- ✅ Performance metric functions: `max_draw_down()`, `annual_operation_count()` (pure domain functions)
+- ✅ Application layer (`fetch_strategy_data`, `create_signals`, `create_strategies`)
+- ✅ Performance metric functions: `max_draw_down()`, `global_roi()`, `annual_roi()`, `annual_operation_count()` (pure domain functions)
+- ✅ Real metrics computed in the strategy generator (`create_strategies()` — no more random placeholders)
+- ✅ Signal generator (`create_signals()` — random timestamp sampling from resampled points)
+- ✅ Two-stage filtering: signal groups by annual op count, then strategies by DD + ROI
 - ✅ Redis signal-groups cache infrastructure (read/write/delete)
+- ✅ `SignalGroup` in domain layer with embedded `indicator_id`
+- ✅ All timestamps are `i64` (epoch seconds)
 - ⬜ Backtest execution logic (not yet implemented)
-- ⬜ Wire real metrics into the strategy generator (currently random placeholders)
+- ⬜ Real signal generation from indicator parameters (MACD crossover, RSI thresholds — currently random timestamps)
 - ⬜ Cache integration in the engine compute path
 - ⬜ API endpoints for running backtests
 
