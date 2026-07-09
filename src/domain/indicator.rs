@@ -14,6 +14,10 @@ pub enum IndicatorParameters {
     /// Awesome Oscillator — fixed 5/34 SMA of the median price, no
     /// configurable parameters (per the MQL5 source).
     AwesomeOscillator,
+    /// Accelerator/Decelerator — fixed 5/34 SMA of the median price with
+    /// AO minus SMA(AO,5), no configurable parameters (per the MQL5
+    /// `Accelerator.mq5` source).
+    AcceleratorDecelerator,
 }
 
 #[derive(Debug, Clone)]
