@@ -18,6 +18,10 @@ pub enum IndicatorParameters {
     /// AO minus SMA(AO,5), no configurable parameters (per the MQL5
     /// `Accelerator.mq5` source).
     AcceleratorDecelerator,
+    /// Bears Power — `low[i] - EMA(close, period)[i]` with a configurable
+    /// EMA period (default 13 per the MQL5 `Bears.mq5` source). The MA method
+    /// is baked in as `MODE_EMA` per umbrella PRD Decision 8.
+    BearsPower { period: i32 },
 }
 
 #[derive(Debug, Clone)]
