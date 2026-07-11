@@ -3,6 +3,7 @@ pub mod ao;
 pub mod bears;
 pub mod bulls;
 pub mod cho;
+pub mod chv;
 pub mod moving_averages;
 pub mod rsi;
 
@@ -46,6 +47,10 @@ pub enum IndicatorError {
     InvalidChoFastPeriod { n: i32 },
     /// The Chaikin Oscillator slow MA period `n` is not positive.
     InvalidChoSlowPeriod { n: i32 },
+    /// The Chaikin Volatility smooth period `n` is not positive.
+    InvalidChvSmoothPeriod { n: i32 },
+    /// The Chaikin Volatility rate-of-change period `n` is not positive.
+    InvalidChvPeriod { n: i32 },
     /// The number of resampled points is too few for the requested window.
     NotEnoughData { points: usize, required: usize },
     /// The indicator variant has no implementation yet (e.g. MACD).
@@ -95,6 +100,13 @@ pub fn generate_indicator_values(
         }
         IndicatorParameters::ChaikinOscillator { fast_ma, slow_ma } => {
             let buffer = cho::compute(points, *fast_ma, *slow_ma)?;
+            Ok(IndicatorValues::One(buffer))
+        }
+        IndicatorParameters::ChaikinVolatility {
+            smooth_period,
+            chv_period,
+        } => {
+            let buffer = chv::compute(points, *smooth_period, *chv_period)?;
             Ok(IndicatorValues::One(buffer))
         }
     }
@@ -460,5 +472,77 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = generate_indicator_values(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidChoSlowPeriod { n: 0 });
+    }
+
+    /// 5 points with constant high-low spread -> exactly one CHV value
+    /// (smooth_period=2, chv_period=3 -> needs 5 points).
+    fn rp_chv_5() -> Vec<ResampledPointD1> {
+        (0..5)
+            .map(|i| ResampledPointD1 {
+                id: i + 1,
+                instrument: "EURUSD".to_string(),
+                open: 9.0,
+                high: 11.0,
+                low: 9.0,
+                close: 11.0,
+                volume: 1000,
+                timestamp: (i + 1) as i64,
+                high_low_order: HighLowOrder::HighFirst,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn chaikin_volatility_dispatch_returns_one_variant() {
+        let params = IndicatorParameters::ChaikinVolatility {
+            smooth_period: 2,
+            chv_period: 3,
+        };
+        let points = rp_chv_5();
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => {
+                // 5 points, smooth=2, chv=3 -> 1 CHV value = 0.0 (constant spread).
+                assert_eq!(buf.items.len(), 1);
+                assert_eq!(buf.items[0].value, 0.0);
+            }
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn chaikin_volatility_dispatch_with_insufficient_data_yields_empty_one() {
+        let params = IndicatorParameters::ChaikinVolatility {
+            smooth_period: 10,
+            chv_period: 10,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn chaikin_volatility_invalid_smooth_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::ChaikinVolatility {
+            smooth_period: 0,
+            chv_period: 10,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidChvSmoothPeriod { n: 0 });
+    }
+
+    #[test]
+    fn chaikin_volatility_invalid_chv_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::ChaikinVolatility {
+            smooth_period: 10,
+            chv_period: 0,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidChvPeriod { n: 0 });
     }
 }

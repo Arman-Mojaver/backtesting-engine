@@ -32,6 +32,12 @@ pub enum IndicatorParameters {
     /// method is baked in as `MODE_EMA`; the volume type is `VOLUME_TICK`
     /// (using `point.volume` as f64, per umbrella PRD Decision 5).
     ChaikinOscillator { fast_ma: i32, slow_ma: i32 },
+    /// Chaikin Volatility — `100 * (SHL[i] - SHL[i - chv_period]) /
+    /// SHL[i - chv_period])` where `SHL = EMA(high - low, smooth_period)`.
+    /// Two configurable periods (defaults 10 and 10 per the MQL5 `CHV.mq5`
+    /// source). The MA method is baked in as `EMA` per umbrella PRD
+    /// Decision 8.
+    ChaikinVolatility { smooth_period: i32, chv_period: i32 },
 }
 
 #[derive(Debug, Clone)]

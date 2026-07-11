@@ -72,6 +72,10 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> IndicatorParameters 
             fast_ma: json_extract_i32(json_text, "fast_ma"),
             slow_ma: json_extract_i32(json_text, "slow_ma"),
         },
+        "chaikin_volatility" => IndicatorParameters::ChaikinVolatility {
+            smooth_period: json_extract_i32(json_text, "smooth_period"),
+            chv_period: json_extract_i32(json_text, "chv_period"),
+        },
         _ => panic!("unknown indicator type: {indicator_type}"),
     }
 }
