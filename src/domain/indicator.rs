@@ -49,6 +49,18 @@ pub enum IndicatorParameters {
     /// `MODE_SMA`; the applied price is `PRICE_CLOSE`; the volume type is
     /// `VOLUME_TICK` (using `point.volume` as f64, per umbrella PRD Decision 7).
     ForceIndex { period: i32 },
+    /// OsMA (Moving Average of Oscillator, aka MACD histogram) —
+    /// `MACD - Signal` where `MACD = EMA(close, fast_ema) - EMA(close,
+    /// slow_ema)` and `Signal = SMA(MACD, signal_sma)`. Three configurable
+    /// periods (defaults 12, 26, 9 per the MQL5 `OsMA.mq5` source). The MA
+    /// methods are baked in as `MODE_EMA` for fast/slow and `MODE_SMA` for
+    /// the signal line; the applied price is `PRICE_CLOSE` (per umbrella PRD
+    /// Decision 8).
+    OsMa {
+        fast_ema: i32,
+        slow_ema: i32,
+        signal_sma: i32,
+    },
 }
 
 #[derive(Debug, Clone)]

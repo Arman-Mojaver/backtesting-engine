@@ -82,6 +82,11 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> IndicatorParameters 
         "force_index" => IndicatorParameters::ForceIndex {
             period: json_extract_i32(json_text, "period"),
         },
+        "osma" => IndicatorParameters::OsMa {
+            fast_ema: json_extract_i32(json_text, "fast_ema"),
+            slow_ema: json_extract_i32(json_text, "slow_ema"),
+            signal_sma: json_extract_i32(json_text, "signal_sma"),
+        },
         _ => panic!("unknown indicator type: {indicator_type}"),
     }
 }

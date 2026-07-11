@@ -7,6 +7,7 @@ pub mod chv;
 pub mod dpo;
 pub mod force;
 pub mod moving_averages;
+pub mod osma;
 pub mod rsi;
 
 #[cfg(test)]
@@ -57,6 +58,12 @@ pub enum IndicatorError {
     InvalidDpoPeriod { n: i32 },
     /// The Force Index period `n` is not positive.
     InvalidForcePeriod { n: i32 },
+    /// The OsMA fast EMA period `n` is not positive.
+    InvalidOsMaFastPeriod { n: i32 },
+    /// The OsMA slow EMA period `n` is not positive.
+    InvalidOsMaSlowPeriod { n: i32 },
+    /// The OsMA signal SMA period `n` is not positive.
+    InvalidOsMaSignalPeriod { n: i32 },
     /// The number of resampled points is too few for the requested window.
     NotEnoughData { points: usize, required: usize },
     /// The indicator variant has no implementation yet (e.g. MACD).
@@ -121,6 +128,14 @@ pub fn generate_indicator_values(
         }
         IndicatorParameters::ForceIndex { period } => {
             let buffer = force::compute(points, *period)?;
+            Ok(IndicatorValues::One(buffer))
+        }
+        IndicatorParameters::OsMa {
+            fast_ema,
+            slow_ema,
+            signal_sma,
+        } => {
+            let buffer = osma::compute(points, *fast_ema, *slow_ema, *signal_sma)?;
             Ok(IndicatorValues::One(buffer))
         }
     }
@@ -670,5 +685,97 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = generate_indicator_values(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidForcePeriod { n: 0 });
+    }
+
+    /// 6 points with constant close -> exactly one OsMA value
+    /// (fast=3, slow=5, signal=2 -> needs 6 points).
+    fn rp_osma_6() -> Vec<ResampledPointD1> {
+        (0..6)
+            .map(|i| {
+                let m = 10.0;
+                ResampledPointD1 {
+                    id: i + 1,
+                    instrument: "EURUSD".to_string(),
+                    open: m,
+                    high: m,
+                    low: m,
+                    close: m,
+                    volume: 1000,
+                    timestamp: (i + 1) as i64,
+                    high_low_order: HighLowOrder::HighFirst,
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn osma_dispatch_returns_one_variant() {
+        let params = IndicatorParameters::OsMa {
+            fast_ema: 3,
+            slow_ema: 5,
+            signal_sma: 2,
+        };
+        let points = rp_osma_6();
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => {
+                // 6 points, fast=3, slow=5, signal=2 -> 1 OsMA value
+                // (constant close -> 0.0).
+                assert_eq!(buf.items.len(), 1);
+                assert_eq!(buf.items[0].value, 0.0);
+            }
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn osma_dispatch_with_insufficient_data_yields_empty_one() {
+        let params = IndicatorParameters::OsMa {
+            fast_ema: 12,
+            slow_ema: 26,
+            signal_sma: 9,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn osma_invalid_fast_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::OsMa {
+            fast_ema: 0,
+            slow_ema: 26,
+            signal_sma: 9,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidOsMaFastPeriod { n: 0 });
+    }
+
+    #[test]
+    fn osma_invalid_slow_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::OsMa {
+            fast_ema: 12,
+            slow_ema: 0,
+            signal_sma: 9,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidOsMaSlowPeriod { n: 0 });
+    }
+
+    #[test]
+    fn osma_invalid_signal_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::OsMa {
+            fast_ema: 12,
+            slow_ema: 26,
+            signal_sma: 0,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidOsMaSignalPeriod { n: 0 });
     }
 }
