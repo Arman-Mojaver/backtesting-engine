@@ -76,6 +76,9 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> IndicatorParameters 
             smooth_period: json_extract_i32(json_text, "smooth_period"),
             chv_period: json_extract_i32(json_text, "chv_period"),
         },
+        "detrended_price_oscillator" => IndicatorParameters::DetrendedPriceOscillator {
+            period: json_extract_i32(json_text, "period"),
+        },
         _ => panic!("unknown indicator type: {indicator_type}"),
     }
 }

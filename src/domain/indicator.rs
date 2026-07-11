@@ -38,6 +38,11 @@ pub enum IndicatorParameters {
     /// source). The MA method is baked in as `EMA` per umbrella PRD
     /// Decision 8.
     ChaikinVolatility { smooth_period: i32, chv_period: i32 },
+    /// Detrended Price Oscillator — `close[i] - SMA(close, ExtMAPeriod)[i]`
+    /// where `ExtMAPeriod = InpDetrendPeriod / 2 + 1` (integer division). One
+    /// configurable period (default 12 per the MQL5 `DPO.mq5` source). The MA
+    /// method is baked in as `SMA` per umbrella PRD Decision 8.
+    DetrendedPriceOscillator { period: i32 },
 }
 
 #[derive(Debug, Clone)]
