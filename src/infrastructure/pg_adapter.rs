@@ -65,6 +65,9 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> IndicatorParameters 
         "bears" => IndicatorParameters::BearsPower {
             period: json_extract_i32(json_text, "period"),
         },
+        "bulls" => IndicatorParameters::BullsPower {
+            period: json_extract_i32(json_text, "period"),
+        },
         _ => panic!("unknown indicator type: {indicator_type}"),
     }
 }

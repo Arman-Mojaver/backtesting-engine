@@ -22,6 +22,10 @@ pub enum IndicatorParameters {
     /// EMA period (default 13 per the MQL5 `Bears.mq5` source). The MA method
     /// is baked in as `MODE_EMA` per umbrella PRD Decision 8.
     BearsPower { period: i32 },
+    /// Bulls Power — `high[i] - EMA(close, period)[i]` with a configurable
+    /// EMA period (default 13 per the MQL5 `Bulls.mq5` source). The MA method
+    /// is baked in as `MODE_EMA` per umbrella PRD Decision 8.
+    BullsPower { period: i32 },
 }
 
 #[derive(Debug, Clone)]

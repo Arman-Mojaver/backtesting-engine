@@ -1,6 +1,7 @@
 pub mod ac;
 pub mod ao;
 pub mod bears;
+pub mod bulls;
 pub mod moving_averages;
 pub mod rsi;
 
@@ -38,6 +39,8 @@ pub enum IndicatorError {
     InvalidRsiPeriod { n: i32 },
     /// The Bears Power period `n` is not positive.
     InvalidBearsPeriod { n: i32 },
+    /// The Bulls Power period `n` is not positive.
+    InvalidBullsPeriod { n: i32 },
     /// The number of resampled points is too few for the requested window.
     NotEnoughData { points: usize, required: usize },
     /// The indicator variant has no implementation yet (e.g. MACD).
@@ -79,6 +82,10 @@ pub fn generate_indicator_values(
         }
         IndicatorParameters::BearsPower { period } => {
             let buffer = bears::compute(points, *period)?;
+            Ok(IndicatorValues::One(buffer))
+        }
+        IndicatorParameters::BullsPower { period } => {
+            let buffer = bulls::compute(points, *period)?;
             Ok(IndicatorValues::One(buffer))
         }
     }
@@ -318,5 +325,59 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = generate_indicator_values(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidBearsPeriod { n: 0 });
+    }
+    /// 14 points with constant close/high -> exactly one Bulls value
+    /// (period 13 -> needs 14 points).
+    fn rp_bulls_14() -> Vec<ResampledPointD1> {
+        (0..14)
+            .map(|i| {
+                let m = 10.0;
+                ResampledPointD1 {
+                    id: i + 1,
+                    instrument: "EURUSD".to_string(),
+                    open: m,
+                    high: 11.0,
+                    low: m,
+                    close: m,
+                    volume: 1000,
+                    timestamp: (i + 1) as i64,
+                    high_low_order: HighLowOrder::HighFirst,
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn bulls_power_dispatch_returns_one_variant() {
+        let params = IndicatorParameters::BullsPower { period: 13 };
+        let points = rp_bulls_14();
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => {
+                // 14 points, period 13 -> 1 Bulls value (11.0 - 10.0 = 1.0).
+                assert_eq!(buf.items.len(), 1);
+                assert_eq!(buf.items[0].value, 1.0);
+            }
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bulls_power_dispatch_with_insufficient_data_yields_empty_one() {
+        let params = IndicatorParameters::BullsPower { period: 13 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bulls_power_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::BullsPower { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidBullsPeriod { n: 0 });
     }
 }

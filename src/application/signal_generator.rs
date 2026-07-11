@@ -356,6 +356,37 @@ mod tests {
     }
 
     #[test]
+    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_bulls() {
+        // Same DI pattern as the AO/AC/Bears Level 1 tests, but routed through the
+        // BullsPower parameter variant — verifying signal generation and
+        // timestamp routing independently of real Bulls Power math.
+        let points = match test_support::fetch_eurusd_points() {
+            Some(p) => p,
+            None => {
+                eprintln!("skipping level1_di_test_bulls: development DB unavailable");
+                return;
+            }
+        };
+        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
+
+        let indicators = vec![Indicator {
+            id: 4,
+            r#type: "bulls".to_string(),
+            parameters: IndicatorParameters::BullsPower { period: 13 },
+            identifier: "bulls_4".to_string(),
+        }];
+
+        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].indicator_id, 4);
+        // Alternating [-1, +1, -1, +1, -1]:
+        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
+        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
+        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
+        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
+    }
+
+    #[test]
     fn default_computer_delegates_to_domain_dispatch() {
         // The DefaultIndicatorComputer must produce the same result as the
         // direct domain dispatch — verifying the delegation is correct.
