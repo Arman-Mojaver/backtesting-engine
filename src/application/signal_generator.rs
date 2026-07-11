@@ -387,6 +387,40 @@ mod tests {
     }
 
     #[test]
+    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_cho() {
+        // Same DI pattern as the AO/AC/Bears/Bulls Level 1 tests, but routed
+        // through the ChaikinOscillator parameter variant — verifying signal
+        // generation and timestamp routing independently of real CHO math.
+        let points = match test_support::fetch_eurusd_points() {
+            Some(p) => p,
+            None => {
+                eprintln!("skipping level1_di_test_cho: development DB unavailable");
+                return;
+            }
+        };
+        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
+
+        let indicators = vec![Indicator {
+            id: 5,
+            r#type: "chaikin_oscillator".to_string(),
+            parameters: IndicatorParameters::ChaikinOscillator {
+                fast_ma: 3,
+                slow_ma: 10,
+            },
+            identifier: "cho_5".to_string(),
+        }];
+
+        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].indicator_id, 5);
+        // Alternating [-1, +1, -1, +1, -1]:
+        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
+        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
+        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
+        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
+    }
+
+    #[test]
     fn default_computer_delegates_to_domain_dispatch() {
         // The DefaultIndicatorComputer must produce the same result as the
         // direct domain dispatch — verifying the delegation is correct.

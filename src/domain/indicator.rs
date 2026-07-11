@@ -26,6 +26,12 @@ pub enum IndicatorParameters {
     /// EMA period (default 13 per the MQL5 `Bulls.mq5` source). The MA method
     /// is baked in as `MODE_EMA` per umbrella PRD Decision 8.
     BullsPower { period: i32 },
+    /// Chaikin Oscillator — `EMA(AD, fast_ma) - EMA(AD, slow_ma)` where AD
+    /// is the Accumulation/Distribution line (inlined). Two configurable MA
+    /// periods (defaults 3 and 10 per the MQL5 `CHO.mq5` source). The MA
+    /// method is baked in as `MODE_EMA`; the volume type is `VOLUME_TICK`
+    /// (using `point.volume` as f64, per umbrella PRD Decision 5).
+    ChaikinOscillator { fast_ma: i32, slow_ma: i32 },
 }
 
 #[derive(Debug, Clone)]

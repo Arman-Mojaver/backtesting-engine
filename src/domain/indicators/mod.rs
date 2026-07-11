@@ -2,6 +2,7 @@ pub mod ac;
 pub mod ao;
 pub mod bears;
 pub mod bulls;
+pub mod cho;
 pub mod moving_averages;
 pub mod rsi;
 
@@ -41,6 +42,10 @@ pub enum IndicatorError {
     InvalidBearsPeriod { n: i32 },
     /// The Bulls Power period `n` is not positive.
     InvalidBullsPeriod { n: i32 },
+    /// The Chaikin Oscillator fast MA period `n` is not positive.
+    InvalidChoFastPeriod { n: i32 },
+    /// The Chaikin Oscillator slow MA period `n` is not positive.
+    InvalidChoSlowPeriod { n: i32 },
     /// The number of resampled points is too few for the requested window.
     NotEnoughData { points: usize, required: usize },
     /// The indicator variant has no implementation yet (e.g. MACD).
@@ -86,6 +91,10 @@ pub fn generate_indicator_values(
         }
         IndicatorParameters::BullsPower { period } => {
             let buffer = bulls::compute(points, *period)?;
+            Ok(IndicatorValues::One(buffer))
+        }
+        IndicatorParameters::ChaikinOscillator { fast_ma, slow_ma } => {
+            let buffer = cho::compute(points, *fast_ma, *slow_ma)?;
             Ok(IndicatorValues::One(buffer))
         }
     }
@@ -379,5 +388,77 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = generate_indicator_values(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidBullsPeriod { n: 0 });
+    }
+
+    /// 5 points with constant positive AD -> exactly one CHO value
+    /// (slow_ma=4 -> needs 5 points).
+    fn rp_cho_5() -> Vec<ResampledPointD1> {
+        (0..5)
+            .map(|i| ResampledPointD1 {
+                id: i + 1,
+                instrument: "EURUSD".to_string(),
+                open: 2.5,
+                high: 3.0,
+                low: 1.0,
+                close: 2.5,
+                volume: 100,
+                timestamp: (i + 1) as i64,
+                high_low_order: HighLowOrder::HighFirst,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn chaikin_oscillator_dispatch_returns_one_variant() {
+        let params = IndicatorParameters::ChaikinOscillator {
+            fast_ma: 2,
+            slow_ma: 4,
+        };
+        let points = rp_cho_5();
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => {
+                // 5 points, slow_ma=4 -> 1 CHO value = 50.0.
+                assert_eq!(buf.items.len(), 1);
+                assert_eq!(buf.items[0].value, 50.0);
+            }
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn chaikin_oscillator_dispatch_with_insufficient_data_yields_empty_one() {
+        let params = IndicatorParameters::ChaikinOscillator {
+            fast_ma: 3,
+            slow_ma: 10,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn chaikin_oscillator_invalid_fast_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::ChaikinOscillator {
+            fast_ma: 0,
+            slow_ma: 10,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidChoFastPeriod { n: 0 });
+    }
+
+    #[test]
+    fn chaikin_oscillator_invalid_slow_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::ChaikinOscillator {
+            fast_ma: 3,
+            slow_ma: 0,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidChoSlowPeriod { n: 0 });
     }
 }

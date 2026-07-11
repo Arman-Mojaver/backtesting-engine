@@ -68,6 +68,10 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> IndicatorParameters 
         "bulls" => IndicatorParameters::BullsPower {
             period: json_extract_i32(json_text, "period"),
         },
+        "chaikin_oscillator" => IndicatorParameters::ChaikinOscillator {
+            fast_ma: json_extract_i32(json_text, "fast_ma"),
+            slow_ma: json_extract_i32(json_text, "slow_ma"),
+        },
         _ => panic!("unknown indicator type: {indicator_type}"),
     }
 }
