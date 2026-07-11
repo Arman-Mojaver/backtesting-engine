@@ -5,6 +5,7 @@ pub mod bulls;
 pub mod cho;
 pub mod chv;
 pub mod dpo;
+pub mod force;
 pub mod moving_averages;
 pub mod rsi;
 
@@ -54,6 +55,8 @@ pub enum IndicatorError {
     InvalidChvPeriod { n: i32 },
     /// The Detrended Price Oscillator period `n` is not positive.
     InvalidDpoPeriod { n: i32 },
+    /// The Force Index period `n` is not positive.
+    InvalidForcePeriod { n: i32 },
     /// The number of resampled points is too few for the requested window.
     NotEnoughData { points: usize, required: usize },
     /// The indicator variant has no implementation yet (e.g. MACD).
@@ -114,6 +117,10 @@ pub fn generate_indicator_values(
         }
         IndicatorParameters::DetrendedPriceOscillator { period } => {
             let buffer = dpo::compute(points, *period)?;
+            Ok(IndicatorValues::One(buffer))
+        }
+        IndicatorParameters::ForceIndex { period } => {
+            let buffer = force::compute(points, *period)?;
             Ok(IndicatorValues::One(buffer))
         }
     }
@@ -607,5 +614,61 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = generate_indicator_values(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidDpoPeriod { n: 0 });
+    }
+
+    /// 4 points with constant close -> exactly one Force Index value
+    /// (period 3 -> needs 4 points).
+    fn rp_force_4() -> Vec<ResampledPointD1> {
+        (0..4)
+            .map(|i| {
+                let m = 10.0;
+                ResampledPointD1 {
+                    id: i + 1,
+                    instrument: "EURUSD".to_string(),
+                    open: m,
+                    high: m,
+                    low: m,
+                    close: m,
+                    volume: 1000,
+                    timestamp: (i + 1) as i64,
+                    high_low_order: HighLowOrder::HighFirst,
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn force_index_dispatch_returns_one_variant() {
+        let params = IndicatorParameters::ForceIndex { period: 3 };
+        let points = rp_force_4();
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => {
+                // 4 points, period 3 -> 1 Force Index value
+                // (1000 * (10.0 - 10.0) = 0.0).
+                assert_eq!(buf.items.len(), 1);
+                assert_eq!(buf.items[0].value, 0.0);
+            }
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn force_index_dispatch_with_insufficient_data_yields_empty_one() {
+        let params = IndicatorParameters::ForceIndex { period: 13 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn force_index_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::ForceIndex { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidForcePeriod { n: 0 });
     }
 }

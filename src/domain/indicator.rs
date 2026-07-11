@@ -43,6 +43,12 @@ pub enum IndicatorParameters {
     /// configurable period (default 12 per the MQL5 `DPO.mq5` source). The MA
     /// method is baked in as `SMA` per umbrella PRD Decision 8.
     DetrendedPriceOscillator { period: i32 },
+    /// Force Index — `volume[i] * (SMA(close, period)[i] -
+    /// SMA(close, period)[i - 1])` with a configurable SMA period (default 13
+    /// per the MQL5 `Force_Index.mq5` source). The MA method is baked in as
+    /// `MODE_SMA`; the applied price is `PRICE_CLOSE`; the volume type is
+    /// `VOLUME_TICK` (using `point.volume` as f64, per umbrella PRD Decision 7).
+    ForceIndex { period: i32 },
 }
 
 #[derive(Debug, Clone)]
