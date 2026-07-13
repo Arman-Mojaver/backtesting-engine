@@ -61,6 +61,12 @@ pub enum IndicatorParameters {
         slow_ema: i32,
         signal_sma: i32,
     },
+    /// Rate of Change — `(close[i] - close[i - period]) / close[i] * 100`
+    /// with a configurable period (default 12 per the MQL5 `ROC.mq5` source).
+    /// The applied price is baked in as `PRICE_CLOSE` (per umbrella PRD
+    /// Decision 8). No MA helpers are needed — ROC is a pure price-momentum
+    /// formula.
+    Roc { period: i32 },
 }
 
 #[derive(Debug, Clone)]

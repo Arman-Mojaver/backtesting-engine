@@ -87,6 +87,9 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> IndicatorParameters 
             slow_ema: json_extract_i32(json_text, "slow_ema"),
             signal_sma: json_extract_i32(json_text, "signal_sma"),
         },
+        "roc" => IndicatorParameters::Roc {
+            period: json_extract_i32(json_text, "period"),
+        },
         _ => panic!("unknown indicator type: {indicator_type}"),
     }
 }

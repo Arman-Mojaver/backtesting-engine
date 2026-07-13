@@ -8,6 +8,7 @@ pub mod dpo;
 pub mod force;
 pub mod moving_averages;
 pub mod osma;
+pub mod roc;
 pub mod rsi;
 
 #[cfg(test)]
@@ -64,6 +65,8 @@ pub enum IndicatorError {
     InvalidOsMaSlowPeriod { n: i32 },
     /// The OsMA signal SMA period `n` is not positive.
     InvalidOsMaSignalPeriod { n: i32 },
+    /// The ROC period `n` is not positive.
+    InvalidRocPeriod { n: i32 },
     /// The number of resampled points is too few for the requested window.
     NotEnoughData { points: usize, required: usize },
     /// The indicator variant has no implementation yet (e.g. MACD).
@@ -136,6 +139,10 @@ pub fn generate_indicator_values(
             signal_sma,
         } => {
             let buffer = osma::compute(points, *fast_ema, *slow_ema, *signal_sma)?;
+            Ok(IndicatorValues::One(buffer))
+        }
+        IndicatorParameters::Roc { period } => {
+            let buffer = roc::compute(points, *period)?;
             Ok(IndicatorValues::One(buffer))
         }
     }
@@ -777,5 +784,60 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = generate_indicator_values(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidOsMaSignalPeriod { n: 0 });
+    }
+
+    /// 5 points with constant close -> 2 ROC values
+    /// (period 3 -> needs 4 points, 5 points -> 2 ROC values).
+    fn rp_roc_5() -> Vec<ResampledPointD1> {
+        (0..5)
+            .map(|i| {
+                let m = 10.0;
+                ResampledPointD1 {
+                    id: i + 1,
+                    instrument: "EURUSD".to_string(),
+                    open: m,
+                    high: m,
+                    low: m,
+                    close: m,
+                    volume: 1000,
+                    timestamp: (i + 1) as i64,
+                    high_low_order: HighLowOrder::HighFirst,
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn roc_dispatch_returns_one_variant() {
+        let params = IndicatorParameters::Roc { period: 3 };
+        let points = rp_roc_5();
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => {
+                // 5 points, period 3 -> 2 ROC values (constant close -> 0.0).
+                assert_eq!(buf.items.len(), 2);
+                assert_eq!(buf.items[0].value, 0.0);
+            }
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn roc_dispatch_with_insufficient_data_yields_empty_one() {
+        let params = IndicatorParameters::Roc { period: 13 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn roc_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Roc { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidRocPeriod { n: 0 });
     }
 }
