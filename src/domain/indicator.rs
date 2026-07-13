@@ -67,6 +67,14 @@ pub enum IndicatorParameters {
     /// Decision 8). No MA helpers are needed — ROC is a pure price-momentum
     /// formula.
     Roc { period: i32 },
+    /// TRIX (Triple Exponential Average) — the rate of change of a
+    /// triple-smoothed EMA of the close price:
+    /// `TRIX[k] = (EMA3[k + 1] - EMA3[k]) / EMA3[k]` where
+    /// `EMA3 = EMA(EMA(EMA(close, period)))`. One configurable period
+    /// (default 14 per the MQL5 `TRIX.mq5` source). The applied price is
+    /// baked in as `PRICE_CLOSE` (per umbrella PRD Decision 8). The `ema`
+    /// helper from `moving_averages.rs` is reused three times.
+    Trix { period: i32 },
 }
 
 #[derive(Debug, Clone)]
