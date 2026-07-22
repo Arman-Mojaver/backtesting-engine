@@ -14,6 +14,7 @@ pub mod rsi;
 #[cfg(test)]
 pub mod test_support;
 pub mod trix;
+pub mod vroc;
 
 use crate::domain::indicator::IndicatorParameters;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -70,6 +71,8 @@ pub enum IndicatorError {
     InvalidRocPeriod { n: i32 },
     /// The TRIX period `n` is not positive.
     InvalidTrixPeriod { n: i32 },
+    /// The VROC period `n` is not positive.
+    InvalidVrocPeriod { n: i32 },
     /// The number of resampled points is too few for the requested window.
     NotEnoughData { points: usize, required: usize },
     /// The indicator variant has no implementation yet (e.g. MACD).
@@ -150,6 +153,10 @@ pub fn generate_indicator_values(
         }
         IndicatorParameters::Trix { period } => {
             let buffer = trix::compute(points, *period)?;
+            Ok(IndicatorValues::One(buffer))
+        }
+        IndicatorParameters::Vroc { period } => {
+            let buffer = vroc::compute(points, *period)?;
             Ok(IndicatorValues::One(buffer))
         }
     }
@@ -901,5 +908,60 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = generate_indicator_values(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidTrixPeriod { n: 0 });
+    }
+
+    /// 5 points with constant volume -> 4 VROC values
+    /// (period 2 -> lookback 1 -> needs 2 points, 5 points -> 4 VROC values).
+    fn rp_vroc_5() -> Vec<ResampledPointD1> {
+        (0..5)
+            .map(|i| {
+                let v = 1000;
+                ResampledPointD1 {
+                    id: i + 1,
+                    instrument: "EURUSD".to_string(),
+                    open: 10.0,
+                    high: 10.0,
+                    low: 10.0,
+                    close: 10.0,
+                    volume: v,
+                    timestamp: (i + 1) as i64,
+                    high_low_order: HighLowOrder::HighFirst,
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn vroc_dispatch_returns_one_variant() {
+        let params = IndicatorParameters::Vroc { period: 2 };
+        let points = rp_vroc_5();
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => {
+                // 5 points, period 2 -> 4 VROC values (constant volume -> 0.0).
+                assert_eq!(buf.items.len(), 4);
+                assert_eq!(buf.items[0].value, 0.0);
+            }
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vroc_dispatch_with_insufficient_data_yields_empty_one() {
+        let params = IndicatorParameters::Vroc { period: 25 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = generate_indicator_values(&params, &points).unwrap();
+        match result {
+            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vroc_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Vroc { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = generate_indicator_values(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidVrocPeriod { n: 0 });
     }
 }

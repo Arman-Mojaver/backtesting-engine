@@ -75,6 +75,12 @@ pub enum IndicatorParameters {
     /// baked in as `PRICE_CLOSE` (per umbrella PRD Decision 8). The `ema`
     /// helper from `moving_averages.rs` is reused three times.
     Trix { period: i32 },
+    /// Volume Rate of Change — `100 * (volume[i] - volume[i - (period - 1)])
+    /// / volume[i - (period - 1)]` with a carry-forward zero-division guard,
+    /// operating on `point.volume as f64` (VOLUME_TICK). One configurable
+    /// period (default 25 per the MQL5 `VROC.mq5` source). No MA helpers are
+    /// needed — VROC is a pure volume-momentum formula.
+    Vroc { period: i32 },
 }
 
 #[derive(Debug, Clone)]

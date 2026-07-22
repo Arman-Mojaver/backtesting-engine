@@ -93,6 +93,9 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> IndicatorParameters 
         "trix" => IndicatorParameters::Trix {
             period: json_extract_i32(json_text, "period"),
         },
+        "vroc" => IndicatorParameters::Vroc {
+            period: json_extract_i32(json_text, "period"),
+        },
         _ => panic!("unknown indicator type: {indicator_type}"),
     }
 }
