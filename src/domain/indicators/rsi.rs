@@ -1,6 +1,6 @@
 use crate::domain::indicators::{IndicatorError, PriceField};
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OneBufferThreshold};
+use crate::domain::signal::{IndicatorValue, ThresholdSeries};
 
 /// A price diff tagged with the timestamp of the newer point.
 #[derive(Debug, Clone, Copy)]
@@ -21,7 +21,7 @@ pub fn compute(
     n: i32,
     high_threshold: f64,
     low_threshold: f64,
-) -> Result<OneBufferThreshold, IndicatorError> {
+) -> Result<ThresholdSeries, IndicatorError> {
     if n <= 0 {
         return Err(IndicatorError::InvalidRsiPeriod { n });
     }
@@ -47,7 +47,7 @@ pub fn compute(
         Vec::new()
     };
 
-    Ok(OneBufferThreshold {
+    Ok(ThresholdSeries {
         items: indicator_values,
         high_threshold,
         low_threshold,
@@ -97,7 +97,7 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OneBufferThreshold) -> &[IndicatorValue] {
+    fn values(buffer: &ThresholdSeries) -> &[IndicatorValue] {
         &buffer.items
     }
 

@@ -1,7 +1,7 @@
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OneBuffer};
+use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
 /// Compute the Accumulation/Distribution (AD) line inline.
 ///
@@ -46,7 +46,7 @@ pub fn compute(
     points: &[ResampledPointD1],
     fast_ma: i32,
     slow_ma: i32,
-) -> Result<OneBuffer, IndicatorError> {
+) -> Result<OscillatorSeries, IndicatorError> {
     if fast_ma <= 0 {
         return Err(IndicatorError::InvalidChoFastPeriod { n: fast_ma });
     }
@@ -65,7 +65,7 @@ pub fn compute(
     // consumes slow EMA entries `1..slow_ema.len()` — requiring at least
     // two slow EMA entries (i.e. `points.len() >= slow + 1`).
     if slow_ema.len() < 2 {
-        return Ok(OneBuffer { items: Vec::new() });
+        return Ok(OscillatorSeries { items: Vec::new() });
     }
 
     // Fast EMA entry `j` corresponds to original index `fast - 1 + j`.
@@ -84,7 +84,7 @@ pub fn compute(
         })
         .collect();
 
-    Ok(OneBuffer { items })
+    Ok(OscillatorSeries { items })
 }
 
 #[cfg(test)]
@@ -109,7 +109,7 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OneBuffer) -> &[IndicatorValue] {
+    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
         &buffer.items
     }
 

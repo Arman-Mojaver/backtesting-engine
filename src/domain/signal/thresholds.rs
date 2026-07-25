@@ -1,14 +1,7 @@
-use crate::domain::signal::OneBufferThreshold;
+use crate::domain::signal::ThresholdSeries;
 use crate::domain::signal_group::SignalGroup;
 
-/// Threshold-band signal rule.
-///
-/// Long signal when the value crosses upward through `low_threshold`
-/// (`prev < low && curr > low`); short signal when it crosses downward
-/// through `high_threshold` (`prev > high && curr < high`). Strict
-/// inequalities mean a value exactly on a threshold produces no signal
-/// (documented known-edge).
-pub fn generate(buffer: &OneBufferThreshold, indicator_id: i32) -> SignalGroup {
+pub fn create(buffer: &ThresholdSeries, indicator_id: i32) -> SignalGroup {
     let values = &buffer.items;
     let n = values.len();
     let high_threshold = buffer.high_threshold;
@@ -53,8 +46,8 @@ mod tests {
         IndicatorValue { timestamp, value }
     }
 
-    fn buf(items: &[IndicatorValue], high: f64, low: f64) -> OneBufferThreshold {
-        OneBufferThreshold {
+    fn buf(items: &[IndicatorValue], high: f64, low: f64) -> ThresholdSeries {
+        ThresholdSeries {
             items: items.to_vec(),
             high_threshold: high,
             low_threshold: low,
@@ -71,13 +64,13 @@ mod tests {
 
     #[test]
     fn empty_buffer_yields_no_signals() {
-        let result = generate(&buf(&[], 1.0, -1.0), ID);
+        let result = create(&buf(&[], 1.0, -1.0), ID);
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn two_values_between_thresholds_no_cross() {
-        let result = generate(
+        let result = create(
             &buf(&[iv(1700006400, 0.5), iv(1700092800, 0.7)], 1.0, -1.0),
             ID,
         );
@@ -86,7 +79,7 @@ mod tests {
 
     #[test]
     fn two_values_above_high_no_down_cross() {
-        let result = generate(
+        let result = create(
             &buf(&[iv(1703808000, 3.0), iv(1703894400, 3.1)], 2.0, -1.0),
             ID,
         );
@@ -95,7 +88,7 @@ mod tests {
 
     #[test]
     fn two_values_below_low_no_up_cross() {
-        let result = generate(
+        let result = create(
             &buf(&[iv(1703980800, -2.5), iv(1704067200, -2.0)], 1.0, -1.0),
             ID,
         );
@@ -105,7 +98,7 @@ mod tests {
     #[test]
     fn value_on_low_threshold_strict_no_long() {
         // low=-1.5: prev=-2.0 < -1.5, curr=-1.5 > -1.5 is false (strict) -> no long.
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1701043200, -2.0),
@@ -123,7 +116,7 @@ mod tests {
     #[test]
     fn value_on_low_threshold_strict_no_long_v2() {
         // low=-2.0: prev=-1.0 < -2.0 false; prev=-2.0 < -2.0 false -> no long.
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1701216000, -1.0),
@@ -141,7 +134,7 @@ mod tests {
     #[test]
     fn value_on_high_threshold_strict_no_short() {
         // high=2.0: prev=2.5 > 2.0, curr=2.0 < 2.0 false -> no short.
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1701216000, 2.5),
@@ -159,7 +152,7 @@ mod tests {
     #[test]
     fn value_on_high_threshold_strict_no_short_v2() {
         // high=1.5: prev=1.0 > 1.5 false; prev=1.5 > 1.5 false -> no short.
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1701216000, 1.0),
@@ -176,7 +169,7 @@ mod tests {
 
     #[test]
     fn cross_above_low_is_long() {
-        let result = generate(
+        let result = create(
             &buf(&[iv(1700006400, -2.0), iv(1700092800, 0.2)], 1.5, -1.0),
             ID,
         );
@@ -185,7 +178,7 @@ mod tests {
 
     #[test]
     fn cross_below_high_is_short() {
-        let result = generate(
+        let result = create(
             &buf(&[iv(1700179200, 2.5), iv(1700265600, 1.0)], 2.0, -1.5),
             ID,
         );
@@ -194,7 +187,7 @@ mod tests {
 
     #[test]
     fn two_long_crosses_through_zero() {
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1700352000, -3.0),
@@ -212,7 +205,7 @@ mod tests {
 
     #[test]
     fn two_short_crosses() {
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1700697600, 3.5),
@@ -230,7 +223,7 @@ mod tests {
 
     #[test]
     fn long_and_short_in_sequence() {
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1701043200, -2.5),
@@ -248,7 +241,7 @@ mod tests {
 
     #[test]
     fn two_longs_one_short_six_points() {
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1702080000, -2.5),
@@ -268,7 +261,7 @@ mod tests {
 
     #[test]
     fn one_long_two_shorts_six_points() {
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1702598400, 2.8),
@@ -288,7 +281,7 @@ mod tests {
 
     #[test]
     fn two_longs_two_shorts_eight_points() {
-        let result = generate(
+        let result = create(
             &buf(
                 &[
                     iv(1703116800, -3.0),
@@ -317,7 +310,7 @@ mod tests {
     fn value_exactly_on_threshold_no_signal_strict_inequality() {
         // high=2.0, low=-1.0. prev=2.0 (not > high), curr=1.9 -> no short.
         // prev=-1.0 (not < low), curr=0.0 -> no long.
-        let result = generate(
+        let result = create(
             &buf(
                 &[iv(100, 2.0), iv(101, 1.9), iv(102, -1.0), iv(103, 0.0)],
                 2.0,
@@ -330,13 +323,13 @@ mod tests {
 
     #[test]
     fn single_element_yields_no_signals() {
-        let result = generate(&buf(&[iv(100, 5.0)], 2.0, -2.0), ID);
+        let result = create(&buf(&[iv(100, 5.0)], 2.0, -2.0), ID);
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn stamps_indicator_id_on_result() {
-        let result = generate(&buf(&[iv(10, -2.0), iv(11, 0.5)], 1.0, -1.0), 7);
+        let result = create(&buf(&[iv(10, -2.0), iv(11, 0.5)], 1.0, -1.0), 7);
         assert_eq!(result.indicator_id, 7);
         assert_eq!(result.long_signals, vec![11]);
     }

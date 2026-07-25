@@ -1,7 +1,7 @@
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OneBuffer};
+use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
 /// Compute the Detrended Price Oscillator from resampled daily points.
 ///
@@ -25,7 +25,10 @@ use crate::domain::signal::{IndicatorValue, OneBuffer};
 /// Insufficient data (fewer than `ExtMAPeriod` points, i.e. `sma_close` is
 /// empty) yields an empty `items` vector (not an error), per umbrella PRD
 /// Decision 10. A non-positive `period` is an error.
-pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, IndicatorError> {
+pub fn compute(
+    points: &[ResampledPointD1],
+    period: i32,
+) -> Result<OscillatorSeries, IndicatorError> {
     if period <= 0 {
         return Err(IndicatorError::InvalidDpoPeriod { n: period });
     }
@@ -35,7 +38,7 @@ pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, In
     let sma_close = sma(&closes, ext_ma_period);
 
     if sma_close.is_empty() {
-        return Ok(OneBuffer { items: Vec::new() });
+        return Ok(OscillatorSeries { items: Vec::new() });
     }
 
     let items = (0..sma_close.len())
@@ -48,7 +51,7 @@ pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, In
         })
         .collect();
 
-    Ok(OneBuffer { items })
+    Ok(OscillatorSeries { items })
 }
 
 #[cfg(test)]
@@ -73,7 +76,7 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OneBuffer) -> &[IndicatorValue] {
+    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
         &buffer.items
     }
 

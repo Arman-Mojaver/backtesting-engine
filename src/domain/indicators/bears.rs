@@ -1,7 +1,7 @@
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OneBuffer};
+use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
 /// Compute Bears Power from resampled daily points.
 ///
@@ -16,7 +16,10 @@ use crate::domain::signal::{IndicatorValue, OneBuffer};
 /// Insufficient data (fewer than `period + 1` points) yields an empty buffer,
 /// not an error — consistent with the AO/AC reference and umbrella PRD
 /// Decision 10. A non-positive period is an error.
-pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, IndicatorError> {
+pub fn compute(
+    points: &[ResampledPointD1],
+    period: i32,
+) -> Result<OscillatorSeries, IndicatorError> {
     if period <= 0 {
         return Err(IndicatorError::InvalidBearsPeriod { n: period });
     }
@@ -29,7 +32,7 @@ pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, In
     // entries `1..ema_close.len()` — requiring at least two EMA entries
     // (i.e. `points.len() >= period + 1`).
     if ema_close.len() < 2 {
-        return Ok(OneBuffer { items: Vec::new() });
+        return Ok(OscillatorSeries { items: Vec::new() });
     }
 
     let items = (1..ema_close.len())
@@ -44,7 +47,7 @@ pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, In
         })
         .collect();
 
-    Ok(OneBuffer { items })
+    Ok(OscillatorSeries { items })
 }
 
 #[cfg(test)]
@@ -69,7 +72,7 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OneBuffer) -> &[IndicatorValue] {
+    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
         &buffer.items
     }
 

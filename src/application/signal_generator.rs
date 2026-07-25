@@ -1,77 +1,28 @@
-use crate::domain::indicator::{Indicator, IndicatorParameters};
-use crate::domain::indicators::{generate_indicator_values, IndicatorError};
+use rayon::prelude::*;
+
+use crate::domain::indicator::Indicator;
+use crate::domain::indicators::create_indicator_output;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::IndicatorValues;
+use crate::domain::signal::IndicatorOutput;
 use crate::domain::signal_group::SignalGroup;
 
-/// Abstraction over the "parameters + points → `IndicatorValues`" step.
-///
-/// Placed at the application layer so that SignalGroup-level tests can
-/// inject a made-up oscillator and verify the full path (injected compute →
-/// `IndicatorValues` → `generate_signals` → `SignalGroup`) — including
-/// crossing-timestamp correctness — without depending on real indicator math.
-pub trait IndicatorComputer {
-    fn compute(
-        &self,
-        parameters: &IndicatorParameters,
-        points: &[ResampledPointD1],
-    ) -> Result<IndicatorValues, IndicatorError>;
-}
-
-/// Default implementation that delegates to the domain dispatch
-/// `generate_indicator_values`.
-pub struct DefaultIndicatorComputer;
-
-impl IndicatorComputer for DefaultIndicatorComputer {
-    fn compute(
-        &self,
-        parameters: &IndicatorParameters,
-        points: &[ResampledPointD1],
-    ) -> Result<IndicatorValues, IndicatorError> {
-        generate_indicator_values(parameters, points)
-    }
-}
-
-/// Create a `SignalGroup` for each indicator using the injected `computer`
-/// to produce indicator values, then deriving long/short signals from them.
-///
-/// Indicators whose computation fails (e.g. unsupported) are skipped silently
-/// rather than aborting the run.
-pub fn create_signals_with_computer(
+pub fn create_signal_groups(
     indicators: &[Indicator],
     resampled_points: &[ResampledPointD1],
-    computer: &dyn IndicatorComputer,
 ) -> Vec<SignalGroup> {
     indicators
-        .iter()
-        .filter_map(|indicator| {
-            let values: IndicatorValues = computer
-                .compute(&indicator.parameters, resampled_points)
-                .ok()?;
-            Some(values.generate_signals(indicator.id))
-        })
+        .par_iter()
+        .filter_map(|indicator| create_signal_group(indicator, resampled_points))
         .collect()
 }
 
-/// Create a `SignalGroup` for each indicator by computing its indicator
-/// values from `resampled_points` and deriving long/short signals from them.
-///
-/// The `count` parameter is retained for signature stability with the
-/// previous random-stub implementation but is **not used**: the number of
-/// signals is now determined by the data, not requested. It is marked for
-/// removal in a later cleanup.
-///
-/// Indicators whose computation is unsupported (e.g. MACD, out of scope for
-/// this migration) are skipped silently rather than aborting the run.
-///
-/// Delegates to `create_signals_with_computer` with `DefaultIndicatorComputer`,
-/// preserving the original signature and behavior (backward-compatible).
-pub fn create_signals(
-    indicators: &[Indicator],
+fn create_signal_group(
+    indicator: &Indicator,
     resampled_points: &[ResampledPointD1],
-    _count: usize,
-) -> Vec<SignalGroup> {
-    create_signals_with_computer(indicators, resampled_points, &DefaultIndicatorComputer)
+) -> Option<SignalGroup> {
+    let values: IndicatorOutput =
+        create_indicator_output(&indicator.parameters, resampled_points).ok()?;
+    Some(values.create_signal_group(indicator.id))
 }
 
 #[cfg(test)]
@@ -79,9 +30,7 @@ mod tests {
     use super::*;
     use crate::domain::fixtures::{indicators_rsi_single, resampled_points_for_rsi};
     use crate::domain::indicator::{Indicator, IndicatorParameters};
-    use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
-    use crate::domain::signal::{IndicatorValue, OneBuffer};
 
     #[test]
     fn rsi_indicator_produces_a_signal_group_stamped_with_its_id() {
@@ -91,21 +40,12 @@ mod tests {
         // So this verifies the path runs and returns a group with no signals.
         let indicators = indicators_rsi_single();
         let points = resampled_points_for_rsi();
-        let result = create_signals(&indicators, &points, 100);
+        let result = create_signal_groups(&indicators, &points);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].indicator_id, 1);
         // RSI 67/33 sit between 30 and 70 -> no threshold crossing -> no signals.
         assert!(result[0].long_signals.is_empty());
         assert!(result[0].short_signals.is_empty());
-    }
-
-    #[test]
-    fn count_parameter_is_ignored_signal_count_comes_from_data() {
-        let indicators = indicators_rsi_single();
-        let points = resampled_points_for_rsi();
-        let with_count_a = create_signals(&indicators, &points, 0);
-        let with_count_b = create_signals(&indicators, &points, 1000);
-        assert_eq!(with_count_a.len(), with_count_b.len());
     }
 
     #[test]
@@ -135,7 +75,7 @@ mod tests {
             },
         ];
         let points = resampled_points_for_rsi();
-        let result = create_signals(&indicators, &points, 100);
+        let result = create_signal_groups(&indicators, &points);
         // Only the RSI indicator yields a group.
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].indicator_id, 2);
@@ -144,7 +84,7 @@ mod tests {
     #[test]
     fn no_indicators_yields_no_signal_groups() {
         let points = resampled_points_for_rsi();
-        let result = create_signals(&[], &points, 100);
+        let result = create_signal_groups(&[], &points);
         assert!(result.is_empty());
     }
 
@@ -162,7 +102,7 @@ mod tests {
             identifier: "macd_1".to_string(),
         }];
         let points = resampled_points_for_rsi();
-        let result = create_signals(&indicators, &points, 100);
+        let result = create_signal_groups(&indicators, &points);
         assert!(result.is_empty());
     }
 
@@ -228,438 +168,11 @@ mod tests {
             },
             identifier: "rsi_2-70-30".to_string(),
         }];
-        let result = create_signals(&indicators, &points, 100);
+        let result = create_signal_groups(&indicators, &points);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].indicator_id, 7);
         // RSI 0 -> 50 crosses above low threshold 30 -> long signal at ts 4000.
         assert_eq!(result[0].long_signals, vec![4000]);
         assert!(result[0].short_signals.is_empty());
-    }
-
-    // --- Level 1: SignalGroup via dependency injection ---
-
-    /// A made-up oscillator that ignores parameters and returns a known
-    /// alternating sequence `[-1, +1, -1, +1, -1]` stamped with the first 5
-    /// resampled-point timestamps. Used to verify signal generation and
-    /// timestamp routing independently of real indicator math.
-    struct CrossingOscillator;
-
-    impl IndicatorComputer for CrossingOscillator {
-        fn compute(
-            &self,
-            _parameters: &IndicatorParameters,
-            points: &[ResampledPointD1],
-        ) -> Result<IndicatorValues, IndicatorError> {
-            let items: Vec<IndicatorValue> = points
-                .iter()
-                .take(5)
-                .enumerate()
-                .map(|(i, p)| IndicatorValue {
-                    timestamp: p.timestamp,
-                    value: if i % 2 == 0 { -1.0 } else { 1.0 },
-                })
-                .collect();
-            Ok(IndicatorValues::One(OneBuffer { items }))
-        }
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps() {
-        // Uses real EURUSD resampled points from the development DB so the
-        // timestamps are real. Skips gracefully if the DB is unavailable.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 1,
-            r#type: "awesome_oscillator".to_string(),
-            parameters: IndicatorParameters::AwesomeOscillator,
-            identifier: "ao_1".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 1);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg→pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos→neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_ac() {
-        // Same DI pattern as the AO Level 1 test, but routed through the
-        // AcceleratorDecelerator parameter variant — verifying signal
-        // generation and timestamp routing independently of real AC math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_ac: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 2,
-            r#type: "accelerator_decelerator".to_string(),
-            parameters: IndicatorParameters::AcceleratorDecelerator,
-            identifier: "ac_2".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 2);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg→pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos→neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_bears() {
-        // Same DI pattern as the AO/AC Level 1 tests, but routed through the
-        // BearsPower parameter variant — verifying signal generation and
-        // timestamp routing independently of real Bears Power math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_bears: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 3,
-            r#type: "bears".to_string(),
-            parameters: IndicatorParameters::BearsPower { period: 13 },
-            identifier: "bears_3".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 3);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_bulls() {
-        // Same DI pattern as the AO/AC/Bears Level 1 tests, but routed through the
-        // BullsPower parameter variant — verifying signal generation and
-        // timestamp routing independently of real Bulls Power math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_bulls: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 4,
-            r#type: "bulls".to_string(),
-            parameters: IndicatorParameters::BullsPower { period: 13 },
-            identifier: "bulls_4".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 4);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_cho() {
-        // Same DI pattern as the AO/AC/Bears/Bulls Level 1 tests, but routed
-        // through the ChaikinOscillator parameter variant — verifying signal
-        // generation and timestamp routing independently of real CHO math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_cho: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 5,
-            r#type: "chaikin_oscillator".to_string(),
-            parameters: IndicatorParameters::ChaikinOscillator {
-                fast_ma: 3,
-                slow_ma: 10,
-            },
-            identifier: "cho_5".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 5);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_chv() {
-        // Same DI pattern as the AO/AC/Bears/Bulls/CHO Level 1 tests, but
-        // routed through the ChaikinVolatility parameter variant — verifying
-        // signal generation and timestamp routing independently of real CHV
-        // math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_chv: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 6,
-            r#type: "chaikin_volatility".to_string(),
-            parameters: IndicatorParameters::ChaikinVolatility {
-                smooth_period: 10,
-                chv_period: 10,
-            },
-            identifier: "chv_6".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 6);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_dpo() {
-        // Same DI pattern as the AO/AC/Bears/Bulls/CHO/CHV Level 1 tests, but
-        // routed through the DetrendedPriceOscillator parameter variant —
-        // verifying signal generation and timestamp routing independently of
-        // real DPO math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_dpo: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 7,
-            r#type: "detrended_price_oscillator".to_string(),
-            parameters: IndicatorParameters::DetrendedPriceOscillator { period: 12 },
-            identifier: "dpo_7".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 7);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_force() {
-        // Same DI pattern as the AO/AC/Bears/Bulls/CHO/CHV/DPO Level 1 tests,
-        // but routed through the ForceIndex parameter variant — verifying
-        // signal generation and timestamp routing independently of real Force
-        // Index math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_force: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 8,
-            r#type: "force_index".to_string(),
-            parameters: IndicatorParameters::ForceIndex { period: 13 },
-            identifier: "force_8".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 8);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_osma() {
-        // Same DI pattern as the AO/AC/Bears/Bulls/CHO/CHV/DPO/Force Level 1
-        // tests, but routed through the OsMa parameter variant — verifying
-        // signal generation and timestamp routing independently of real OsMA
-        // math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_osma: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 9,
-            r#type: "osma".to_string(),
-            parameters: IndicatorParameters::OsMa {
-                fast_ema: 12,
-                slow_ema: 26,
-                signal_sma: 9,
-            },
-            identifier: "osma_9".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 9);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_roc() {
-        // Same DI pattern as the AO/AC/Bears/Bulls/CHO/CHV/DPO/Force/OsMA
-        // Level 1 tests, but routed through the Roc parameter variant —
-        // verifying signal generation and timestamp routing independently of
-        // real ROC math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_roc: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 10,
-            r#type: "roc".to_string(),
-            parameters: IndicatorParameters::Roc { period: 12 },
-            identifier: "roc_10".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 10);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_trix() {
-        // Same DI pattern as the AO/AC/Bears/Bulls/CHO/CHV/DPO/Force/OsMA/ROC
-        // Level 1 tests, but routed through the Trix parameter variant —
-        // verifying signal generation and timestamp routing independently of
-        // real TRIX math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_trix: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 11,
-            r#type: "trix".to_string(),
-            parameters: IndicatorParameters::Trix { period: 14 },
-            identifier: "trix_11".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 11);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn level1_injected_oscillator_produces_expected_crossing_timestamps_for_vroc() {
-        // Same DI pattern as the AO/AC/Bears/Bulls/CHO/CHV/DPO/Force/OsMA/ROC/TRIX
-        // Level 1 tests, but routed through the Vroc parameter variant —
-        // verifying signal generation and timestamp routing independently of
-        // real VROC math.
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level1_di_test_vroc: development DB unavailable");
-                return;
-            }
-        };
-        let ts: Vec<i64> = points.iter().take(5).map(|p| p.timestamp).collect();
-
-        let indicators = vec![Indicator {
-            id: 12,
-            r#type: "vroc".to_string(),
-            parameters: IndicatorParameters::Vroc { period: 25 },
-            identifier: "vroc_12".to_string(),
-        }];
-
-        let result = create_signals_with_computer(&indicators, &points, &CrossingOscillator);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 12);
-        // Alternating [-1, +1, -1, +1, -1]:
-        //   up-crosses (neg->pos) at index 1 and 3 -> long at ts[1], ts[3]
-        //   down-crosses (pos->neg) at index 2 and 4 -> short at ts[2], ts[4]
-        assert_eq!(result[0].long_signals, vec![ts[1], ts[3]]);
-        assert_eq!(result[0].short_signals, vec![ts[2], ts[4]]);
-    }
-
-    #[test]
-    fn default_computer_delegates_to_domain_dispatch() {
-        // The DefaultIndicatorComputer must produce the same result as the
-        // direct domain dispatch — verifying the delegation is correct.
-        let indicators = indicators_rsi_single();
-        let points = resampled_points_for_rsi();
-        let via_default =
-            create_signals_with_computer(&indicators, &points, &DefaultIndicatorComputer);
-        let via_direct = create_signals(&indicators, &points, 100);
-        assert_eq!(via_default, via_direct);
     }
 }

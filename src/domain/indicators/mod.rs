@@ -18,7 +18,7 @@ pub mod vroc;
 
 use crate::domain::indicator::IndicatorParameters;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::IndicatorValues;
+use crate::domain::signal::IndicatorOutput;
 
 /// Which price component of a resampled point an indicator consumes.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -40,52 +40,31 @@ impl PriceField {
     }
 }
 
-/// Domain error raised when indicator computation cannot proceed.
 #[derive(Debug, Clone, PartialEq)]
 pub enum IndicatorError {
-    /// The RSI period `n` is not positive.
     InvalidRsiPeriod { n: i32 },
-    /// The Bears Power period `n` is not positive.
     InvalidBearsPeriod { n: i32 },
-    /// The Bulls Power period `n` is not positive.
     InvalidBullsPeriod { n: i32 },
-    /// The Chaikin Oscillator fast MA period `n` is not positive.
     InvalidChoFastPeriod { n: i32 },
-    /// The Chaikin Oscillator slow MA period `n` is not positive.
     InvalidChoSlowPeriod { n: i32 },
-    /// The Chaikin Volatility smooth period `n` is not positive.
     InvalidChvSmoothPeriod { n: i32 },
-    /// The Chaikin Volatility rate-of-change period `n` is not positive.
     InvalidChvPeriod { n: i32 },
-    /// The Detrended Price Oscillator period `n` is not positive.
     InvalidDpoPeriod { n: i32 },
-    /// The Force Index period `n` is not positive.
     InvalidForcePeriod { n: i32 },
-    /// The OsMA fast EMA period `n` is not positive.
     InvalidOsMaFastPeriod { n: i32 },
-    /// The OsMA slow EMA period `n` is not positive.
     InvalidOsMaSlowPeriod { n: i32 },
-    /// The OsMA signal SMA period `n` is not positive.
     InvalidOsMaSignalPeriod { n: i32 },
-    /// The ROC period `n` is not positive.
     InvalidRocPeriod { n: i32 },
-    /// The TRIX period `n` is not positive.
     InvalidTrixPeriod { n: i32 },
-    /// The VROC period `n` is not positive.
     InvalidVrocPeriod { n: i32 },
-    /// The number of resampled points is too few for the requested window.
     NotEnoughData { points: usize, required: usize },
-    /// The indicator variant has no implementation yet (e.g. MACD).
     UnsupportedIndicator { indicator: String },
 }
 
-/// Compute the indicator value buffer for the given parameters from the
-/// resampled points. Dispatches off the `IndicatorParameters` variant, which
-/// is both the type tag and the typed parameter bundle.
-pub fn generate_indicator_values(
+pub fn create_indicator_output(
     parameters: &IndicatorParameters,
     points: &[ResampledPointD1],
-) -> Result<IndicatorValues, IndicatorError> {
+) -> Result<IndicatorOutput, IndicatorError> {
     match parameters {
         IndicatorParameters::Rsi {
             n,
@@ -99,45 +78,45 @@ pub fn generate_indicator_values(
                 f64::from(*high_threshold),
                 f64::from(*low_threshold),
             )?;
-            Ok(IndicatorValues::OneThreshold(buffer))
+            Ok(IndicatorOutput::Threshold(buffer))
         }
         IndicatorParameters::Macd { .. } => Err(IndicatorError::UnsupportedIndicator {
             indicator: "macd".to_string(),
         }),
         IndicatorParameters::AwesomeOscillator => {
             let buffer = ao::compute(points)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::AcceleratorDecelerator => {
             let buffer = ac::compute(points)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::BearsPower { period } => {
             let buffer = bears::compute(points, *period)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::BullsPower { period } => {
             let buffer = bulls::compute(points, *period)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::ChaikinOscillator { fast_ma, slow_ma } => {
             let buffer = cho::compute(points, *fast_ma, *slow_ma)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::ChaikinVolatility {
             smooth_period,
             chv_period,
         } => {
             let buffer = chv::compute(points, *smooth_period, *chv_period)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::DetrendedPriceOscillator { period } => {
             let buffer = dpo::compute(points, *period)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::ForceIndex { period } => {
             let buffer = force::compute(points, *period)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::OsMa {
             fast_ema,
@@ -145,19 +124,19 @@ pub fn generate_indicator_values(
             signal_sma,
         } => {
             let buffer = osma::compute(points, *fast_ema, *slow_ema, *signal_sma)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::Roc { period } => {
             let buffer = roc::compute(points, *period)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::Trix { period } => {
             let buffer = trix::compute(points, *period)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
         IndicatorParameters::Vroc { period } => {
             let buffer = vroc::compute(points, *period)?;
-            Ok(IndicatorValues::One(buffer))
+            Ok(IndicatorOutput::Oscillator(buffer))
         }
     }
 }
@@ -167,7 +146,7 @@ mod tests {
     use super::*;
     use crate::domain::indicator::IndicatorParameters;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
-    use crate::domain::signal::IndicatorValues;
+    use crate::domain::signal::IndicatorOutput;
 
     fn rp(id: i32, ts: i64, close: f64) -> ResampledPointD1 {
         ResampledPointD1 {
@@ -211,9 +190,9 @@ mod tests {
             low_threshold: 30,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0), rp(3, 3, 3.0), rp(4, 4, 4.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::OneThreshold(ref buf) => {
+            IndicatorOutput::Threshold(ref buf) => {
                 assert_eq!(buf.high_threshold, 70.0);
                 assert_eq!(buf.low_threshold, 30.0);
                 assert!(!buf.items.is_empty());
@@ -231,7 +210,7 @@ mod tests {
             fast_n: 12,
         };
         let points = vec![rp(1, 1, 1.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(
             err,
             IndicatorError::UnsupportedIndicator {
@@ -244,9 +223,9 @@ mod tests {
     fn awesome_oscillator_dispatch_returns_one_variant() {
         let params = IndicatorParameters::AwesomeOscillator;
         let points = rp_ao_34();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 34 points -> 1 AO value (constant median -> 0.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -259,9 +238,9 @@ mod tests {
     fn awesome_oscillator_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::AwesomeOscillator;
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -293,7 +272,7 @@ mod tests {
             low_threshold: 30,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidRsiPeriod { n: 0 });
     }
 
@@ -321,9 +300,9 @@ mod tests {
     fn accelerator_decelerator_dispatch_returns_one_variant() {
         let params = IndicatorParameters::AcceleratorDecelerator;
         let points = rp_ac_38();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 38 points -> 1 AC value (constant median -> 0.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -336,9 +315,9 @@ mod tests {
     fn accelerator_decelerator_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::AcceleratorDecelerator;
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -368,9 +347,9 @@ mod tests {
     fn bears_power_dispatch_returns_one_variant() {
         let params = IndicatorParameters::BearsPower { period: 13 };
         let points = rp_bears_14();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 14 points, period 13 -> 1 Bears value (9.0 - 10.0 = -1.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, -1.0);
@@ -383,9 +362,9 @@ mod tests {
     fn bears_power_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::BearsPower { period: 13 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -394,7 +373,7 @@ mod tests {
     fn bears_power_invalid_period_propagates_error_through_dispatch() {
         let params = IndicatorParameters::BearsPower { period: 0 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidBearsPeriod { n: 0 });
     }
     /// 14 points with constant close/high -> exactly one Bulls value
@@ -422,9 +401,9 @@ mod tests {
     fn bulls_power_dispatch_returns_one_variant() {
         let params = IndicatorParameters::BullsPower { period: 13 };
         let points = rp_bulls_14();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 14 points, period 13 -> 1 Bulls value (11.0 - 10.0 = 1.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 1.0);
@@ -437,9 +416,9 @@ mod tests {
     fn bulls_power_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::BullsPower { period: 13 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -448,7 +427,7 @@ mod tests {
     fn bulls_power_invalid_period_propagates_error_through_dispatch() {
         let params = IndicatorParameters::BullsPower { period: 0 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidBullsPeriod { n: 0 });
     }
 
@@ -477,9 +456,9 @@ mod tests {
             slow_ma: 4,
         };
         let points = rp_cho_5();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 5 points, slow_ma=4 -> 1 CHO value = 50.0.
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 50.0);
@@ -495,9 +474,9 @@ mod tests {
             slow_ma: 10,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -509,7 +488,7 @@ mod tests {
             slow_ma: 10,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidChoFastPeriod { n: 0 });
     }
 
@@ -520,7 +499,7 @@ mod tests {
             slow_ma: 0,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidChoSlowPeriod { n: 0 });
     }
 
@@ -549,9 +528,9 @@ mod tests {
             chv_period: 3,
         };
         let points = rp_chv_5();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 5 points, smooth=2, chv=3 -> 1 CHV value = 0.0 (constant spread).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -567,9 +546,9 @@ mod tests {
             chv_period: 10,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -581,7 +560,7 @@ mod tests {
             chv_period: 10,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidChvSmoothPeriod { n: 0 });
     }
 
@@ -592,7 +571,7 @@ mod tests {
             chv_period: 0,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidChvPeriod { n: 0 });
     }
 
@@ -621,9 +600,9 @@ mod tests {
     fn detrended_price_oscillator_dispatch_returns_one_variant() {
         let params = IndicatorParameters::DetrendedPriceOscillator { period: 12 };
         let points = rp_dpo_7();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 7 points, period 12 -> ExtMAPeriod = 7 -> 1 DPO value
                 // (10.0 - 10.0 = 0.0).
                 assert_eq!(buf.items.len(), 1);
@@ -637,9 +616,9 @@ mod tests {
     fn detrended_price_oscillator_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::DetrendedPriceOscillator { period: 12 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -648,7 +627,7 @@ mod tests {
     fn detrended_price_oscillator_invalid_period_propagates_error_through_dispatch() {
         let params = IndicatorParameters::DetrendedPriceOscillator { period: 0 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidDpoPeriod { n: 0 });
     }
 
@@ -677,9 +656,9 @@ mod tests {
     fn force_index_dispatch_returns_one_variant() {
         let params = IndicatorParameters::ForceIndex { period: 3 };
         let points = rp_force_4();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 4 points, period 3 -> 1 Force Index value
                 // (1000 * (10.0 - 10.0) = 0.0).
                 assert_eq!(buf.items.len(), 1);
@@ -693,9 +672,9 @@ mod tests {
     fn force_index_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::ForceIndex { period: 13 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -704,7 +683,7 @@ mod tests {
     fn force_index_invalid_period_propagates_error_through_dispatch() {
         let params = IndicatorParameters::ForceIndex { period: 0 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidForcePeriod { n: 0 });
     }
 
@@ -737,9 +716,9 @@ mod tests {
             signal_sma: 2,
         };
         let points = rp_osma_6();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 6 points, fast=3, slow=5, signal=2 -> 1 OsMA value
                 // (constant close -> 0.0).
                 assert_eq!(buf.items.len(), 1);
@@ -757,9 +736,9 @@ mod tests {
             signal_sma: 9,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -772,7 +751,7 @@ mod tests {
             signal_sma: 9,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidOsMaFastPeriod { n: 0 });
     }
 
@@ -784,7 +763,7 @@ mod tests {
             signal_sma: 9,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidOsMaSlowPeriod { n: 0 });
     }
 
@@ -796,7 +775,7 @@ mod tests {
             signal_sma: 0,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidOsMaSignalPeriod { n: 0 });
     }
 
@@ -825,9 +804,9 @@ mod tests {
     fn roc_dispatch_returns_one_variant() {
         let params = IndicatorParameters::Roc { period: 3 };
         let points = rp_roc_5();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 5 points, period 3 -> 2 ROC values (constant close -> 0.0).
                 assert_eq!(buf.items.len(), 2);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -840,9 +819,9 @@ mod tests {
     fn roc_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::Roc { period: 13 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -851,7 +830,7 @@ mod tests {
     fn roc_invalid_period_propagates_error_through_dispatch() {
         let params = IndicatorParameters::Roc { period: 0 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidRocPeriod { n: 0 });
     }
 
@@ -880,9 +859,9 @@ mod tests {
     fn trix_dispatch_returns_one_variant() {
         let params = IndicatorParameters::Trix { period: 2 };
         let points = rp_trix_5();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 5 points, period 2 -> 1 TRIX value (constant close -> 0.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -895,9 +874,9 @@ mod tests {
     fn trix_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::Trix { period: 14 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -906,7 +885,7 @@ mod tests {
     fn trix_invalid_period_propagates_error_through_dispatch() {
         let params = IndicatorParameters::Trix { period: 0 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidTrixPeriod { n: 0 });
     }
 
@@ -935,9 +914,9 @@ mod tests {
     fn vroc_dispatch_returns_one_variant() {
         let params = IndicatorParameters::Vroc { period: 2 };
         let points = rp_vroc_5();
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => {
+            IndicatorOutput::Oscillator(ref buf) => {
                 // 5 points, period 2 -> 4 VROC values (constant volume -> 0.0).
                 assert_eq!(buf.items.len(), 4);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -950,9 +929,9 @@ mod tests {
     fn vroc_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::Vroc { period: 25 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let result = generate_indicator_values(&params, &points).unwrap();
+        let result = create_indicator_output(&params, &points).unwrap();
         match result {
-            IndicatorValues::One(ref buf) => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -961,7 +940,7 @@ mod tests {
     fn vroc_invalid_period_propagates_error_through_dispatch() {
         let params = IndicatorParameters::Vroc { period: 0 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = generate_indicator_values(&params, &points).unwrap_err();
+        let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidVrocPeriod { n: 0 });
     }
 }

@@ -1,7 +1,7 @@
 use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OneBuffer};
+use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
 /// Compute the OsMA (Moving Average of Oscillator, aka MACD histogram) from
 /// resampled daily points.
@@ -27,7 +27,7 @@ pub fn compute(
     fast_ema: i32,
     slow_ema: i32,
     signal_sma: i32,
-) -> Result<OneBuffer, IndicatorError> {
+) -> Result<OscillatorSeries, IndicatorError> {
     if fast_ema <= 0 {
         return Err(IndicatorError::InvalidOsMaFastPeriod { n: fast_ema });
     }
@@ -56,7 +56,7 @@ pub fn compute(
     let signal_line = sma(&macd, signal);
 
     if signal_line.is_empty() {
-        return Ok(OneBuffer { items: Vec::new() });
+        return Ok(OscillatorSeries { items: Vec::new() });
     }
 
     // OsMA[k] = macd[k + signal - 1] - signal[k] for k = 0..(signal.len()).
@@ -69,7 +69,7 @@ pub fn compute(
         })
         .collect();
 
-    Ok(OneBuffer { items })
+    Ok(OscillatorSeries { items })
 }
 
 #[cfg(test)]
@@ -94,7 +94,7 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OneBuffer) -> &[IndicatorValue] {
+    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
         &buffer.items
     }
 

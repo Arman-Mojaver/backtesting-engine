@@ -1,7 +1,7 @@
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OneBuffer};
+use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
 /// Compute the Chaikin Volatility from resampled daily points.
 ///
@@ -27,7 +27,7 @@ pub fn compute(
     points: &[ResampledPointD1],
     smooth_period: i32,
     chv_period: i32,
-) -> Result<OneBuffer, IndicatorError> {
+) -> Result<OscillatorSeries, IndicatorError> {
     if smooth_period <= 0 {
         return Err(IndicatorError::InvalidChvSmoothPeriod { n: smooth_period });
     }
@@ -44,7 +44,7 @@ pub fn compute(
     // CHV[k] uses SHL[k + chv] (current) and SHL[k] (chv_period bars ago).
     // Need at least chv + 1 SHL entries for one CHV value.
     if shl.len() < chv + 1 {
-        return Ok(OneBuffer { items: Vec::new() });
+        return Ok(OscillatorSeries { items: Vec::new() });
     }
 
     let items = (0..(shl.len() - chv))
@@ -64,7 +64,7 @@ pub fn compute(
         })
         .collect();
 
-    Ok(OneBuffer { items })
+    Ok(OscillatorSeries { items })
 }
 
 #[cfg(test)]
@@ -89,7 +89,7 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OneBuffer) -> &[IndicatorValue] {
+    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
         &buffer.items
     }
 

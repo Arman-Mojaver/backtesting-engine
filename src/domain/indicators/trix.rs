@@ -1,7 +1,7 @@
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OneBuffer};
+use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
 /// Compute the TRIX (Triple Exponential Average) from resampled daily points.
 ///
@@ -22,7 +22,10 @@ use crate::domain::signal::{IndicatorValue, OneBuffer};
 /// Insufficient data (fewer than `3 * period - 1` points, i.e. `EMA3` has
 /// fewer than 2 entries) yields an empty `items` vector (not an error), per
 /// umbrella PRD Decision 10. A non-positive `period` is an error.
-pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, IndicatorError> {
+pub fn compute(
+    points: &[ResampledPointD1],
+    period: i32,
+) -> Result<OscillatorSeries, IndicatorError> {
     if period <= 0 {
         return Err(IndicatorError::InvalidTrixPeriod { n: period });
     }
@@ -34,7 +37,7 @@ pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, In
     let ema3 = ema(&ema2, p);
 
     if ema3.len() < 2 {
-        return Ok(OneBuffer { items: Vec::new() });
+        return Ok(OscillatorSeries { items: Vec::new() });
     }
 
     // TRIX entry k corresponds to original index 3*p - 2 + k.
@@ -53,7 +56,7 @@ pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, In
         })
         .collect();
 
-    Ok(OneBuffer { items })
+    Ok(OscillatorSeries { items })
 }
 
 #[cfg(test)]
@@ -78,7 +81,7 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OneBuffer) -> &[IndicatorValue] {
+    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
         &buffer.items
     }
 

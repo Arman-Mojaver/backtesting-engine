@@ -1,7 +1,7 @@
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OneBuffer};
+use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
 /// Fast SMA period (fixed per the MQL5 `Accelerator.mq5` source).
 const FAST_PERIOD: usize = 5;
@@ -41,7 +41,7 @@ fn ao_series(points: &[ResampledPointD1]) -> Vec<f64> {
 ///
 /// Insufficient data (fewer than 38 points) yields an empty buffer, not an
 /// error — consistent with the AO reference and umbrella PRD Decision 10.
-pub fn compute(points: &[ResampledPointD1]) -> Result<OneBuffer, IndicatorError> {
+pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, IndicatorError> {
     let ao = ao_series(points);
     let sma_ao = sma(&ao, FAST_PERIOD);
 
@@ -58,7 +58,7 @@ pub fn compute(points: &[ResampledPointD1]) -> Result<OneBuffer, IndicatorError>
         })
         .collect();
 
-    Ok(OneBuffer { items })
+    Ok(OscillatorSeries { items })
 }
 
 #[cfg(test)]
@@ -88,7 +88,7 @@ mod tests {
         rp(id, ts, median + 0.5, median - 0.5)
     }
 
-    fn values(buffer: &OneBuffer) -> &[IndicatorValue] {
+    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
         &buffer.items
     }
 

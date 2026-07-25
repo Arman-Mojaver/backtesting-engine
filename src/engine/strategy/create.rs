@@ -1,4 +1,4 @@
-use crate::application::signal_generator::create_signals;
+use crate::application::signal_generator::create_signal_groups;
 use crate::application::strategy_data::{fetch_strategy_data, StrategyQuery};
 use crate::application::strategy_generator::create_strategies;
 use crate::config::environment::parquet_base_dir;
@@ -41,7 +41,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
     );
 
     eprintln!("Creating signals ...");
-    let signal_groups = create_signals(&data.indicators, &data.resampled_points, 100);
+    let signal_groups = create_signal_groups(&data.indicators, &data.resampled_points);
     eprintln!(
         "Signal Groups {} signal groups (total operations: {})",
         signal_groups.len(),

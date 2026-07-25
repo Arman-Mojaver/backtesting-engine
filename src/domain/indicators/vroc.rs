@@ -1,6 +1,6 @@
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OneBuffer};
+use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
 /// Compute the Volume Rate of Change (VROC) from resampled daily points.
 ///
@@ -20,7 +20,10 @@ use crate::domain::signal::{IndicatorValue, OneBuffer};
 /// Insufficient data (fewer than `period` points, i.e. `N < period`) yields an
 /// empty `items` vector (not an error), per umbrella PRD Decision 10. A
 /// non-positive `period` is an error.
-pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, IndicatorError> {
+pub fn compute(
+    points: &[ResampledPointD1],
+    period: i32,
+) -> Result<OscillatorSeries, IndicatorError> {
     if period <= 0 {
         return Err(IndicatorError::InvalidVrocPeriod { n: period });
     }
@@ -28,7 +31,7 @@ pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, In
     let n = points.len();
 
     if n <= lookback {
-        return Ok(OneBuffer { items: Vec::new() });
+        return Ok(OscillatorSeries { items: Vec::new() });
     }
 
     let volumes: Vec<f64> = points.iter().map(|pt| pt.volume as f64).collect();
@@ -50,7 +53,7 @@ pub fn compute(points: &[ResampledPointD1], period: i32) -> Result<OneBuffer, In
         });
     }
 
-    Ok(OneBuffer { items })
+    Ok(OscillatorSeries { items })
 }
 
 #[cfg(test)]
@@ -75,7 +78,7 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OneBuffer) -> &[IndicatorValue] {
+    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
         &buffer.items
     }
 
