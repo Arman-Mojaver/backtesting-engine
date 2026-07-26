@@ -7,12 +7,8 @@ pub struct SignalGroup {
     pub indicator_id: i32,
     pub long_signals: Vec<i64>,
     pub short_signals: Vec<i64>,
-}
-
-impl SignalGroup {
-    pub fn operation_count(&self) -> usize {
-        self.long_signals.len() + self.short_signals.len()
-    }
+    pub operation_count: usize,
+    pub instrument: String,
 }
 
 pub fn filter_signal_groups_by_annual_ops(
@@ -24,8 +20,8 @@ pub fn filter_signal_groups_by_annual_ops(
     signal_groups
         .into_iter()
         .filter(|sg| {
-            sg.operation_count() > 0
-                && annual_operation_count(sg.operation_count(), start_timestamp, end_timestamp)
+            sg.operation_count > 0
+                && annual_operation_count(sg.operation_count, start_timestamp, end_timestamp)
                     >= min_operation_count
         })
         .collect()
@@ -42,36 +38,34 @@ mod tests {
             indicator_id: 1,
             long_signals: vec![0; long_count],
             short_signals: vec![0; short_count],
+            operation_count: long_count + short_count,
+            instrument: "EURUSD".to_string(),
         }
     }
-
-    // --- operation_count tests ---
 
     #[test]
     fn both_empty_returns_zero() {
         let group = make_group(0, 0);
-        assert_eq!(group.operation_count(), 0);
+        assert_eq!(group.operation_count, 0);
     }
 
     #[test]
     fn only_longs_returns_long_count() {
         let group = make_group(5, 0);
-        assert_eq!(group.operation_count(), 5);
+        assert_eq!(group.operation_count, 5);
     }
 
     #[test]
     fn only_shorts_returns_short_count() {
         let group = make_group(0, 3);
-        assert_eq!(group.operation_count(), 3);
+        assert_eq!(group.operation_count, 3);
     }
 
     #[test]
     fn both_populated_returns_sum() {
         let group = make_group(4, 7);
-        assert_eq!(group.operation_count(), 11);
+        assert_eq!(group.operation_count, 11);
     }
-
-    // --- filter_signal_groups_by_annual_ops tests ---
 
     #[test]
     fn filter_keeps_group_meeting_threshold() {
@@ -96,11 +90,7 @@ mod tests {
 
     #[test]
     fn filter_mixed_bag() {
-        let groups = vec![
-            make_group(20, 0), // annual ≈ 20 → passes
-            make_group(3, 0),  // annual ≈ 3  → fails
-            make_group(0, 0),  // empty → fails
-        ];
+        let groups = vec![make_group(20, 0), make_group(3, 0), make_group(0, 0)];
         let result = filter_signal_groups_by_annual_ops(groups, 10.0, 0, ONE_YEAR_SECS);
         assert_eq!(result.len(), 1);
     }
@@ -111,6 +101,8 @@ mod tests {
             indicator_id: 42,
             long_signals: vec![0; 15],
             short_signals: vec![],
+            operation_count: 15,
+            instrument: "EURUSD".to_string(),
         };
         let result = filter_signal_groups_by_annual_ops(vec![group], 10.0, 0, ONE_YEAR_SECS);
         assert_eq!(result.len(), 1);

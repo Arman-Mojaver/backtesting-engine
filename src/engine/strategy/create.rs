@@ -47,7 +47,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
         signal_groups.len(),
         signal_groups
             .iter()
-            .map(|sg| sg.operation_count())
+            .map(|sg| sg.operation_count)
             .sum::<usize>()
     );
 

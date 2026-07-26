@@ -102,16 +102,22 @@ fn sample_signal_groups() -> Vec<SignalGroup> {
             indicator_id: 1,
             long_signals: vec![1704067200, 1704153600, 1704240000, 1704326400, 1704412800],
             short_signals: vec![1704499200, 1704585600, 1704672000],
+            operation_count: 8,
+            instrument: "EURUSD".to_string(),
         },
         SignalGroup {
             indicator_id: 2,
             long_signals: vec![1704067200, 1704240000, 1704412800],
             short_signals: vec![1704153600, 1704326400, 1704499200, 1704585600],
+            operation_count: 7,
+            instrument: "EURUSD".to_string(),
         },
         SignalGroup {
             indicator_id: 3,
             long_signals: vec![1704067200],
             short_signals: vec![],
+            operation_count: 1,
+            instrument: "EURUSD".to_string(),
         },
     ]
 }

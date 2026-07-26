@@ -20,9 +20,9 @@ fn create_signal_group(
     indicator: &Indicator,
     resampled_points: &[ResampledPointD1],
 ) -> Option<SignalGroup> {
-    let values: IndicatorOutput =
+    let indicator_output: IndicatorOutput =
         create_indicator_output(&indicator.parameters, resampled_points).ok()?;
-    Some(values.create_signal_group(indicator.id))
+    Some(indicator_output.create_signal_group(indicator.id))
 }
 
 #[cfg(test)]

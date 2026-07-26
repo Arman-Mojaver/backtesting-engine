@@ -53,11 +53,15 @@ mod tests {
                 indicator_id: 1,
                 long_signals: vec![100, 200, 300],
                 short_signals: vec![150, 250],
+                operation_count: 5,
+                instrument: "EURUSD".to_string(),
             },
             SignalGroup {
                 indicator_id: 2,
                 long_signals: vec![],
                 short_signals: vec![400],
+                operation_count: 1,
+                instrument: "EURUSD".to_string(),
             },
         ];
 
@@ -79,6 +83,8 @@ mod tests {
             indicator_id: 42,
             long_signals: vec![],
             short_signals: vec![],
+            operation_count: 0,
+            instrument: "EURUSD".to_string(),
         }];
 
         let json = serde_json::to_string(&groups).expect("serialize");

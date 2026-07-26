@@ -65,6 +65,7 @@ pub fn create_indicator_output(
     parameters: &IndicatorParameters,
     points: &[ResampledPointD1],
 ) -> Result<IndicatorOutput, IndicatorError> {
+    let instrument = points.first().map(|p| p.instrument.clone()).unwrap();
     match parameters {
         IndicatorParameters::Rsi {
             n,
@@ -78,45 +79,45 @@ pub fn create_indicator_output(
                 f64::from(*high_threshold),
                 f64::from(*low_threshold),
             )?;
-            Ok(IndicatorOutput::Threshold(buffer))
+            Ok(IndicatorOutput::Threshold { instrument, buffer })
         }
         IndicatorParameters::Macd { .. } => Err(IndicatorError::UnsupportedIndicator {
             indicator: "macd".to_string(),
         }),
         IndicatorParameters::AwesomeOscillator => {
             let buffer = ao::compute(points)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::AcceleratorDecelerator => {
             let buffer = ac::compute(points)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::BearsPower { period } => {
             let buffer = bears::compute(points, *period)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::BullsPower { period } => {
             let buffer = bulls::compute(points, *period)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::ChaikinOscillator { fast_ma, slow_ma } => {
             let buffer = cho::compute(points, *fast_ma, *slow_ma)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::ChaikinVolatility {
             smooth_period,
             chv_period,
         } => {
             let buffer = chv::compute(points, *smooth_period, *chv_period)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::DetrendedPriceOscillator { period } => {
             let buffer = dpo::compute(points, *period)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::ForceIndex { period } => {
             let buffer = force::compute(points, *period)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::OsMa {
             fast_ema,
@@ -124,19 +125,19 @@ pub fn create_indicator_output(
             signal_sma,
         } => {
             let buffer = osma::compute(points, *fast_ema, *slow_ema, *signal_sma)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::Roc { period } => {
             let buffer = roc::compute(points, *period)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::Trix { period } => {
             let buffer = trix::compute(points, *period)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::Vroc { period } => {
             let buffer = vroc::compute(points, *period)?;
-            Ok(IndicatorOutput::Oscillator(buffer))
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
     }
 }
@@ -168,7 +169,7 @@ mod tests {
             .map(|i| {
                 let m = 1.0;
                 ResampledPointD1 {
-                    id: i as i32 + 1,
+                    id: i + 1,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m + 0.5,
@@ -191,8 +192,10 @@ mod tests {
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0), rp(3, 3, 3.0), rp(4, 4, 4.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Threshold(ref buf) => {
+        match &result {
+            IndicatorOutput::Threshold {
+                buffer: ref buf, ..
+            } => {
                 assert_eq!(buf.high_threshold, 70.0);
                 assert_eq!(buf.low_threshold, 30.0);
                 assert!(!buf.items.is_empty());
@@ -224,8 +227,10 @@ mod tests {
         let params = IndicatorParameters::AwesomeOscillator;
         let points = rp_ao_34();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 34 points -> 1 AO value (constant median -> 0.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -239,8 +244,10 @@ mod tests {
         let params = IndicatorParameters::AwesomeOscillator;
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -282,7 +289,7 @@ mod tests {
             .map(|i| {
                 let m = 1.0;
                 ResampledPointD1 {
-                    id: i as i32 + 1,
+                    id: i + 1,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m + 0.5,
@@ -301,8 +308,10 @@ mod tests {
         let params = IndicatorParameters::AcceleratorDecelerator;
         let points = rp_ac_38();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 38 points -> 1 AC value (constant median -> 0.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -316,8 +325,10 @@ mod tests {
         let params = IndicatorParameters::AcceleratorDecelerator;
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -348,8 +359,10 @@ mod tests {
         let params = IndicatorParameters::BearsPower { period: 13 };
         let points = rp_bears_14();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 14 points, period 13 -> 1 Bears value (9.0 - 10.0 = -1.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, -1.0);
@@ -363,8 +376,10 @@ mod tests {
         let params = IndicatorParameters::BearsPower { period: 13 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -402,8 +417,10 @@ mod tests {
         let params = IndicatorParameters::BullsPower { period: 13 };
         let points = rp_bulls_14();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 14 points, period 13 -> 1 Bulls value (11.0 - 10.0 = 1.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 1.0);
@@ -417,8 +434,10 @@ mod tests {
         let params = IndicatorParameters::BullsPower { period: 13 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -457,8 +476,10 @@ mod tests {
         };
         let points = rp_cho_5();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 5 points, slow_ma=4 -> 1 CHO value = 50.0.
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 50.0);
@@ -475,8 +496,10 @@ mod tests {
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -529,8 +552,10 @@ mod tests {
         };
         let points = rp_chv_5();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 5 points, smooth=2, chv=3 -> 1 CHV value = 0.0 (constant spread).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -547,8 +572,10 @@ mod tests {
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -601,8 +628,10 @@ mod tests {
         let params = IndicatorParameters::DetrendedPriceOscillator { period: 12 };
         let points = rp_dpo_7();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 7 points, period 12 -> ExtMAPeriod = 7 -> 1 DPO value
                 // (10.0 - 10.0 = 0.0).
                 assert_eq!(buf.items.len(), 1);
@@ -617,8 +646,10 @@ mod tests {
         let params = IndicatorParameters::DetrendedPriceOscillator { period: 12 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -657,8 +688,10 @@ mod tests {
         let params = IndicatorParameters::ForceIndex { period: 3 };
         let points = rp_force_4();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 4 points, period 3 -> 1 Force Index value
                 // (1000 * (10.0 - 10.0) = 0.0).
                 assert_eq!(buf.items.len(), 1);
@@ -673,8 +706,10 @@ mod tests {
         let params = IndicatorParameters::ForceIndex { period: 13 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -717,8 +752,10 @@ mod tests {
         };
         let points = rp_osma_6();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 6 points, fast=3, slow=5, signal=2 -> 1 OsMA value
                 // (constant close -> 0.0).
                 assert_eq!(buf.items.len(), 1);
@@ -737,8 +774,10 @@ mod tests {
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -805,8 +844,10 @@ mod tests {
         let params = IndicatorParameters::Roc { period: 3 };
         let points = rp_roc_5();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 5 points, period 3 -> 2 ROC values (constant close -> 0.0).
                 assert_eq!(buf.items.len(), 2);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -820,8 +861,10 @@ mod tests {
         let params = IndicatorParameters::Roc { period: 13 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -860,8 +903,10 @@ mod tests {
         let params = IndicatorParameters::Trix { period: 2 };
         let points = rp_trix_5();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 5 points, period 2 -> 1 TRIX value (constant close -> 0.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -875,8 +920,10 @@ mod tests {
         let params = IndicatorParameters::Trix { period: 14 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -915,8 +962,10 @@ mod tests {
         let params = IndicatorParameters::Vroc { period: 2 };
         let points = rp_vroc_5();
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => {
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
                 // 5 points, period 2 -> 4 VROC values (constant volume -> 0.0).
                 assert_eq!(buf.items.len(), 4);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -930,8 +979,10 @@ mod tests {
         let params = IndicatorParameters::Vroc { period: 25 };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
-        match result {
-            IndicatorOutput::Oscillator(ref buf) => assert!(buf.items.is_empty()),
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
