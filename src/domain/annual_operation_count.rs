@@ -6,7 +6,7 @@ fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
     if days <= 0.0 {
         return 0.0;
     }
-    (days / DAYS_PER_YEAR * 100.0).round() / 100.0
+    days / DAYS_PER_YEAR
 }
 
 pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_timestamp: i64) -> f64 {
@@ -27,8 +27,8 @@ pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_time
 mod tests {
     use super::*;
 
-    const ONE_YEAR_SECS: i64 = 365 * 86400;
-    const TWO_YEARS_SECS: i64 = 730 * 86400;
+    const ONE_YEAR_SECS: i64 = 31_557_600; // 365.25 * 86400
+    const TWO_YEARS_SECS: i64 = 63_115_200; // 2 * ONE_YEAR_SECS
 
     #[test]
     fn zero_count_returns_zero() {
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn one_year_count_1() {
-        // years = round(365/365.25, 2) = 1.0; 1/1.0 = 1.0
+        // years = 1.0; 1/1.0 = 1.0
         let result = annual_operation_count(1, 0, ONE_YEAR_SECS);
         assert_eq!(result, 1.0);
     }
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn two_years_count_1() {
-        // years = round(730/365.25, 2) = 2.0; 1/2.0 = 0.5
+        // years = 2.0; 1/2.0 = 0.5
         let result = annual_operation_count(1, 0, TWO_YEARS_SECS);
         assert_eq!(result, 0.5);
     }
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn count_equals_days_rounds_years_to_one() {
-        // years = round(365/365.25, 2) = 1.0; 365/1.0 = 365.0
+        // years = 1.0; 365/1.0 = 365.0
         let result = annual_operation_count(365, 0, ONE_YEAR_SECS);
         assert_eq!(result, 365.0);
     }
@@ -138,8 +138,8 @@ mod tests {
 
     #[test]
     fn near_zero_rounds_to_small_nonzero() {
-        // 10 years: years = round(3650/365.25, 2) = 9.99; 1/9.99 = 0.10
-        let ten_years_secs: i64 = 3650 * 86400;
+        // 10 years: years = 10.0; 1/10.0 = 0.10
+        let ten_years_secs: i64 = 10 * ONE_YEAR_SECS;
         let result = annual_operation_count(1, 0, ten_years_secs);
         assert_eq!(result, 0.10);
     }

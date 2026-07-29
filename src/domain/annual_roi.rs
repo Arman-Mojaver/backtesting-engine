@@ -6,7 +6,7 @@ fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
     if days <= 0.0 {
         return 0.0;
     }
-    (days / DAYS_PER_YEAR * 100.0).round() / 100.0
+    days / DAYS_PER_YEAR
 }
 
 pub fn annual_roi(start_timestamp: i64, end_timestamp: i64, global_roi: f64) -> f64 {
@@ -24,10 +24,10 @@ pub fn annual_roi(start_timestamp: i64, end_timestamp: i64, global_roi: f64) -> 
 mod tests {
     use super::*;
 
-    const ONE_YEAR_SECS: i64 = 365 * 86400;
-    const HALF_YEAR_SECS: i64 = 182 * 86400;
-    const QUARTER_YEAR_SECS: i64 = 91 * 86400;
-    const THIRD_YEAR_SECS: i64 = 122 * 86400;
+    const ONE_YEAR_SECS: i64 = 31_557_600; // 365.25 * 86400
+    const HALF_YEAR_SECS: i64 = 15_778_800; // ONE_YEAR_SECS / 2
+    const QUARTER_YEAR_SECS: i64 = 7_889_400; // ONE_YEAR_SECS / 4
+    const THIRD_YEAR_SECS: i64 = 10_519_200; // ONE_YEAR_SECS / 3
 
     #[test]
     fn zero_span_returns_zero() {
@@ -89,8 +89,8 @@ mod tests {
 
     #[test]
     fn third_of_year_compounds_to_global() {
-        // 0.33 years, global 3.195%: annual = ((1.03195)^(1/0.33) - 1) * 100 = 10.0
-        assert_eq!(annual_roi(0, THIRD_YEAR_SECS, 3.195), 10.0);
+        // 0.33 years, global 3.228%: annual = ((1.03228)^(1/0.33) - 1) * 100 = 10.0
+        assert_eq!(annual_roi(0, THIRD_YEAR_SECS, 3.228), 10.0);
     }
 
     #[test]
