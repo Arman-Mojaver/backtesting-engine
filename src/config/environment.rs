@@ -92,6 +92,15 @@ pub fn parquet_base_dir(env: Environment) -> String {
     format!("{PARQUET_FILES_PATH}/{subdirectory}/strategy")
 }
 
+pub fn parquet_root_dir(env: Environment) -> String {
+    let subdirectory = match env {
+        Environment::Production => "production",
+        Environment::Development => "development",
+        Environment::Testing => "testing",
+    };
+    format!("{PARQUET_FILES_PATH}/{subdirectory}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,5 +206,23 @@ mod tests {
     fn parquet_base_dir_testing() {
         let dir = parquet_base_dir(Environment::Testing);
         assert_eq!(dir, "/app/parquet_files/testing/strategy");
+    }
+
+    #[test]
+    fn parquet_root_dir_development() {
+        let dir = parquet_root_dir(Environment::Development);
+        assert_eq!(dir, "/app/parquet_files/development");
+    }
+
+    #[test]
+    fn parquet_root_dir_production() {
+        let dir = parquet_root_dir(Environment::Production);
+        assert_eq!(dir, "/app/parquet_files/production");
+    }
+
+    #[test]
+    fn parquet_root_dir_testing() {
+        let dir = parquet_root_dir(Environment::Testing);
+        assert_eq!(dir, "/app/parquet_files/testing");
     }
 }

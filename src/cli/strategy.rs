@@ -27,6 +27,10 @@ pub fn build_strategy_cli() -> Command {
                 ),
         )
         .subcommand(
+            Command::new("metadata")
+                .about("Show metadata: DB vs manifest state and remaining triples"),
+        )
+        .subcommand(
             Command::new("display")
                 .about("Display a strategy with its iteration table")
                 .arg(
@@ -55,6 +59,7 @@ pub enum StrategyCommand {
         strategy_id: i64,
         verbose: bool,
     },
+    Metadata,
 }
 
 pub fn parse_strategy(m: &ArgMatches) -> StrategyCommand {
@@ -68,6 +73,7 @@ pub fn parse_strategy(m: &ArgMatches) -> StrategyCommand {
                 .cloned()
                 .unwrap_or_else(|| "EURUSD".to_string()),
         },
+        Some(("metadata", _sub_m)) => StrategyCommand::Metadata,
         Some(("display", sub_m)) => StrategyCommand::Display {
             strategy_id: *sub_m.get_one::<i64>("strategy_id").unwrap(),
             verbose: sub_m.get_flag("verbose"),
@@ -90,6 +96,9 @@ impl StrategyCommand {
                 "--instrument".to_string(),
                 instrument,
             ]),
+            StrategyCommand::Metadata => {
+                super::exec_engine_cli(&["strategy".to_string(), "metadata".to_string()])
+            }
             StrategyCommand::Display {
                 strategy_id,
                 verbose,

@@ -25,7 +25,7 @@ impl Default for GlobalStrategyFilter {
     fn default() -> Self {
         Self {
             max_draw_down_max: 30.0,
-            min_annual_roi:5.0,
+            min_annual_roi: 5.0,
             min_operation_count: 10.0,
         }
     }
@@ -98,7 +98,7 @@ mod tests {
     fn filters_mixed_bag() {
         let strategies = vec![
             make_strategy(1, 15.0, 20.0, 10.0), // passes
-            make_strategy(2, 3.0, 20.0, 10.0), // low ROI
+            make_strategy(2, 3.0, 20.0, 10.0),  // low ROI
             make_strategy(3, 15.0, 50.0, 10.0), // high DD
             make_strategy(4, 15.0, 20.0, 3.0),  // passes
             make_strategy(5, 25.0, 10.0, 20.0), // passes

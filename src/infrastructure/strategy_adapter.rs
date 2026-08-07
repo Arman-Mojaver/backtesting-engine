@@ -12,6 +12,7 @@ use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
+use rustc_hash::FxHashSet;
 
 use crate::domain::strategy::Strategy;
 
@@ -73,8 +74,14 @@ impl ParquetStrategyRepository {
             .map(|(i, s)| StrategyRow::from_strategy(s, next_id + i as i64))
             .collect();
 
+        // Collect indicator IDs from new strategies for dedup-on-write
+        let new_indicator_ids: FxHashSet<i32> = strategies.iter().map(|s| s.indicator_id).collect();
+
         let mut combined: Vec<StrategyRow> = if path.exists() {
             self.read_rows(&path)?
+                .into_iter()
+                .filter(|row| !new_indicator_ids.contains(&row.indicator_id))
+                .collect()
         } else {
             Vec::new()
         };
@@ -305,6 +312,19 @@ mod tests {
         rows.into_iter().map(|r| r.strategy_id).collect()
     }
 
+    fn read_back_indicator_ids(
+        repo: &ParquetStrategyRepository,
+        instrument: &str,
+        mms_id: i32,
+    ) -> Vec<i32> {
+        let path = PathBuf::from(format!(
+            "{}/instrument={}/money_management_strategy_id={}/strategies.parquet",
+            repo.base_dir, instrument, mms_id
+        ));
+        let rows = repo.read_rows(&path).expect("read back");
+        rows.into_iter().map(|r| r.indicator_id).collect()
+    }
+
     #[test]
     fn write_does_not_error() {
         let tmp = TempDir::new().unwrap();
@@ -439,6 +459,101 @@ mod tests {
         repo.write("EURUSD", 390, &strategies).unwrap();
 
         let ids = read_back_ids(&repo, "EURUSD", 390);
-        assert_eq!(ids, vec![1, 2, 5, 6]);
+        assert_eq!(ids, vec![5, 6]);
+    }
+
+    // ---------- Dedup-on-write tests ----------
+
+    #[test]
+    fn write_deduplicates_same_batch() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let strategies = sample_strategies();
+
+        repo.write("EURUSD", 390, &strategies).unwrap();
+        repo.write("EURUSD", 390, &strategies).unwrap();
+
+        let indicator_ids = read_back_indicator_ids(&repo, "EURUSD", 390);
+        assert_eq!(indicator_ids.len(), 2);
+        assert!(indicator_ids.contains(&2001));
+        assert!(indicator_ids.contains(&2002));
+    }
+
+    #[test]
+    fn write_preserves_different_indicators() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let first = sample_strategies();
+        let second: Vec<Strategy> = vec![Strategy {
+            indicator_id: 9999,
+            annual_roi: 1.0,
+            max_draw_down: 2.0,
+            annual_operation_count: 3.0,
+            long_operation_point_ids: vec![],
+            short_operation_point_ids: vec![],
+            money_management_strategy_id: 390,
+        }];
+
+        repo.write("EURUSD", 390, &first).unwrap();
+        repo.write("EURUSD", 390, &second).unwrap();
+
+        let indicator_ids = read_back_indicator_ids(&repo, "EURUSD", 390);
+        assert_eq!(indicator_ids.len(), 3);
+        assert!(indicator_ids.contains(&2001));
+        assert!(indicator_ids.contains(&2002));
+        assert!(indicator_ids.contains(&9999));
+    }
+
+    #[test]
+    fn write_partial_overlap_replaces_old() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let first = sample_strategies();
+        let second: Vec<Strategy> = vec![
+            Strategy {
+                indicator_id: 2002,
+                annual_roi: 99.0,
+                max_draw_down: 1.0,
+                annual_operation_count: 5.0,
+                long_operation_point_ids: vec![100],
+                short_operation_point_ids: vec![],
+                money_management_strategy_id: 390,
+            },
+            Strategy {
+                indicator_id: 3000,
+                annual_roi: 1.0,
+                max_draw_down: 2.0,
+                annual_operation_count: 3.0,
+                long_operation_point_ids: vec![],
+                short_operation_point_ids: vec![],
+                money_management_strategy_id: 390,
+            },
+        ];
+
+        repo.write("EURUSD", 390, &first).unwrap();
+        repo.write("EURUSD", 390, &second).unwrap();
+
+        let indicator_ids = read_back_indicator_ids(&repo, "EURUSD", 390);
+        assert_eq!(indicator_ids.len(), 3);
+        // 2001 from first write -- preserved
+        assert!(indicator_ids.contains(&2001));
+        // 2002 from second write -- replaced (should exist, but only once)
+        assert!(indicator_ids.contains(&2002));
+        // 3000 from second write -- new
+        assert!(indicator_ids.contains(&3000));
+    }
+
+    #[test]
+    fn dedup_does_not_affect_ids_from_other_partitions() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let strategies = sample_strategies();
+
+        repo.write("EURUSD", 390, &strategies).unwrap();
+        repo.write("USDJPY", 400, &strategies).unwrap();
+        repo.write("EURUSD", 390, &strategies).unwrap();
+
+        let usdjpy_ids = read_back_ids(&repo, "USDJPY", 400);
+        assert_eq!(usdjpy_ids, vec![3, 4]);
     }
 }

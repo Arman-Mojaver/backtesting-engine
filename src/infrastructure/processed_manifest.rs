@@ -1,0 +1,385 @@
+use std::fs;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use arrow::array::{AsArray, Int32Array, Int64Array, StringBuilder};
+use arrow::datatypes::{DataType, Field, Int32Type, Int64Type, Schema};
+use arrow::record_batch::RecordBatch;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::arrow::ArrowWriter;
+use parquet::basic::Compression;
+use parquet::file::properties::WriterProperties;
+
+/// A row in the processed manifest recording a completed (instrument, mms_id, indicator_id)
+/// run at a given Unix timestamp.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessedRow {
+    pub instrument: String,
+    pub mms_id: i32,
+    pub indicator_id: i32,
+    pub processed_at: i64,
+}
+
+/// Persists which (instrument, mms_id, indicator_id) triples have already been processed
+/// into a single `processed.parquet` file under `root_dir`.
+pub struct ParquetProcessedManifest {
+    root_dir: String,
+}
+
+impl ParquetProcessedManifest {
+    pub fn new(root_dir: String) -> Self {
+        ParquetProcessedManifest { root_dir }
+    }
+
+    fn path(&self) -> PathBuf {
+        PathBuf::from(format!("{}/processed.parquet", self.root_dir))
+    }
+
+    /// Returns all rows for the given instrument and mms_id.
+    /// Returns an empty vec if the manifest file does not exist yet.
+    pub fn read(&self, instrument: &str, mms_id: i32) -> anyhow::Result<Vec<ProcessedRow>> {
+        let path = self.path();
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
+        let all = read_all(&path)?;
+        Ok(all
+            .into_iter()
+            .filter(|r| r.instrument == instrument && r.mms_id == mms_id)
+            .collect())
+    }
+
+    /// Appends rows for each `indicator_id`, deduplicating any existing rows for the
+    /// same (instrument, mms_id, indicator_id) triple. Writes atomically via a temp file.
+    pub fn append(
+        &self,
+        instrument: &str,
+        mms_id: i32,
+        indicator_ids: &[i32],
+        processed_at: i64,
+    ) -> anyhow::Result<()> {
+        let path = self.path();
+        let mut rows: Vec<ProcessedRow> = if path.exists() {
+            read_all(&path)?
+        } else {
+            Vec::new()
+        };
+
+        // Identify rows about to be replaced (for the info log below)
+        let replaced_ids: Vec<i32> = rows
+            .iter()
+            .filter(|r| {
+                r.instrument == instrument
+                    && r.mms_id == mms_id
+                    && indicator_ids.contains(&r.indicator_id)
+            })
+            .map(|r| r.indicator_id)
+            .collect();
+
+        // Dedup: drop any existing row that matches (instrument, mms_id) + an incoming indicator_id
+        rows.retain(|r| {
+            !(r.instrument == instrument
+                && r.mms_id == mms_id
+                && indicator_ids.contains(&r.indicator_id))
+        });
+
+        if !replaced_ids.is_empty() {
+            eprintln!(
+                "Processed manifest: replacing {} existing row(s) for instrument={} mms_id={} (indicator_ids: {:?})",
+                replaced_ids.len(),
+                instrument,
+                mms_id,
+                replaced_ids
+            );
+        }
+
+        // Append new rows for each indicator_id
+        for &indicator_id in indicator_ids {
+            rows.push(ProcessedRow {
+                instrument: instrument.to_string(),
+                mms_id,
+                indicator_id,
+                processed_at,
+            });
+        }
+
+        // Atomic write: temp file first, then rename
+        let temp_path = path.with_extension("parquet.tmp");
+        write_parquet(&temp_path, &rows)?;
+        fs::rename(&temp_path, &path)?;
+
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Private helpers
+// ---------------------------------------------------------------------------
+
+fn read_all(path: &Path) -> anyhow::Result<Vec<ProcessedRow>> {
+    let file = File::open(path)?;
+    let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
+    let mut reader = builder.build()?;
+    let mut rows: Vec<ProcessedRow> = Vec::new();
+    while let Some(batch) = reader.next().transpose()? {
+        rows.extend(decode_batch(&batch)?);
+    }
+    Ok(rows)
+}
+
+fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<ProcessedRow>> {
+    let schema = batch.schema();
+    let col = |name: &str| -> anyhow::Result<usize> {
+        schema
+            .index_of(name)
+            .map_err(|e| anyhow::anyhow!("missing column {name}: {e}"))
+    };
+
+    let instruments = batch.column(col("instrument")?).as_string::<i32>();
+    let mms_ids = batch.column(col("mms_id")?).as_primitive::<Int32Type>();
+    let indicator_ids = batch
+        .column(col("indicator_id")?)
+        .as_primitive::<Int32Type>();
+    let processed_ats = batch
+        .column(col("processed_at")?)
+        .as_primitive::<Int64Type>();
+
+    let n = batch.num_rows();
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        out.push(ProcessedRow {
+            instrument: instruments.value(i).to_string(),
+            mms_id: mms_ids.value(i),
+            indicator_id: indicator_ids.value(i),
+            processed_at: processed_ats.value(i),
+        });
+    }
+    Ok(out)
+}
+
+fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("instrument", DataType::Utf8, false),
+        Field::new("mms_id", DataType::Int32, false),
+        Field::new("indicator_id", DataType::Int32, false),
+        Field::new("processed_at", DataType::Int64, false),
+    ]));
+
+    // String column requires a builder; integer columns use collect()
+    let mut instrument_builder = StringBuilder::new();
+    for r in rows {
+        instrument_builder.append_value(&r.instrument);
+    }
+
+    let mms_ids: Int32Array = rows.iter().map(|r| r.mms_id).collect();
+    let indicator_ids: Int32Array = rows.iter().map(|r| r.indicator_id).collect();
+    let processed_ats: Int64Array = rows.iter().map(|r| r.processed_at).collect();
+
+    let batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(instrument_builder.finish()),
+            Arc::new(mms_ids),
+            Arc::new(indicator_ids),
+            Arc::new(processed_ats),
+        ],
+    )?;
+
+    let props = WriterProperties::builder()
+        .set_compression(Compression::ZSTD(Default::default()))
+        .build();
+
+    let file = File::create(path)?;
+    let mut writer = ArrowWriter::try_new(file, schema, Some(props))?;
+    writer.write(&batch)?;
+    writer.close()?;
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+//  Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn new_manifest() -> (TempDir, ParquetProcessedManifest) {
+        let tmp = TempDir::new().expect("tempdir");
+        let manifest = ParquetProcessedManifest::new(tmp.path().to_string_lossy().to_string());
+        (tmp, manifest)
+    }
+
+    #[test]
+    fn write_and_read_back() {
+        let (_tmp, manifest) = new_manifest();
+        let ts = 1700000000;
+
+        manifest
+            .append("EURUSD", 390, &[2001, 2002], ts)
+            .expect("append");
+
+        let rows = manifest.read("EURUSD", 390).expect("read");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].instrument, "EURUSD");
+        assert_eq!(rows[0].mms_id, 390);
+        assert_eq!(rows[0].indicator_id, 2001);
+        assert_eq!(rows[0].processed_at, ts);
+        assert_eq!(rows[1].indicator_id, 2002);
+    }
+
+    #[test]
+    fn append_new_rows_preserves_existing() {
+        let (_tmp, manifest) = new_manifest();
+
+        manifest
+            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .expect("first append");
+        manifest
+            .append("EURUSD", 390, &[2003], 1700000001)
+            .expect("second append");
+
+        let rows = manifest.read("EURUSD", 390).expect("read");
+        assert_eq!(rows.len(), 3);
+
+        let ids: Vec<i32> = rows.iter().map(|r| r.indicator_id).collect();
+        assert!(ids.contains(&2001));
+        assert!(ids.contains(&2002));
+        assert!(ids.contains(&2003));
+    }
+
+    #[test]
+    fn append_with_duplicate_indicator_ids_drops_old() {
+        let (_tmp, manifest) = new_manifest();
+
+        // First run: process indicators 2001, 2002
+        manifest
+            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .expect("first append");
+
+        // Re-run with indicator 2001 + new 2003: old 2001 should be replaced
+        manifest
+            .append("EURUSD", 390, &[2001, 2003], 1700000001)
+            .expect("re-run append");
+
+        let rows = manifest.read("EURUSD", 390).expect("read");
+        assert_eq!(rows.len(), 3);
+
+        // 2001 should exist exactly once, with the new timestamp
+        let row_2001: Vec<&ProcessedRow> = rows.iter().filter(|r| r.indicator_id == 2001).collect();
+        assert_eq!(row_2001.len(), 1);
+        assert_eq!(row_2001[0].processed_at, 1700000001);
+
+        // 2002 should still be there with old timestamp
+        let row_2002: Vec<&ProcessedRow> = rows.iter().filter(|r| r.indicator_id == 2002).collect();
+        assert_eq!(row_2002.len(), 1);
+        assert_eq!(row_2002[0].processed_at, 1700000000);
+
+        // 2003 should exist with new timestamp
+        let row_2003: Vec<&ProcessedRow> = rows.iter().filter(|r| r.indicator_id == 2003).collect();
+        assert_eq!(row_2003.len(), 1);
+        assert_eq!(row_2003[0].processed_at, 1700000001);
+    }
+
+    #[test]
+    fn append_across_instruments_does_not_interfere() {
+        let (_tmp, manifest) = new_manifest();
+
+        manifest
+            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .expect("EURUSD");
+        manifest
+            .append("USDJPY", 400, &[3001], 1700000001)
+            .expect("USDJPY");
+
+        let eur_rows = manifest.read("EURUSD", 390).expect("read EURUSD");
+        let usd_rows = manifest.read("USDJPY", 400).expect("read USDJPY");
+
+        assert_eq!(eur_rows.len(), 2);
+        assert_eq!(usd_rows.len(), 1);
+        assert_eq!(usd_rows[0].indicator_id, 3001);
+    }
+
+    #[test]
+    fn empty_file_read_returns_empty() {
+        let (_tmp, manifest) = new_manifest();
+
+        let rows = manifest.read("EURUSD", 390).expect("read");
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn multi_instrument_rows_read_filtered() {
+        let (_tmp, manifest) = new_manifest();
+
+        manifest
+            .append("EURUSD", 390, &[2001], 1700000000)
+            .expect("EURUSD 390");
+        manifest
+            .append("EURUSD", 391, &[2002], 1700000000)
+            .expect("EURUSD 391");
+        manifest
+            .append("USDJPY", 390, &[3001], 1700000000)
+            .expect("USDJPY 390");
+
+        // Read only EURUSD/390
+        let rows = manifest.read("EURUSD", 390).expect("read");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].indicator_id, 2001);
+
+        // Read EURUSD/391
+        let rows = manifest.read("EURUSD", 391).expect("read");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].indicator_id, 2002);
+
+        // Read USDJPY/390
+        let rows = manifest.read("USDJPY", 390).expect("read");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].indicator_id, 3001);
+    }
+
+    #[test]
+    fn append_with_empty_indicator_ids_noops() {
+        let (_tmp, manifest) = new_manifest();
+
+        manifest
+            .append("EURUSD", 390, &[2001], 1700000000)
+            .expect("first append");
+
+        // Append with empty slice: nothing added, nothing removed
+        manifest
+            .append("EURUSD", 390, &[], 1700000001)
+            .expect("empty append");
+
+        let rows = manifest.read("EURUSD", 390).expect("read");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].indicator_id, 2001);
+        assert_eq!(rows[0].processed_at, 1700000000);
+    }
+
+    #[test]
+    fn atomic_write_cleans_up_temp_file() {
+        let (_tmp, manifest) = new_manifest();
+
+        manifest
+            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .expect("first append");
+        manifest
+            .append("EURUSD", 390, &[2003], 1700000001)
+            .expect("second append");
+
+        // Verify the manifest file exists
+        let path = manifest.path();
+        assert!(path.exists(), "processed.parquet should exist");
+
+        // Verify no temp file remains after atomic rename
+        let temp_path = manifest.path().with_extension("parquet.tmp");
+        assert!(
+            !temp_path.exists(),
+            "processed.parquet.tmp should not exist after rename"
+        );
+    }
+}

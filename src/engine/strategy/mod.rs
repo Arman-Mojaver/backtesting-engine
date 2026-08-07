@@ -1,4 +1,5 @@
 mod create;
+mod metadata;
 
 use clap::{value_parser, Arg, ArgMatches, Command};
 
@@ -9,6 +10,7 @@ pub enum StrategyCommand {
         money_management_strategy_id: i32,
         instrument: String,
     },
+    Metadata,
 }
 
 pub fn build_strategy_cli() -> Command {
@@ -36,6 +38,10 @@ pub fn build_strategy_cli() -> Command {
                         .help("Instrument pair (default: EURUSD)"),
                 ),
         )
+        .subcommand(
+            Command::new("metadata")
+                .about("Show metadata: DB vs manifest state and remaining triples"),
+        )
 }
 
 pub fn parse_strategy(m: &ArgMatches) -> StrategyCommand {
@@ -49,6 +55,7 @@ pub fn parse_strategy(m: &ArgMatches) -> StrategyCommand {
                 .cloned()
                 .unwrap_or_else(|| "EURUSD".to_string()),
         },
+        Some(("metadata", _sub_m)) => StrategyCommand::Metadata,
         _ => unreachable!("invalid strategy command"),
     }
 }
@@ -67,6 +74,7 @@ impl StrategyCommand {
                 money_management_strategy_id,
                 instrument,
             } => create::execute(money_management_strategy_id, instrument),
+            StrategyCommand::Metadata => metadata::execute(),
         }
     }
 }

@@ -153,6 +153,20 @@ impl PgLongOperationPointAdapter {
             conn: RefCell::new(conn),
         })
     }
+
+    pub fn get_distinct_mms_ids(&self) -> Vec<i32> {
+        let rows = self
+            .conn
+            .borrow_mut()
+            .query(
+                "SELECT DISTINCT money_management_strategy_id FROM long_operation_point ORDER BY 1",
+                &[],
+            )
+            .expect("failed to query money_management_strategy_id");
+        rows.iter()
+            .map(|r| r.get("money_management_strategy_id"))
+            .collect()
+    }
 }
 
 impl LongOperationPointRepository for PgLongOperationPointAdapter {
@@ -237,6 +251,18 @@ impl PgResampledPointAdapter {
             conn: RefCell::new(conn),
         })
     }
+
+    pub fn get_distinct_instruments(&self) -> Vec<String> {
+        let rows = self
+            .conn
+            .borrow_mut()
+            .query(
+                "SELECT DISTINCT instrument FROM resampled_point_d1 ORDER BY 1",
+                &[],
+            )
+            .expect("failed to query instrument");
+        rows.iter().map(|r| r.get("instrument")).collect()
+    }
 }
 
 impl ResampledPointD1Repository for PgResampledPointAdapter {
@@ -277,6 +303,15 @@ impl PgIndicatorAdapter {
         Ok(Self {
             conn: RefCell::new(conn),
         })
+    }
+
+    pub fn get_all_indicator_ids(&self) -> Vec<i32> {
+        let rows = self
+            .conn
+            .borrow_mut()
+            .query("SELECT id FROM indicator ORDER BY 1", &[])
+            .expect("failed to query id");
+        rows.iter().map(|r| r.get("id")).collect()
     }
 }
 
