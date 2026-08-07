@@ -31,3 +31,4 @@ debug
 **/node_modules/
 .opencode/.tmp/
 **/parquet_files/**
+.tmp
