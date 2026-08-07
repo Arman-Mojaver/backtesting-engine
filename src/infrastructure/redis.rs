@@ -1,13 +1,23 @@
 use crate::domain::signal_group::SignalGroup;
 
-/// The Redis key for the signal groups cache.
-pub const SIGNAL_GROUPS_KEY: &str = "signal_groups";
+pub fn signal_groups_key(instrument: &str) -> String {
+    format!("signal_groups:{}", instrument)
+}
+
+/// Lists all signal group cache keys currently stored in Redis.
+///
+/// Uses `KEYS signal_groups:*` — acceptable for a dev CLI tool with a small key space.
+pub fn list_signal_group_keys(conn: &mut redis::Connection) -> anyhow::Result<Vec<String>> {
+    let keys: Vec<String> = redis::cmd("KEYS").arg("signal_groups:*").query(conn)?;
+    Ok(keys)
+}
 
 /// Reads signal groups from Redis. Returns `Ok(None)` if the key does not exist.
 pub fn read_signal_groups(
     conn: &mut redis::Connection,
+    key: &str,
 ) -> anyhow::Result<Option<Vec<SignalGroup>>> {
-    let value: Option<String> = redis::cmd("GET").arg(SIGNAL_GROUPS_KEY).query(conn)?;
+    let value: Option<String> = redis::cmd("GET").arg(key).query(conn)?;
 
     match value {
         Some(json_str) => {
@@ -22,22 +32,20 @@ pub fn read_signal_groups(
 /// Writes signal groups to Redis, overwriting any existing value.
 pub fn write_signal_groups(
     conn: &mut redis::Connection,
+    key: &str,
     groups: &Vec<SignalGroup>,
 ) -> anyhow::Result<()> {
     let json_str = serde_json::to_string(groups)
         .map_err(|e| anyhow::anyhow!("Failed to serialize signal groups: {}", e))?;
 
-    redis::cmd("SET")
-        .arg(SIGNAL_GROUPS_KEY)
-        .arg(json_str)
-        .query::<()>(conn)?;
+    redis::cmd("SET").arg(key).arg(json_str).query::<()>(conn)?;
 
     Ok(())
 }
 
 /// Deletes signal groups from Redis.
-pub fn delete_signal_groups(conn: &mut redis::Connection) -> anyhow::Result<()> {
-    redis::cmd("DEL").arg(SIGNAL_GROUPS_KEY).query::<()>(conn)?;
+pub fn delete_signal_groups(conn: &mut redis::Connection, key: &str) -> anyhow::Result<()> {
+    redis::cmd("DEL").arg(key).query::<()>(conn)?;
 
     Ok(())
 }
@@ -45,6 +53,12 @@ pub fn delete_signal_groups(conn: &mut redis::Connection) -> anyhow::Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_signal_groups_key() {
+        assert_eq!(signal_groups_key("EURUSD"), "signal_groups:EURUSD");
+        assert_eq!(signal_groups_key("USDJPY"), "signal_groups:USDJPY");
+    }
 
     #[test]
     fn test_signal_group_serde_roundtrip() {
@@ -93,10 +107,5 @@ mod tests {
         assert_eq!(deserialized[0].indicator_id, 42);
         assert!(deserialized[0].long_signals.is_empty());
         assert!(deserialized[0].short_signals.is_empty());
-    }
-
-    #[test]
-    fn test_signal_groups_key_constant() {
-        assert_eq!(SIGNAL_GROUPS_KEY, "signal_groups");
     }
 }
