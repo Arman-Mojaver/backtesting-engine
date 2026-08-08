@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -105,6 +106,50 @@ impl ParquetProcessedManifest {
         }
 
         // Atomic write: temp file first, then rename
+        let temp_path = path.with_extension("parquet.tmp");
+        write_parquet(&temp_path, &rows)?;
+        fs::rename(&temp_path, &path)?;
+
+        Ok(())
+    }
+    /// Appends multiple (instrument, mms_id, indicator_ids) entries at once.
+    /// Reads the manifest once, applies all deduplications, writes once atomically.
+    pub fn append_all(
+        &self,
+        entries: &[(String, i32, Vec<i32>)],
+        processed_at: i64,
+    ) -> anyhow::Result<()> {
+        let path = self.path();
+        let mut rows: Vec<ProcessedRow> = if path.exists() {
+            read_all(&path)?
+        } else {
+            Vec::new()
+        };
+
+        eprintln!(
+            "Writing manifest: {} entries ({} total indicator IDs) ...",
+            entries.len(),
+            entries.iter().map(|(_, _, ids)| ids.len()).sum::<usize>(),
+        );
+
+        for (instrument, mms_id, indicator_ids) in entries {
+            let indicator_set: HashSet<i32> = indicator_ids.iter().copied().collect();
+            rows.retain(|r| {
+                !(r.instrument == *instrument
+                    && r.mms_id == *mms_id
+                    && indicator_set.contains(&r.indicator_id))
+            });
+
+            for &indicator_id in indicator_ids {
+                rows.push(ProcessedRow {
+                    instrument: instrument.clone(),
+                    mms_id: *mms_id,
+                    indicator_id,
+                    processed_at,
+                });
+            }
+        }
+
         let temp_path = path.with_extension("parquet.tmp");
         write_parquet(&temp_path, &rows)?;
         fs::rename(&temp_path, &path)?;

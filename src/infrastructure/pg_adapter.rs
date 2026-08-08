@@ -340,3 +340,27 @@ impl IndicatorRepository for PgIndicatorAdapter {
         rows.iter().map(row_to_indicator).collect()
     }
 }
+pub struct PgMoneyManagementStrategyAdapter {
+    conn: RefCell<Client>,
+}
+
+impl PgMoneyManagementStrategyAdapter {
+    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
+        let conn = connect(connection_string)?;
+        Ok(Self {
+            conn: RefCell::new(conn),
+        })
+    }
+
+    pub fn get_distinct_ids(&self) -> Vec<i32> {
+        let rows = self
+            .conn
+            .borrow_mut()
+            .query(
+                "SELECT DISTINCT id FROM money_management_strategy ORDER BY 1",
+                &[],
+            )
+            .expect("failed to query money_management_strategy");
+        rows.iter().map(|r| r.get("id")).collect()
+    }
+}

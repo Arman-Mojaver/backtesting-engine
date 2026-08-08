@@ -8,7 +8,7 @@ pub fn build_strategy_cli() -> Command {
         .arg_required_else_help(true)
         .subcommand(
             Command::new("create")
-                .about("Create a Strategy")
+                .about("Create a Strategy (fetches data from PostgreSQL)")
                 .arg(
                     Arg::new("money_management_strategy_id")
                         .short('m')
@@ -25,6 +25,10 @@ pub fn build_strategy_cli() -> Command {
                         .default_value("EURUSD")
                         .help("Instrument pair (default: EURUSD)"),
                 ),
+        )
+        .subcommand(
+            Command::new("create_loop")
+                .about("Run idempotent strategy pipeline for all (instrument, mms_id) pairs"),
         )
         .subcommand(
             Command::new("metadata")
@@ -55,6 +59,7 @@ pub enum StrategyCommand {
         money_management_strategy_id: i32,
         instrument: String,
     },
+    CreateLoop,
     Display {
         strategy_id: i64,
         verbose: bool,
@@ -73,6 +78,7 @@ pub fn parse_strategy(m: &ArgMatches) -> StrategyCommand {
                 .cloned()
                 .unwrap_or_else(|| "EURUSD".to_string()),
         },
+        Some(("create_loop", _sub_m)) => StrategyCommand::CreateLoop,
         Some(("metadata", _sub_m)) => StrategyCommand::Metadata,
         Some(("display", sub_m)) => StrategyCommand::Display {
             strategy_id: *sub_m.get_one::<i64>("strategy_id").unwrap(),
@@ -96,6 +102,9 @@ impl StrategyCommand {
                 "--instrument".to_string(),
                 instrument,
             ]),
+            StrategyCommand::CreateLoop => {
+                super::exec_engine_cli(&["strategy".to_string(), "create_loop".to_string()])
+            }
             StrategyCommand::Metadata => {
                 super::exec_engine_cli(&["strategy".to_string(), "metadata".to_string()])
             }

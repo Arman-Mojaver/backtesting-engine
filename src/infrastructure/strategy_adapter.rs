@@ -66,7 +66,7 @@ impl ParquetStrategyRepository {
 
         let path = PathBuf::from(format!("{}/strategies.parquet", partition_dir));
 
-        let next_id = self.find_max_strategy_id()? + 1;
+        let next_id = self.max_strategy_id()? + 1;
 
         let mut new_rows: Vec<StrategyRow> = strategies
             .iter()
@@ -102,9 +102,64 @@ impl ParquetStrategyRepository {
         Ok(())
     }
 
-    fn find_max_strategy_id(&self) -> anyhow::Result<i64> {
+    /// Writes strategies using a pre-assigned starting ID instead of scanning
+    /// all files for the global maximum. Used by parallel writers that coordinate
+    /// ID assignment externally.
+    pub fn write_with_start_id(
+        &self,
+        instrument: &str,
+        mms_id: i32,
+        strategies: &[Strategy],
+        start_id: i64,
+    ) -> anyhow::Result<()> {
+        let partition_dir = format!(
+            "{}/instrument={}/money_management_strategy_id={}",
+            self.base_dir, instrument, mms_id
+        );
+        fs::create_dir_all(&partition_dir)?;
+
+        let path = PathBuf::from(format!("{}/strategies.parquet", partition_dir));
+
+        let mut new_rows: Vec<StrategyRow> = strategies
+            .iter()
+            .enumerate()
+            .map(|(i, s)| StrategyRow::from_strategy(s, start_id + i as i64))
+            .collect();
+
+        let new_indicator_ids: FxHashSet<i32> = strategies.iter().map(|s| s.indicator_id).collect();
+
+        let mut combined: Vec<StrategyRow> = if path.exists() {
+            self.read_rows(&path)?
+                .into_iter()
+                .filter(|row| !new_indicator_ids.contains(&row.indicator_id))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        combined.append(&mut new_rows);
+
+        let batch = build_record_batch(&combined)?;
+        let schema = batch.schema();
+
+        let props = WriterProperties::builder()
+            .set_compression(Compression::ZSTD(Default::default()))
+            .build();
+
+        let file = File::create(&path)?;
+        let mut writer = ArrowWriter::try_new(file, schema, Some(props))?;
+        writer.write(&batch)?;
+        writer.close()?;
+
+        Ok(())
+    }
+
+    pub fn max_strategy_id(&self) -> anyhow::Result<i64> {
+        let root = PathBuf::from(&self.base_dir);
+        if !root.exists() {
+            return Ok(0);
+        }
         let mut max_id: i64 = 0;
-        let mut dirs: Vec<PathBuf> = vec![PathBuf::from(&self.base_dir)];
+        let mut dirs: Vec<PathBuf> = vec![root];
         while let Some(dir) = dirs.pop() {
             for entry in fs::read_dir(&dir)? {
                 let entry = entry?;
