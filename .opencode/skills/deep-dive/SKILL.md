@@ -1,27 +1,52 @@
 ---
 name: deep-dive
 description: >
-  Analyze the last commit and generate a runnable walkthrough script that helps developers
-  understand implementation details. Creates instantiations of new/modified structures with
+  Analyze code (from a commit OR arbitrary input) and generate a runnable walkthrough script
+  that helps developers understand implementation details. Creates instantiations of structures with
   seed data and print statements. Use when user says "deep-dive", "deep dive", "understand
-  the implementation", "walkthrough", "show me how this works", "help me understand this
-  commit", or invokes /deep-dive.
+  the implementation", "walkthrough", "show me how this works", "deep dive on this", or
+  invokes /deep-dive. Works in two modes: commit-based (analyzes last commit) or code-input
+  (analyzes code you paste or reference directly).
 ---
 
 # Deep Dive Skill
 
-Generate an educational walkthrough script for the last commit to help developers understand implementation details beyond the feature description.
+Generate an educational walkthrough script to help developers understand implementation details
+beyond the surface-level description. Works with both git commits and arbitrary code/data structures.
 
 ## When to Use
 
+**Commit Mode** (triggered by "deep dive", "/deep-dive" with no code provided):
 - After implementing a feature
 - When you understand what a feature does but not how it's implemented
-- When you need hands-on understanding of code changes
+- When you need hands-on understanding of recent code changes
 - To learn from recent commits by seeing real instantiations
+
+**Code Input Mode** (triggered by "deep dive on this", "/deep-dive --code", or pasting code):
+- When you paste a struct, function, or data structure and want to understand it deeply
+- When you reference a file path + struct name (e.g., "deep dive on SignalGenerator in src/signals.rs")
+- When you want to explore any piece of code regardless of whether it was committed
+- When learning a new codebase — pick any module and generate a walkthrough
 
 ## Process
 
-### Step 1: Check for Uncommitted Changes
+### Step 0: Determine Mode
+
+Before anything else, determine which mode to use:
+
+| Condition | Mode | Next Step |
+|-----------|------|-----------|
+| User says "deep dive" (no code provided) and there's a recent commit | **Commit Mode** | Go to Step A1 |
+| User says "deep dive on this" followed by pasted code | **Code Input Mode** | Go to Step B1 |
+| User says "deep dive on {struct/function} in {file}" | **Code Input Mode** | Go to Step B1 |
+| User invokes `/deep-dive --code` or pastes code in the same message | **Code Input Mode** | Go to Step B1 |
+| Ambiguous — ask: "Commit mode (last commit) or code input mode (analyze specific code)?" | Wait for user | — |
+
+---
+
+## Mode A: Commit Analysis
+
+### Step A1: Check for Uncommitted Changes
 
 **IMPORTANT**: Before analyzing, check `git status` for uncommitted changes.
 
@@ -42,7 +67,7 @@ What would you like to do?
 
 Wait for user confirmation before proceeding. If they choose option 3, continue with awareness that changes will be mixed.
 
-### Step 2: Analyze the Last Commit
+### Step A2: Analyze the Last Commit
 
 Run:
 ```bash
@@ -57,16 +82,86 @@ Identify:
 - Key methods and their purposes
 - Dependencies and relationships between structures
 
-### Step 3: Generate Walkthrough Script
+Then proceed to **Shared: Script Generation** below.
+
+### Step A3: Optionally Add Print Statements to Codebase
+
+If the commit modifies complex logic that benefits from runtime visibility:
+
+1. Add temporary println!/log statements directly into the modified functions
+2. Mark them clearly: `println!("DEBUG [deep-dive]: {}", value);`
+3. Note in the output that temporary debug statements were added
+4. Provide instructions to remove them after understanding
+
+**Only do this if:**
+- User acknowledged uncommitted changes (Step A1)
+- The code structure makes it hard to understand without runtime visibility
+- The benefit outweighs the cleanup effort
+
+After optional debug statements, proceed to **Shared: Output Format**.
+
+---
+
+## Mode B: Code Input Analysis
+
+### Step B1: Receive and Parse the Code
+
+The user provides code in one of these forms:
+
+**Form 1 — Pasted code block:**
+```
+User: deep dive on this:
+```rust
+pub struct SignalGenerator {
+    config: GeneratorConfig,
+    signal_count: u32,
+}
+impl SignalGenerator { ... }
+```
+```
+
+**Form 2 — File path + struct/function name:**
+```
+User: deep dive on SignalGenerator in src/application/signal_generator.rs
+User: deep dive on the calculate_position_size function
+```
+
+**Form 3 — Multiple pieces:**
+```
+User: deep dive on these three structs: SignalGenerator, BacktestRunner, StrategyConfig
+```
+
+### Step B2: Analyze the Provided Code
+
+**If pasted code:** Parse it directly. Identify all structures, enums, functions, methods, private fields, internal helpers, and code paths.
+
+**If file path + name:** Read the file and find the referenced struct/function. If the name is unambiguous, proceed. If ambiguous (multiple matches), ask the user to clarify.
+
+**Key analysis tasks (same as commit mode):**
+- Identify all structs, enums, functions added/modified
+- Identify methods, their signatures, and visibility (pub, pub(crate), private)
+- Map out code paths: happy path, edge cases, error conditions, branching
+- Detect CLI/API patterns (same rules as commit mode)
+- Determine the programming language
+
+Then proceed to **Shared: Script Generation** below.
+
+---
+
+## Shared: Script Generation
+
+These rules apply to BOTH modes. Once you have analyzed the code (from commit or input),
+generate the walkthrough script following all rules below.
+
+### Output Convention
 
 Create a standalone script (saved to `examples/{timestamp}.{ext}`) that:
 
 **Directory convention:** Always save walkthrough scripts to the `examples/` directory (e.g., `examples/deep-dive-001-helper-functions.rs`). Cargo auto-discovers `.rs` files in `examples/` — no `Cargo.toml` changes needed. Use descriptive filenames: `examples/deep-dive-{NNN}-{slug}.rs`. When done, simply delete the file: `rm examples/deep-dive-*.rs`.
 
-
 **IMPORTANT: Split Large Changes into Multiple Scripts**
 
-If the commit contains extensive changes (>200 lines, multiple unrelated features, or complex multi-component changes), split the walkthrough into multiple focused scripts instead of one massive script.
+If the code contains extensive structures (>200 lines, multiple unrelated components, or complex multi-component changes), split the walkthrough into multiple focused scripts instead of one massive script.
 
 **Why?** A 1000-line script that takes 2 hours to understand defeats the purpose of learning. Each script should be digestible in 10-15 minutes.
 
@@ -86,8 +181,8 @@ If the commit contains extensive changes (>200 lines, multiple unrelated feature
 ```
 ## Deep Dive Walkthrough Generated
 
-📊 Commit: abc1234 - Add backtesting strategy system
-📏 Total changes: 450 lines across 8 files
+📊 Source: [Commit abc1234 - Add backtesting strategy system] OR [Code input: SignalGenerator + BacktestRunner]
+📏 Total scope: [450 lines across 8 files] OR [3 structs, 12 methods]
 📦 Split into 3 focused scripts (10-15 min each)
 
 ### Script 1: Strategy Validation (Core Logic)
@@ -112,9 +207,9 @@ Run: cargo run --example deep-dive-003-strategy-results
 ```
 
 **When NOT to split:**
-- Small, focused changes (<100 lines)
+- Small, focused structures (<100 lines)
 - Single class/struct with related methods
-- Changes that are tightly coupled and hard to separate
+- Components that are tightly coupled and hard to separate
 
 #### A. Includes Hardcoded Seed Data
 ```rust
@@ -299,11 +394,11 @@ Each section function must produce **no more than 20-25 lines** of terminal outp
 
 #### H. CLI/API Detection — Print Instructions, Don't Execute
 
-If the commit introduces or modifies a **CLI command** or **API endpoint**, the walkthrough script must **NOT** execute those commands or make real HTTP calls. Instead, it prints the exact commands the developer should run themselves.
+If the analyzed code introduces or modifies a **CLI command** or **API endpoint**, the walkthrough script must **NOT** execute those commands or make real HTTP calls. Instead, it prints the exact commands the developer should run themselves.
 
 **Why?** CLI commands may have side effects (writing files, modifying state). API calls hit real servers. The walkthrough script must be safe and side-effect-free.
 
-**Detection rules — a commit is flagged as CLI/API if it touches:**
+**Detection rules — flag as CLI/API if the code touches:**
 - `clap`/`structopt` command structs or `#[derive(Parser)]`
 - Route handlers (`actix-web`, `axum`, `warp`) or `#[get("/...")]`, `#[post("/...")]`
 - `main.rs` argument parsing
@@ -352,47 +447,84 @@ fn section_5_create_strategy_api() {
 }
 ```
 
+---
 
-### Step 4: Optionally Add Print Statements to Codebase
+## Shared: Output Format
 
-If the commit modifies complex logic that benefits from runtime visibility:
+After generating the walkthrough script(s), present the results using this format.
 
-1. Add temporary println!/log statements directly into the modified functions
-2. Mark them clearly: `println!("DEBUG [deep-dive]: {}", value);`
-3. Note in the output that temporary debug statements were added
-4. Provide instructions to remove them after understanding
-
-**Only do this if:**
-- User acknowledged uncommitted changes (Step 1)
-- The code structure makes it hard to understand without runtime visibility
-- The benefit outweighs the cleanup effort
-
-### Step 5: Provide Instructions
-
-Output should include:
-
+**For Commit Mode:**
 ```
 ## Deep Dive Walkthrough Generated
 
-📄 Script: examples/20260807-123456.rs
+📄 Script: examples/{timestamp}.rs
+📊 Commit: {commit-hash} - {commit-message}
+🔧 Changes analyzed: {number} files modified
 
-### What this script does:
-[2-3 sentence explanation]
+### What this script demonstrates:
+[Clear explanation of what the developer will learn]
 
 ### How to run:
 ```bash
-cargo run --example deep-dive-20260807-123456
+# Run all sections (shows the menu):
+cargo run --example deep-dive-{timestamp}
+
+# Run a specific section:
+cargo run --example deep-dive-{timestamp} 1
+cargo run --example deep-dive-{timestamp} 2
+cargo run --example deep-dive-{timestamp} 3
 ```
 
-### What you'll see:
-- Instantiation of [structure names]
-- [Key operations being demonstrated]
-- Output showing [what the developer will learn]
+### Available sections:
+1. [Section title — copy this to search the file!]
+2. [Section title — copy this to search the file!]
+3. [Section title — copy this to search the file!]
 
-### After running:
-- Remove temporary debug statements (if added to codebase)
-- Delete the script when done: rm examples/20260807-123456.rs
+### CLI/API detection:
+[If detected: "CLI/API commands detected — script prints instructions, never executes"]
+
+### Temporary changes:
+[If debug statements were added to codebase, list them here with file paths]
+
+### After understanding:
+Delete walkthrough scripts: `rm examples/deep-dive-*.rs`
 ```
+
+**For Code Input Mode:**
+```
+## Deep Dive Walkthrough Generated
+
+📄 Script: examples/{timestamp}.rs
+📝 Source: Code input — {struct/function names} from {file or "pasted code"}
+🔍 Structures analyzed: {struct/enum/function names}
+
+### What this script demonstrates:
+[Clear explanation of what the developer will learn]
+
+### How to run:
+```bash
+# Run all sections (shows the menu):
+cargo run --example deep-dive-{timestamp}
+
+# Run a specific section:
+cargo run --example deep-dive-{timestamp} 1
+cargo run --example deep-dive-{timestamp} 2
+cargo run --example deep-dive-{timestamp} 3
+```
+
+### Available sections:
+1. [Section title — copy this to search the file!]
+2. [Section title — copy this to search the file!]
+3. [Section title — copy this to search the file!]
+
+### CLI/API detection:
+[If detected: "CLI/API commands detected — script prints instructions, never executes"]
+
+### After understanding:
+Delete walkthrough scripts: `rm examples/deep-dive-*.rs`
+```
+
+---
 
 ## Examples
 
@@ -795,6 +927,78 @@ fn section_3_error_handling() {
 }
 ```
 
+### Example 4: Code Input Mode — Pasted Struct
+
+**User pastes:**
+```rust
+pub struct RiskManager {
+    max_drawdown: f64,
+    daily_loss_limit: f64,
+    position_limits: HashMap<String, f64>,
+    trade_count: u32,
+}
+impl RiskManager {
+    pub fn new(max_drawdown: f64, daily_loss_limit: f64) -> Self { ... }
+    pub fn can_open_position(&self, symbol: &str, size: f64, current_pnl: f64) -> bool { ... }
+    fn check_drawdown(&self, pnl: f64) -> bool { ... }
+    fn check_position_limit(&self, symbol: &str, size: f64) -> bool { ... }
+}
+```
+
+**Detection:** Code Input Mode (pasted code, no commit context). No CLI/API patterns → standard interactive script.
+
+**Generated script (abbreviated):**
+```rust
+// examples/20260807-risk-manager.rs
+//! Deep Dive: RiskManager Implementation
+//! Source: Code input — pasted struct
+
+use std::collections::HashMap;
+use std::env;
+
+// ---- Shared test fixtures ----
+fn make_manager() -> RiskManager {
+    RiskManager::new(0.25, 0.05) // 25% max drawdown, 5% daily loss
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let section = args.get(1).map(|s| s.as_str()).unwrap_or("list");
+    match section {
+        "1" => section_1_happy_path(),
+        "2" => section_2_drawdown_breach(),
+        "3" => section_3_zero_pnl(),
+        "list" | _ => list_sections(),
+    }
+}
+
+fn list_sections() {
+    println!("Usage: cargo run --example deep-dive-20260807-risk-manager <section>");
+    println!();
+    println!("  list - Show this list");
+    println!("  1    - Happy Path: Position allowed under all limits");
+    println!("  2    - Drawdown Breach: Position rejected at max drawdown");
+    println!("  3    - Zero PnL: Edge case at initialization");
+}
+
+// ============================================================
+// SECTION 1: Happy Path - Position Allowed
+// (Copy the title above and search this file to find this code!)
+// ============================================================
+fn section_1_happy_path() {
+    println!("============================================================");
+    println!("SECTION 1: Happy Path - Position Allowed");
+    println!("============================================================");
+    let rm = make_manager();
+    let allowed = rm.can_open_position("BTCUSD", 1.0, 0.02);
+    println!("can_open_position(BTCUSD, 1.0, pnl=0.02) → {}", allowed);
+    println!();
+    println!("  → PnL (0.02) < daily loss limit (0.05) ✓");
+    println!("  → Position size (1.0) within limit ✓");
+}
+// ... (remaining sections follow same pattern)
+```
+
 ## Language Detection
 
 This is a **Rust project**. All walkthrough scripts should be written in Rust:
@@ -804,7 +1008,7 @@ This is a **Rust project**. All walkthrough scripts should be written in Rust:
 - **Dependencies**: Use `use` statements to import from the project's modules
 - **Formatting**: Use Rust's Debug trait (`{:?}`) for structs/enums, Display (`{}`) for simple values
 
-**Note**: If the commit includes other languages (e.g., Python scripts, shell scripts), create separate walkthrough scripts for each language, but prioritize Rust for the core backtesting engine code.
+**Note**: If the analyzed code includes other languages (e.g., Python scripts, shell scripts), create separate walkthrough scripts for each language, but prioritize Rust for the core backtesting engine code.
 
 ## Best Practices
 
@@ -815,54 +1019,24 @@ This is a **Rust project**. All walkthrough scripts should be written in Rust:
 5. **Use realistic data** - Seed data should resemble real usage
 6. **Show edge cases** - Demonstrate both happy paths and edge cases
 7. **Explain the "why"** - Not just what happens, but why it matters
-8. **Keep it focused** - Only demonstrate changes from the commit, not the entire codebase
+8. **Keep it focused** - Only demonstrate the target code, not the entire codebase
 9. **CLI/API safety** - Print commands to run, never execute CLI or make real API calls
 10. **Mark temporary changes** - If adding debug statements, mark them clearly for cleanup
-
-## Output Format
-
-```
-## Deep Dive Walkthrough Generated
-
-📄 Script: examples/{timestamp}.rs
-📊 Commit: {commit-hash} - {commit-message}
-🔧 Changes analyzed: {number} files modified
-
-### What this script demonstrates:
-[Clear explanation of what the developer will learn]
-
-### How to run:
-```bash
-# Run all sections (shows the menu):
-cargo run --example deep-dive-{timestamp}
-
-# Run a specific section:
-cargo run --example deep-dive-{timestamp} 1
-cargo run --example deep-dive-{timestamp} 2
-cargo run --example deep-dive-{timestamp} 3
-```
-
-### Available sections:
-1. [Section title — copy this to search the file!]
-2. [Section title — copy this to search the file!]
-3. [Section title — copy this to search the file!]
-
-### CLI/API detection:
-[If detected: "CLI/API commands detected — script prints instructions, never executes"]
-
-### Temporary changes:
-[If debug statements were added to codebase, list them here with file paths]
-
-### After understanding:
-Delete walkthrough scripts: `rm examples/deep-dive-*.rs`
-```
+11. **Code Input Mode specifics** - When the user provides code directly, read the referenced file to find imports, dependencies, and surrounding context. Use the file's module structure to write correct `use` statements.
 
 ## When NOT to Use
 
-- For trivial changes (typo fixes, comment updates)
-- When you already understand the implementation
+**Both modes:**
+- For trivial code (typo fixes, comment updates, trivial getters/setters)
+- When you already understand the implementation thoroughly
+
+**Commit Mode specifically:**
+- When the commit is too large (>500 lines changed) — suggest breaking it down first
 - For refactoring with no behavioral changes (unless complex)
-- When the commit is too large (>500 lines changed) - suggest breaking it down first
+
+**Code Input Mode specifically:**
+- When the code snippet is too small to generate meaningful walkthrough sections (< 10 lines, no branching)
+- When the referenced struct/function cannot be found in the codebase
 
 ---
 
