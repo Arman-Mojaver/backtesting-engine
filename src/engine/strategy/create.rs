@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
 use crate::config::environment::{parquet_base_dir, parquet_root_dir};
 use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
@@ -7,22 +9,25 @@ use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
 
 use super::resolve_environment;
 
-/// Runs the strategy pipeline for a single (instrument, mms_id) pair and
-/// writes results to parquet + manifest immediately.
 pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow::Result<()> {
-    let Some((strategies, unprocessed_ids)) =
-        run_strategies(&instrument, money_management_strategy_id)?
-    else {
+    eprintln!(
+        "Fetching shared data for {} (mms_id={}) ...",
+        instrument, money_management_strategy_id
+    );
+    let data = fetch_source_data(&instrument, money_management_strategy_id)?;
+
+    let manifest = ParquetProcessedManifest::new(parquet_root_dir(resolve_environment()));
+    let processed_rows = manifest.read(&instrument, money_management_strategy_id)?;
+    let processed_ids: HashSet<i32> = processed_rows.iter().map(|r| r.indicator_id).collect();
+
+    let Some((strategies, unprocessed_ids)) = run_strategies(data, processed_ids)? else {
         return Ok(());
     };
 
-    let env = resolve_environment();
-
-    let repo = ParquetStrategyRepository::new(parquet_base_dir(env));
+    let repo = ParquetStrategyRepository::new(parquet_base_dir(resolve_environment()));
     eprintln!("Writing {} strategies to parquet ...", strategies.len());
     repo.write(&instrument, money_management_strategy_id, &strategies)?;
 
-    let manifest = ParquetProcessedManifest::new(parquet_root_dir(env));
     let processed_at = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)

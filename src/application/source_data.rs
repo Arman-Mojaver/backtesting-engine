@@ -11,19 +11,19 @@ use crate::infrastructure::pg_adapter::{
     PgShortOperationPointAdapter,
 };
 
-pub struct StrategyQuery {
-    pub money_management_strategy_id: i32,
+pub struct SourceData {
     pub instrument: String,
-}
-
-pub struct StrategyData {
+    pub money_management_strategy_id: i32,
     pub indicators: Vec<Indicator>,
     pub resampled_points: Vec<ResampledPointD1>,
     pub long_operation_points: Vec<OperationPoint>,
     pub short_operation_points: Vec<OperationPoint>,
 }
 
-pub fn fetch_strategy_data(query: &StrategyQuery) -> anyhow::Result<StrategyData> {
+pub fn fetch_source_data(
+    instrument: &str,
+    money_management_strategy_id: i32,
+) -> anyhow::Result<SourceData> {
     let env: Environment = std::env::var("ENVIRONMENT")
         .unwrap_or_else(|_| "development".to_string())
         .parse()
@@ -43,15 +43,17 @@ pub fn fetch_strategy_data(query: &StrategyQuery) -> anyhow::Result<StrategyData
         .with_context(|| connection_diagnostics(&config))?;
 
     let indicators = indicator_adapter.get_all();
-    let resampled_points = resampled_adapter.get_by_instrument(&query.instrument);
+    let resampled_points = resampled_adapter.get_by_instrument(instrument);
 
-    let long_operation_points: Vec<OperationPoint> = long_adapter
-        .get_by_mms_id_and_instrument(query.money_management_strategy_id, &query.instrument);
+    let long_operation_points: Vec<OperationPoint> =
+        long_adapter.get_by_mms_id_and_instrument(money_management_strategy_id, instrument);
 
-    let short_operation_points: Vec<OperationPoint> = short_adapter
-        .get_by_mms_id_and_instrument(query.money_management_strategy_id, &query.instrument);
+    let short_operation_points: Vec<OperationPoint> =
+        short_adapter.get_by_mms_id_and_instrument(money_management_strategy_id, instrument);
 
-    Ok(StrategyData {
+    Ok(SourceData {
+        instrument: instrument.to_string(),
+        money_management_strategy_id,
         indicators,
         resampled_points,
         long_operation_points,
