@@ -3,6 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
+use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::config::environment::{parquet_base_dir, parquet_root_dir};
 use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
 use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
@@ -20,9 +21,27 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
     let processed_rows = manifest.read(&instrument, money_management_strategy_id)?;
     let processed_ids: HashSet<i32> = processed_rows.iter().map(|r| r.indicator_id).collect();
 
-    let Some((strategies, unprocessed_ids)) = run_strategies(data, processed_ids)? else {
+    let all_indicator_ids: Vec<i32> = data.indicators.iter().map(|i| i.id).collect();
+    let unprocessed_ids = get_unprocessed(&all_indicator_ids, &processed_ids);
+    if unprocessed_ids.is_empty() {
+        eprintln!(
+            "All {} indicators already processed for {} (mms_id={}). Nothing to do.",
+            all_indicator_ids.len(),
+            instrument,
+            money_management_strategy_id,
+        );
         return Ok(());
-    };
+    }
+
+    eprintln!(
+        "{} indicators total, {} unprocessed for {} (mms_id={})",
+        all_indicator_ids.len(),
+        unprocessed_ids.len(),
+        instrument,
+        money_management_strategy_id,
+    );
+
+    let strategies = run_strategies(data, &unprocessed_ids)?;
 
     let repo = ParquetStrategyRepository::new(parquet_base_dir(resolve_environment()));
     eprintln!("Writing {} strategies to parquet ...", strategies.len());

@@ -12,7 +12,6 @@ use crate::infrastructure::pg_adapter::{
 };
 
 pub struct SourceData {
-    pub instrument: String,
     pub money_management_strategy_id: i32,
     pub indicators: Vec<Indicator>,
     pub resampled_points: Vec<ResampledPointD1>,
@@ -52,7 +51,6 @@ pub fn fetch_source_data(
         short_adapter.get_by_mms_id_and_instrument(money_management_strategy_id, instrument);
 
     Ok(SourceData {
-        instrument: instrument.to_string(),
         money_management_strategy_id,
         indicators,
         resampled_points,

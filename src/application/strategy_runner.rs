@@ -3,19 +3,14 @@ use std::collections::HashSet;
 use crate::application::signal_generator::create_signal_groups;
 use crate::application::source_data::SourceData;
 use crate::application::strategy_generator::create_strategies;
-use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::OperationPoints;
 use crate::domain::signal_group::filter_signal_groups_by_annual_ops;
 use crate::domain::strategy::{filter_strategies, GlobalStrategyFilter, Strategy};
 use crate::domain::validation::combined_validation::{validate_all, CombinedValidationError};
 
-pub fn run_strategies(
-    data: SourceData,
-    processed_ids: HashSet<i32>,
-) -> anyhow::Result<Option<(Vec<Strategy>, Vec<i32>)>> {
+pub fn run_strategies(data: SourceData, unprocessed_ids: &[i32]) -> anyhow::Result<Vec<Strategy>> {
     let SourceData {
-        instrument,
         money_management_strategy_id: mms_id,
         indicators,
         resampled_points,
@@ -31,26 +26,6 @@ pub fn run_strategies(
         mms_id,
     )
     .map_err(|e: CombinedValidationError| anyhow::anyhow!("Validation failed: {:?}", e))?;
-
-    let all_indicator_ids: Vec<i32> = indicators.iter().map(|i| i.id).collect();
-    let unprocessed_ids = get_unprocessed(&all_indicator_ids, &processed_ids);
-    if unprocessed_ids.is_empty() {
-        eprintln!(
-            "All {} indicators already processed for {} (mms_id={}). Nothing to do.",
-            all_indicator_ids.len(),
-            instrument,
-            mms_id,
-        );
-        return Ok(None);
-    }
-
-    eprintln!(
-        "{} indicators total, {} unprocessed for {} (mms_id={})",
-        all_indicator_ids.len(),
-        unprocessed_ids.len(),
-        instrument,
-        mms_id,
-    );
 
     let operation_points = OperationPoints {
         long_operation_points,
@@ -96,5 +71,5 @@ pub fn run_strategies(
         strategies.len(),
     );
 
-    Ok(Some((strategies, unprocessed_ids)))
+    Ok(strategies)
 }

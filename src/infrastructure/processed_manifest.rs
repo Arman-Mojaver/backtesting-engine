@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -37,15 +37,17 @@ impl ParquetProcessedManifest {
         PathBuf::from(format!("{}/processed.parquet", self.root_dir))
     }
 
-    /// Returns all rows for the given instrument and mms_id.
-    /// Returns an empty vec if the manifest file does not exist yet.
-    pub fn read(&self, instrument: &str, mms_id: i32) -> anyhow::Result<Vec<ProcessedRow>> {
+    fn read_all(&self) -> anyhow::Result<Vec<ProcessedRow>> {
         let path = self.path();
         if !path.exists() {
             return Ok(Vec::new());
         }
-        let all = read_all(&path)?;
-        Ok(all
+        read_parquet(&path)
+    }
+    
+    pub fn read(&self, instrument: &str, mms_id: i32) -> anyhow::Result<Vec<ProcessedRow>> {
+        Ok(self
+            .read_all()?
             .into_iter()
             .filter(|r| r.instrument == instrument && r.mms_id == mms_id)
             .collect())
@@ -61,11 +63,7 @@ impl ParquetProcessedManifest {
         processed_at: i64,
     ) -> anyhow::Result<()> {
         let path = self.path();
-        let mut rows: Vec<ProcessedRow> = if path.exists() {
-            read_all(&path)?
-        } else {
-            Vec::new()
-        };
+        let mut rows = self.read_all()?;
 
         // Identify rows about to be replaced (for the info log below)
         let replaced_ids: Vec<i32> = rows
@@ -120,11 +118,7 @@ impl ParquetProcessedManifest {
         processed_at: i64,
     ) -> anyhow::Result<()> {
         let path = self.path();
-        let mut rows: Vec<ProcessedRow> = if path.exists() {
-            read_all(&path)?
-        } else {
-            Vec::new()
-        };
+        let mut rows = self.read_all()?;
 
         eprintln!(
             "Writing manifest: {} entries ({} total indicator IDs) ...",
@@ -156,13 +150,25 @@ impl ParquetProcessedManifest {
 
         Ok(())
     }
+    
+    pub fn read_processed_ids_per_cell(
+        &self,
+    ) -> anyhow::Result<HashMap<(String, i32), HashSet<i32>>> {
+        let mut map: HashMap<(String, i32), HashSet<i32>> = HashMap::new();
+        for row in self.read_all()? {
+            map.entry((row.instrument, row.mms_id))
+                .or_default()
+                .insert(row.indicator_id);
+        }
+        Ok(map)
+    }
 }
 
 // ---------------------------------------------------------------------------
 //  Private helpers
 // ---------------------------------------------------------------------------
 
-fn read_all(path: &Path) -> anyhow::Result<Vec<ProcessedRow>> {
+fn read_parquet(path: &Path) -> anyhow::Result<Vec<ProcessedRow>> {
     let file = File::open(path)?;
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
     let mut reader = builder.build()?;
