@@ -58,85 +58,60 @@ impl ParquetStrategyRepository {
         mms_id: i32,
         strategies: &[Strategy],
     ) -> anyhow::Result<()> {
-        let partition_dir = format!(
-            "{}/instrument={}/money_management_strategy_id={}",
-            self.base_dir, instrument, mms_id
-        );
-        fs::create_dir_all(&partition_dir)?;
-
-        let path = PathBuf::from(format!("{}/strategies.parquet", partition_dir));
-
         let next_id = self.max_strategy_id()? + 1;
-
-        let mut new_rows: Vec<StrategyRow> = strategies
-            .iter()
-            .enumerate()
-            .map(|(i, s)| StrategyRow::from_strategy(s, next_id + i as i64))
-            .collect();
-
-        // Collect indicator IDs from new strategies for dedup-on-write
-        let new_indicator_ids: FxHashSet<i32> = strategies.iter().map(|s| s.indicator_id).collect();
-
-        let mut combined: Vec<StrategyRow> = if path.exists() {
-            self.read_rows(&path)?
-                .into_iter()
-                .filter(|row| !new_indicator_ids.contains(&row.indicator_id))
-                .collect()
-        } else {
-            Vec::new()
-        };
-        combined.append(&mut new_rows);
-
-        let batch = build_record_batch(&combined)?;
-        let schema = batch.schema();
-
-        let props = WriterProperties::builder()
-            .set_compression(Compression::ZSTD(Default::default()))
-            .build();
-
-        let file = File::create(&path)?;
-        let mut writer = ArrowWriter::try_new(file, schema, Some(props))?;
-        writer.write(&batch)?;
-        writer.close()?;
-
-        Ok(())
+        self.write_cell(instrument, mms_id, strategies, next_id)
     }
 
-    /// Writes strategies using a pre-assigned starting ID instead of scanning
-    /// all files for the global maximum. Used by parallel writers that coordinate
-    /// ID assignment externally.
-    pub fn write_with_start_id(
+    pub fn write_cell(
         &self,
         instrument: &str,
         mms_id: i32,
         strategies: &[Strategy],
         start_id: i64,
     ) -> anyhow::Result<()> {
-        let partition_dir = format!(
-            "{}/instrument={}/money_management_strategy_id={}",
-            self.base_dir, instrument, mms_id
-        );
-        fs::create_dir_all(&partition_dir)?;
-
-        let path = PathBuf::from(format!("{}/strategies.parquet", partition_dir));
-
-        let mut new_rows: Vec<StrategyRow> = strategies
+        let new_rows: Vec<StrategyRow> = strategies
             .iter()
             .enumerate()
             .map(|(i, s)| StrategyRow::from_strategy(s, start_id + i as i64))
             .collect();
 
-        let new_indicator_ids: FxHashSet<i32> = strategies.iter().map(|s| s.indicator_id).collect();
+        let path = self.partition_path(instrument, mms_id)?;
+        self.write_partition(&path, new_rows)
+    }
 
-        let mut combined: Vec<StrategyRow> = if path.exists() {
-            self.read_rows(&path)?
-                .into_iter()
-                .filter(|row| !new_indicator_ids.contains(&row.indicator_id))
-                .collect()
+    /// Returns the parquet path for a single `(instrument, mms_id)` partition,
+    /// creating the partition directory if needed.
+    fn partition_path(&self, instrument: &str, mms_id: i32) -> anyhow::Result<PathBuf> {
+        let partition_dir = format!(
+            "{}/instrument={}/money_management_strategy_id={}",
+            self.base_dir, instrument, mms_id
+        );
+        fs::create_dir_all(&partition_dir)?;
+        Ok(PathBuf::from(format!(
+            "{}/strategies.parquet",
+            partition_dir
+        )))
+    }
+
+    fn write_partition(&self, path: &Path, new_rows: Vec<StrategyRow>) -> anyhow::Result<()> {
+        let existing_rows: Vec<StrategyRow> = if path.exists() {
+            self.read_rows(path)?
         } else {
             Vec::new()
         };
-        combined.append(&mut new_rows);
+
+        let existing_ids: FxHashSet<i32> = existing_rows.iter().map(|r| r.indicator_id).collect();
+        let fresh_rows: Vec<StrategyRow> = new_rows
+            .into_iter()
+            .filter(|row| !existing_ids.contains(&row.indicator_id))
+            .collect();
+
+        if fresh_rows.is_empty() {
+            return Ok(());
+        }
+
+        let mut combined = existing_rows;
+        combined.extend(fresh_rows);
 
         let batch = build_record_batch(&combined)?;
         let schema = batch.schema();
@@ -145,7 +120,7 @@ impl ParquetStrategyRepository {
             .set_compression(Compression::ZSTD(Default::default()))
             .build();
 
-        let file = File::create(&path)?;
+        let file = File::create(path)?;
         let mut writer = ArrowWriter::try_new(file, schema, Some(props))?;
         writer.write(&batch)?;
         writer.close()?;
@@ -338,6 +313,7 @@ mod tests {
     fn sample_strategies() -> Vec<Strategy> {
         vec![
             Strategy {
+                instrument: "EURUSD".to_string(),
                 indicator_id: 2001,
                 annual_roi: 12.34,
                 max_draw_down: 25.67,
@@ -347,6 +323,7 @@ mod tests {
                 money_management_strategy_id: 390,
             },
             Strategy {
+                instrument: "EURUSD".to_string(),
                 indicator_id: 2002,
                 annual_roi: -5.10,
                 max_draw_down: 35.0,
@@ -465,6 +442,7 @@ mod tests {
         let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
         let strategies: Vec<Strategy> = (0..5)
             .map(|i| Strategy {
+                instrument: "EURUSD".to_string(),
                 indicator_id: i as i32,
                 annual_roi: 10.0,
                 max_draw_down: 20.0,
@@ -487,6 +465,7 @@ mod tests {
         let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
         let first = sample_strategies();
         let second: Vec<Strategy> = vec![Strategy {
+            instrument: "EURUSD".to_string(),
             indicator_id: 9999,
             annual_roi: 1.0,
             max_draw_down: 2.0,
@@ -504,7 +483,7 @@ mod tests {
     }
 
     #[test]
-    fn append_across_partitions_continues_from_global_max() {
+    fn rewriting_same_partition_preserves_original_ids() {
         let tmp = TempDir::new().unwrap();
         let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
         let strategies = sample_strategies();
@@ -513,8 +492,9 @@ mod tests {
         repo.write("USDJPY", 400, &strategies).unwrap();
         repo.write("EURUSD", 390, &strategies).unwrap();
 
+        // Re-writing an already-written partition is a no-op: original IDs are preserved.
         let ids = read_back_ids(&repo, "EURUSD", 390);
-        assert_eq!(ids, vec![5, 6]);
+        assert_eq!(ids, vec![1, 2]);
     }
 
     // ---------- Dedup-on-write tests ----------
@@ -540,6 +520,7 @@ mod tests {
         let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
         let first = sample_strategies();
         let second: Vec<Strategy> = vec![Strategy {
+            instrument: "EURUSD".to_string(),
             indicator_id: 9999,
             annual_roi: 1.0,
             max_draw_down: 2.0,
@@ -560,12 +541,13 @@ mod tests {
     }
 
     #[test]
-    fn write_partial_overlap_replaces_old() {
+    fn write_partial_overlap_ignores_duplicate() {
         let tmp = TempDir::new().unwrap();
         let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
         let first = sample_strategies();
         let second: Vec<Strategy> = vec![
             Strategy {
+                instrument: "EURUSD".to_string(),
                 indicator_id: 2002,
                 annual_roi: 99.0,
                 max_draw_down: 1.0,
@@ -575,6 +557,7 @@ mod tests {
                 money_management_strategy_id: 390,
             },
             Strategy {
+                instrument: "EURUSD".to_string(),
                 indicator_id: 3000,
                 annual_roi: 1.0,
                 max_draw_down: 2.0,
@@ -588,14 +571,13 @@ mod tests {
         repo.write("EURUSD", 390, &first).unwrap();
         repo.write("EURUSD", 390, &second).unwrap();
 
-        let indicator_ids = read_back_indicator_ids(&repo, "EURUSD", 390);
-        assert_eq!(indicator_ids.len(), 3);
-        // 2001 from first write -- preserved
-        assert!(indicator_ids.contains(&2001));
-        // 2002 from second write -- replaced (should exist, but only once)
-        assert!(indicator_ids.contains(&2002));
-        // 3000 from second write -- new
-        assert!(indicator_ids.contains(&3000));
+        // The duplicate 2002 is ignored (original id 2 preserved); only 3000 is added
+        // (it receives id 4, since id 3 was pre-assigned to the ignored duplicate).
+        assert_eq!(read_back_ids(&repo, "EURUSD", 390), vec![1, 2, 4]);
+        assert_eq!(
+            read_back_indicator_ids(&repo, "EURUSD", 390),
+            vec![2001, 2002, 3000]
+        );
     }
 
     #[test]
@@ -610,5 +592,33 @@ mod tests {
 
         let usdjpy_ids = read_back_ids(&repo, "USDJPY", 400);
         assert_eq!(usdjpy_ids, vec![3, 4]);
+    }
+
+    #[test]
+    fn write_cell_ignores_duplicate_incoming_rows() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+
+        fn s(indicator_id: i32) -> Strategy {
+            Strategy {
+                instrument: "EURUSD".to_string(),
+                indicator_id,
+                annual_roi: 1.0,
+                max_draw_down: 1.0,
+                annual_operation_count: 1.0,
+                long_operation_point_ids: vec![],
+                short_operation_point_ids: vec![],
+                money_management_strategy_id: 390,
+            }
+        }
+
+        // First write assigns id 1 to indicator 2001.
+        repo.write("EURUSD", 390, &[s(2001)]).unwrap();
+
+        // Re-write the same indicator with a would-be new id 100: it must be ignored.
+        repo.write_cell("EURUSD", 390, &[s(2001)], 100).unwrap();
+
+        // Original row (id 1) is preserved; incoming id 100 discarded.
+        assert_eq!(read_back_ids(&repo, "EURUSD", 390), vec![1]);
     }
 }

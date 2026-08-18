@@ -2,6 +2,7 @@ use std::default::Default;
 
 #[derive(Debug, Clone)]
 pub struct Strategy {
+    pub instrument: String,
     pub indicator_id: i32,
     pub annual_roi: f64,
     pub max_draw_down: f64,
@@ -49,6 +50,7 @@ mod tests {
 
     fn make_strategy(indicator_id: i32, roi: f64, dd: f64, ops: f64) -> Strategy {
         Strategy {
+            instrument: "EURUSD".to_string(),
             indicator_id,
             annual_roi: roi,
             max_draw_down: dd,

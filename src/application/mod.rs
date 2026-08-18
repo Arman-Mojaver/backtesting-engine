@@ -1,3 +1,4 @@
+pub mod cell_output;
 pub mod metadata_report;
 pub mod signal_generator;
 pub mod source_data;

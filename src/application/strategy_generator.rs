@@ -70,6 +70,7 @@ pub fn create_strategy(
     let annual_roi = annual_roi(start_timestamp, end_timestamp, global_roi);
 
     Strategy {
+        instrument: signal_group.instrument.clone(),
         indicator_id: signal_group.indicator_id,
         annual_roi,
         max_draw_down,
