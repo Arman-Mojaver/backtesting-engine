@@ -17,7 +17,7 @@ use rustc_hash::FxHashSet;
 use crate::domain::strategy::Strategy;
 
 #[derive(Debug, Clone)]
-struct StrategyRow {
+pub struct StrategyRow {
     strategy_id: i64,
     indicator_id: i32,
     annual_roi: f64,
@@ -29,7 +29,7 @@ struct StrategyRow {
 }
 
 impl StrategyRow {
-    fn from_strategy(s: &Strategy, id: i64) -> Self {
+    pub fn from_strategy(s: &Strategy, id: i64) -> Self {
         StrategyRow {
             strategy_id: id,
             indicator_id: s.indicator_id,
@@ -58,25 +58,23 @@ impl ParquetStrategyRepository {
         mms_id: i32,
         strategies: &[Strategy],
     ) -> anyhow::Result<()> {
-        let next_id = self.max_strategy_id()? + 1;
-        self.write_cell(instrument, mms_id, strategies, next_id)
+        let mut next_id = self.max_strategy_id()? + 1;
+        let mut rows = Vec::with_capacity(strategies.len());
+        for strategy in strategies {
+            rows.push(StrategyRow::from_strategy(strategy, next_id));
+            next_id += 1;
+        }
+        self.write_rows(instrument, mms_id, rows)
     }
 
-    pub fn write_cell(
+    pub fn write_rows(
         &self,
         instrument: &str,
         mms_id: i32,
-        strategies: &[Strategy],
-        start_id: i64,
+        rows: Vec<StrategyRow>,
     ) -> anyhow::Result<()> {
-        let new_rows: Vec<StrategyRow> = strategies
-            .iter()
-            .enumerate()
-            .map(|(i, s)| StrategyRow::from_strategy(s, start_id + i as i64))
-            .collect();
-
         let path = self.partition_path(instrument, mms_id)?;
-        self.write_partition(&path, new_rows)
+        self.write_partition(&path, rows)
     }
 
     /// Returns the parquet path for a single `(instrument, mms_id)` partition,
@@ -595,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    fn write_cell_ignores_duplicate_incoming_rows() {
+    fn write_rows_ignores_duplicate_incoming_rows() {
         let tmp = TempDir::new().unwrap();
         let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
 
@@ -616,7 +614,8 @@ mod tests {
         repo.write("EURUSD", 390, &[s(2001)]).unwrap();
 
         // Re-write the same indicator with a would-be new id 100: it must be ignored.
-        repo.write_cell("EURUSD", 390, &[s(2001)], 100).unwrap();
+        let duplicate = StrategyRow::from_strategy(&s(2001), 100);
+        repo.write_rows("EURUSD", 390, vec![duplicate]).unwrap();
 
         // Original row (id 1) is preserved; incoming id 100 discarded.
         assert_eq!(read_back_ids(&repo, "EURUSD", 390), vec![1]);

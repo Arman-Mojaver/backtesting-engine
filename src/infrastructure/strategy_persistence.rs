@@ -5,7 +5,26 @@ use rayon::prelude::*;
 
 use crate::application::cell_output::CellOutput;
 use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
-use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
+use crate::infrastructure::strategy_adapter::{ParquetStrategyRepository, StrategyRow};
+
+pub struct CellOutputDTO {
+    pub instrument: String,
+    pub mms_id: i32,
+    pub strategy_rows: Vec<StrategyRow>,
+    pub processed_indicator_ids: Vec<i32>,
+}
+
+impl CellOutputDTO {
+    pub(crate) fn manifest_entry(&self) -> (String, i32, Vec<i32>) {
+        (
+            self.instrument.clone(),
+            self.mms_id,
+            self.processed_indicator_ids.clone(),
+        )
+    }
+
+}
+
 
 pub struct StrategyPersistence {
     strategies: ParquetStrategyRepository,
@@ -19,7 +38,7 @@ impl StrategyPersistence {
             manifest: ParquetProcessedManifest::new(root_dir),
         }
     }
-    
+
     pub fn read_processed_ids_per_cell(
         &self,
     ) -> anyhow::Result<HashMap<(String, i32), HashSet<i32>>> {
@@ -28,29 +47,30 @@ impl StrategyPersistence {
 
     pub fn persist_cells(&self, cells: Vec<CellOutput>) -> anyhow::Result<()> {
         let mut next_id = self.strategies.max_strategy_id()? + 1;
-
-        // Sequential: assign a starting ID per cell and collect manifest entries.
-        let mut jobs = Vec::with_capacity(cells.len());
-        let mut manifest_entries = Vec::with_capacity(cells.len());
+        let mut dto_cells: Vec<CellOutputDTO> = Vec::with_capacity(cells.len());
         for cell in cells {
-            let start_id = next_id;
-            next_id += cell.strategies.len() as i64;
-            manifest_entries.push((
-                cell.instrument.clone(),
-                cell.mms_id,
-                cell.processed_indicator_ids,
-            ));
-            jobs.push((start_id, cell.instrument, cell.mms_id, cell.strategies));
+            let mut strategy_rows = Vec::with_capacity(cell.strategies.len());
+            for strategy in cell.strategies {
+                strategy_rows.push(StrategyRow::from_strategy(&strategy, next_id));
+                next_id += 1;
+            }
+            dto_cells.push(CellOutputDTO {
+                instrument: cell.instrument,
+                mms_id: cell.mms_id,
+                strategy_rows,
+                processed_indicator_ids: cell.processed_indicator_ids,
+            });
         }
 
-        // Parallel: write each cell to its own partition.
-        jobs.into_par_iter()
-            .try_for_each(|(start_id, instrument, mms_id, strategies)| {
-                self.strategies
-                    .write_cell(&instrument, mms_id, &strategies, start_id)
-            })?;
+        let manifest_entries: Vec<(String, i32, Vec<i32>)> = dto_cells
+            .iter()
+            .map(|c| c.manifest_entry())
+            .collect();
 
-        // Commit (last): mark processed indicator IDs in the manifest.
+        dto_cells
+            .into_par_iter()
+            .try_for_each(|c| self.strategies.write_rows(&c.instrument, c.mms_id, c.strategy_rows))?;
+
         let processed_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
