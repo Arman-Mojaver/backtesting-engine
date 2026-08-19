@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/business | Priority: high | Version: 1.3 | Updated: 2026-06-28 -->
+<!-- Context: project-intelligence/business | Priority: high | Version: 1.4 | Updated: 2026-08-19 -->
 
 # Business Domain
 
@@ -52,12 +52,11 @@ The engine is in **active development**:
 - ✅ Real metrics computed in the strategy generator (`create_strategies()` — no more random placeholders)
 - ✅ Signal generator (`create_signals()` — random timestamp sampling from resampled points)
 - ✅ Two-stage filtering: signal groups by annual op count, then strategies by DD + ROI
-- ✅ Redis signal-groups cache infrastructure (read/write/delete)
+- ✅ In-memory signal-group memoization (`cached` crate, keyed by `indicator_id` + instrument)
 - ✅ `SignalGroup` in domain layer with embedded `indicator_id`
 - ✅ All timestamps are `i64` (epoch seconds)
 - ⬜ Backtest execution logic (not yet implemented)
 - ⬜ Real signal generation from indicator parameters (MACD crossover, RSI thresholds — currently random timestamps)
-- ⬜ Cache integration in the engine compute path
 - ⬜ API endpoints for running backtests
 
 ## Business Constraints

@@ -1,8 +1,6 @@
-use serde::{Deserialize, Serialize};
-
 use crate::domain::annual_operation_count::annual_operation_count;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SignalGroup {
     pub indicator_id: i32,
     pub long_signals: Vec<i64>,

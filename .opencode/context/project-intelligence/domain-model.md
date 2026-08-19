@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.4 | Updated: 2026-06-28 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.5 | Updated: 2026-08-19 -->
 
 # Domain Model — Backtesting Engine
 
@@ -31,8 +31,6 @@
 | **Annual Operation Count** | Number of trades per year, annualized from a total count over the time span. Computed from signal-group operation counts; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_operation_count` |
 | **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 30%, min annual ROI ≥ 10%. (Annual operation count is enforced earlier, at the signal-group stage.) | `GlobalStrategyFilter` | `domain::strategy` |
 | **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` it belongs to. Lives in the domain layer. | `SignalGroup` | `domain::signal_group` |
-| **Signal Groups Cache** | An ephemeral Redis cache storing the complete collection of signal groups as `Vec<SignalGroup>`. Prevents redundant computation across CLI invocations. | `Vec<SignalGroup>` | `infrastructure::redis` |
-| **Cache HIT / MISS** | Whether the Redis `signal_groups` key exists (HIT — skip compute) or not (MISS — compute from scratch). | CLI output | `engine::redis` |
 | **Parquet Strategy Repository** | Writes `Vec<Strategy>` to partitioned parquet files under `{base}/instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. | `ParquetStrategyRepository` | `infrastructure::strategy_adapter` |
 | **Strategy Generator** | Builds `Strategy` records from signal groups + operation points, computing real metrics (`annual_roi`, `max_draw_down`, `annual_operation_count`) for each. Parallelized with rayon. | `create_strategies`, `create_strategy` | `application::strategy_generator` |
 | **Strategy Data** | The fetched-from-PostgreSQL inputs for strategy generation: indicators, resampled points, long/short operation points for one (instrument, mms_id). | `StrategyData`, `StrategyQuery` | `application::strategy_data` |
@@ -123,7 +121,7 @@ GlobalStrategyFilter { max_draw_down_max: f64, min_annual_roi: f64, min_operatio
 ```
 
 ### SignalGroup
-A group of signal timestamps (long and short) for a single indicator. Embeds its `indicator_id`. Lives in the domain layer; serialized to JSON for Redis storage.
+A group of signal timestamps (long and short) for a single indicator. Embeds its `indicator_id`. Lives in the domain layer.
 ```
 SignalGroup {
     indicator_id:  i32       — which indicator this group belongs to
@@ -185,7 +183,6 @@ Infrastructure provides `InMemory*Repo` (testing) and `Pg*Adapter` (PostgreSQL) 
 |---------|---------|------|
 | `Pg*Adapter` | PostgreSQL persistence (production) | `src/infrastructure/pg_adapter.rs` |
 | `InMemory*Repo` | In-memory storage (testing) | `src/infrastructure/in_memory_repos.rs` |
-| `Redis` module | Ephemeral cache for signal groups (`Vec<SignalGroup>`) | `src/infrastructure/redis.rs` |
 | `ParquetStrategyRepository` | Writes strategies to partitioned parquet files (ZSTD compression) | `src/infrastructure/strategy_adapter.rs` |
 
 ### Parquet Strategy Repository
@@ -194,8 +191,6 @@ Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_
 - `base_dir` resolved by `config::environment::parquet_base_dir(env)` → `/app/parquet_files/{env}/strategy`. Overridable via `--parquet-dir` for running outside Docker.
 - **Append semantics**: `write()` reads existing rows (if file exists), appends new rows, rewrites the file. `strategy_id` is assigned at write time as `find_max_strategy_id() + 1` (global max across ALL partitions, scanned recursively). IDs are contiguous within a batch and continue across partitions and appends.
 
-### Redis Cache
-Three operations on a single key (`signal_groups`): `read_signal_groups`, `write_signal_groups`, `delete_signal_groups`. Stores `Vec<SignalGroup>` (JSON-serialized). All hard-fail on connection/serialization error (no silent fallback).
 
 ---
 
@@ -229,12 +224,10 @@ src/
 │   ├── money_management_strategy.rs  # mms/money-management-strategy create, delete
 │   ├── operation_point.rs     # o/operation-point align, create, delete
 │   ├── raw_point.rs            # r/raw-point create, delete
-│   ├── redis.rs                # ct redis — delegates to bt-engine redis via Docker exec
 │   ├── resampled_point.rs      # rr/resampled-point create, delete
 │   └── strategy.rs             # s/strategy create, display (+verbose)  [generate removed]
 ├── engine/                     # Standalone Rust CLI engine (own binary)
 │   ├── mod.rs                  # EngineCommand enum, build_cli(), parse(), execute()
-│   ├── redis.rs                # bt-engine redis — check HIT/MISS, verbose dump, --clean
 │   ├── strategy/                # bt-engine strategy commands (module dir)
 │   │   ├── mod.rs              # StrategyCommand enum, build/parse/execute
 │   │   └── create.rs           # strategy create — full pipeline (fetch→validate→signals→filter→strategies→parquet)
@@ -250,10 +243,9 @@ src/
 │   ├── max_draw_down.rs        # max_draw_down() metric
 │   ├── validation/             # Domain invariant checks (5 rules + combined)
 │   └── fixtures.rs             # Test data builders
-├── infrastructure/             # Adapters (PG, memory, Redis, parquet)
+├── infrastructure/             # Adapters (PG, memory, parquet)
 │   ├── in_memory_repos.rs
 │   ├── pg_adapter.rs           # PG adapters implementing domain repo traits
-│   ├── redis.rs                # SIGNAL_GROUPS_KEY, read/write/delete (Vec<SignalGroup>)
 │   └── strategy_adapter.rs     # ParquetStrategyRepository (partitioned parquet writes)
 ├── config/                     # Environment + DB configuration
 │   └── environment.rs         # Environment, DbConfig, parquet_base_dir()
@@ -278,13 +270,12 @@ src/
 9. **Two-stage filtering**: `filter_signal_groups_by_annual_ops()` prunes signal groups by annual operation count first (cheap), then `filter_strategies(strategies, &GlobalStrategyFilter)` prunes by max draw down + annual ROI (expensive, runs on fewer candidates). `GlobalStrategyFilter::default()` encodes the baseline quality bar.
 10. **Parquet partitioning by (instrument, mms_id)**: Strategies are written as partitioned parquet files — `instrument=.../money_management_strategy_id=.../strategies.parquet`. Matches the single-instrument, single-MMS backtest constraint and enables efficient per-partition reads.
 11. **Typed indicator parameters**: `IndicatorParameters` is an enum (`Macd`/`Rsi`) — the PG adapter hand-parses the JSON `parameters` column into the correct variant by `type`. No `serde` on the hot path.
-12. **Simple Redis key constant**: `SIGNAL_GROUPS_KEY` is a plain `&str` (`"signal_groups"`). Hard fail on Redis errors — no silent fallback.
-13. **Real metrics in the generator**: `create_strategies()` computes `max_draw_down`, `global_roi` → `annual_roi`, and `annual_operation_count` from each strategy's referenced operation points — no more random placeholder metrics. Parallelized with **rayon** `par_iter()`.
-14. **`SignalGroup` lives in the domain**: `SignalGroup` was moved from `infrastructure::redis` to `domain::signal_group` and now embeds `indicator_id`. The Redis cache stores `Vec<SignalGroup>` (not a HashMap keyed by indicator ID) — the ID travels with each group.
-15. **Timestamps are `i64`**: All timestamps (`OperationPoint`, `ResampledPointD1`, signal timestamps) are `i64` epoch seconds, not `i32`. The PG adapter casts `i32` DB columns to `i64` on read.
-16. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. IDs are assigned at parquet write time by `ParquetStrategyRepository` (global max across all partitions + 1). Keeps the domain free of persistence concerns.
-17. **Parquet append semantics**: `write()` reads existing rows, appends new ones, and rewrites the whole file. `find_max_strategy_id()` recursively scans all partitions to find the global max ID, ensuring IDs are unique and contiguous across partitions and appends.
-18. **`strategy generate` command removed**: The purely-synthetic `generate` command (both `ct s generate` and `bt-engine strategy generate`) has been removed. Strategy creation now flows through `strategy create`, which fetches real data from PG, generates signals, and computes real metrics.
+12. **Real metrics in the generator**: `create_strategies()` computes `max_draw_down`, `global_roi` → `annual_roi`, and `annual_operation_count` from each strategy's referenced operation points — no more random placeholder metrics. Parallelized with **rayon** `par_iter()`.
+13. **`SignalGroup` lives in the domain**: `SignalGroup` was moved from infrastructure to `domain::signal_group` and now embeds `indicator_id`. The cache stores `Vec<SignalGroup>` (not a HashMap keyed by indicator ID) — the ID travels with each group.
+14. **Timestamps are `i64`**: All timestamps (`OperationPoint`, `ResampledPointD1`, signal timestamps) are `i64` epoch seconds, not `i32`. The PG adapter casts `i32` DB columns to `i64` on read.
+15. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. IDs are assigned at parquet write time by `ParquetStrategyRepository` (global max across all partitions + 1). Keeps the domain free of persistence concerns.
+16. **Parquet append semantics**: `write()` reads existing rows, appends new ones, and rewrites the whole file. `find_max_strategy_id()` recursively scans all partitions to find the global max ID, ensuring IDs are unique and contiguous across partitions and appends.
+17. **`strategy generate` command removed**: The purely-synthetic `generate` command (both `ct s generate` and `bt-engine strategy generate`) has been removed. Strategy creation now flows through `strategy create`, which fetches real data from PG, generates signals, and computes real metrics.
 
 ---
 
@@ -294,7 +285,7 @@ src/
 - **When discussing market data**: Use "resampled point" or "D1 candle", not "price bar" or "OHLC".
 - **When discussing risk rules**: Use "money management strategy" (MMS), not "position sizing" or "risk model".
 - **When discussing validation**: Reference the specific invariant by name (e.g. "same-instrument validation").
-- **When discussing cache**: Use "signal groups cache", "cache HIT/MISS". The cache is ephemeral — not a persistent store.
+- **When discussing cache**: Use "signal-group memoization". The `cached` crate memoizes per `(indicator_id, instrument)` in-process.
 - **When discussing strategies**: Use "strategy" (a configured indicator + op-point sets + MMS + metrics). Reference "annual ROI", "max draw down", "annual operation count" by name.
 - **When adding new entities**: Follow the pattern — struct + repository trait in domain, in-memory impl in infrastructure, fixtures in `domain::fixtures`.
 - **When adding new metrics**: Follow `annual_operation_count`/`max_draw_down`/`global_roi`/`annual_roi` — free function in `domain/`, unit-tested in the same file. `max_draw_down` and `global_roi` take `&[&OperationPoint]`; `annual_operation_count` takes a count + timestamp span; `annual_roi` takes a span + global ROI.

@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.4 | Updated: 2026-06-28 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.5 | Updated: 2026-08-19 -->
 
 # Decisions Log
 
@@ -48,7 +48,7 @@
 ## Decision: Redis-Backed Signal Groups Cache
 
 **Date**: 2026-06-08
-**Status**: Decided
+**Status**: Deprecated
 **Owner**: Arman Mojaver
 
 ### Context
@@ -81,6 +81,42 @@ Add a dedicated Redis container to the Docker Compose stack and introduce a `red
 - PRD: `.opencode/.tmp/prd/2026-06-08-redis-signal-groups-cache.md`
 - Implementation: `src/infrastructure/redis.rs`, `src/engine/redis.rs`, `src/cli/redis.rs`
 - Docker: `docker-compose.yaml` — `redis` service
+
+---
+
+## Decision: Remove Redis
+
+**Date**: 2026-08-19
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The Redis-backed signal groups cache (`src/infrastructure/redis.rs`, the `redis` Docker Compose service, and the `ct redis` / `bt-engine redis` CLI commands) was built to avoid recomputing signal groups across CLI invocations. It was never wired into the engine's compute path — it existed only as manual operator tooling. In-memory memoization (the `cached` crate) was added directly to `create_signal_group` in commit `1387bcc`, keyed by `(indicator_id, instrument)`, which provides actual compute-path caching with no external service.
+
+### Decision
+Remove Redis entirely: the `redis` Cargo dependency, `src/infrastructure/redis.rs`, `src/cli/redis.rs`, `src/engine/redis.rs`, the `redis` Docker Compose service and `redis-data` volume, and all related documentation.
+
+### Rationale
+- In-memory memoization (`cached`) covers the real need — redundant computation within a run
+- Redis added operational overhead (extra service, port, dependency) without being integrated into the compute path
+- Fewer services = simpler Docker setup and lower maintenance
+- YAGNI — re-introduce Redis only if cross-process caching becomes a real requirement
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep Redis | Available for future cross-process caching | Unused in compute path; extra service/dep/port | YAGNI; re-add when needed |
+| Wire Redis into the compute path | Cross-invocation caching | Adds I/O + failure modes to the hot path | In-memory `cached` memoization already solves redundant compute |
+
+### Impact
+**Positive**: Simpler infra (no `redis` service/volume), fewer dependencies, smaller binary
+**Negative**: No cross-process persistence of signal groups (recomputed per process)
+**Risk**: Low — no active consumer of Redis; memoization covers the compute path
+
+### Related
+- Commit `1387bcc` (feat: add cache to signal group generation) — introduced `cached` memoization
+- Supersedes: "Redis-Backed Signal Groups Cache" (2026-06-08)
+- Implementation: removed `src/infrastructure/redis.rs`, `src/cli/redis.rs`, `src/engine/redis.rs`, and the `redis` service in `docker-compose.yaml`
 
 ---
 
@@ -486,7 +522,7 @@ The `ParquetStrategyRepository` needed to support multiple writes to the same pa
 
 | Decision | Date | Replaced By | Why |
 |----------|------|-------------|-----|
-(none yet)
+| Redis-Backed Signal Groups Cache | 2026-06-08 | Remove Redis (2026-08-19) | Superseded by in-memory `cached` memoization |
 
 ## Onboarding Checklist
 

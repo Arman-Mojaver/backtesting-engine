@@ -2,35 +2,33 @@ pub mod crossover;
 pub mod oscillator;
 pub mod thresholds;
 
-use serde::{Deserialize, Serialize};
-
 use crate::domain::signal_group::SignalGroup;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IndicatorValue {
     pub timestamp: i64,
     pub value: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct OscillatorSeries {
     pub items: Vec<IndicatorValue>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ThresholdSeries {
     pub items: Vec<IndicatorValue>,
     pub high_threshold: f64,
     pub low_threshold: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CrossoverPair {
     pub upcross_long_buffer: Vec<IndicatorValue>,
     pub upcross_short_buffer: Vec<IndicatorValue>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IndicatorOutput {
     Oscillator {
         instrument: String,

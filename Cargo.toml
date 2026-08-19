@@ -19,10 +19,6 @@ clap = { version = "4.5", features = ["string", "derive"] }
 cached = "2"
 anyhow = "1.0"
 postgres = "0.19"
-redis = { version = "1.2", default-features = false }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-rand = "0.10"
 arrow = "58"
 parquet = { version = "58", features = ["arrow"] }
 rustc-hash = "2.1.2"

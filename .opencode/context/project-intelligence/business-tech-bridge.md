@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.4 | Updated: 2026-06-28 -->
+<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.5 | Updated: 2026-08-19 -->
 
 # Business ↔ Tech Bridge
 
@@ -38,19 +38,13 @@
 | Build strategies from signal groups | `create_strategies()` / `create_strategy()` | `src/application/strategy_generator.rs` | One strategy per signal group; computes real metrics; rayon-parallelized |
 | Generate signal groups from indicators | `create_signals()` | `src/application/signal_generator.rs` | Random timestamps from resampled points (skips first/last 200) |
 | Write strategies to parquet | `ParquetStrategyRepository::write()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD; append semantics (reads existing + rewrites); IDs assigned at write time |
-| Redis cache (ephemeral) | `SignalGroup`, CRUD functions | `src/infrastructure/redis.rs` | Stores `Vec<SignalGroup>` (JSON); `SignalGroup` defined in `domain::signal_group` |
-| Redis connection | `redis::Connection` via `redis::Client` | `src/infrastructure/redis.rs` | Sync connection to `redis://redis:6379/0` |
-| Redis cache key constant | `SIGNAL_GROUPS_KEY` (`&str`) | `src/infrastructure/redis.rs` | Plain `"signal_groups"` constant |
-| Read cached signal groups | `read_signal_groups(conn)` | `src/infrastructure/redis.rs` | Returns `Option<SignalGroups>`, hard fail on error |
-| Write cached signal groups | `write_signal_groups(conn, groups)` | `src/infrastructure/redis.rs` | Serializes to JSON, hard fail on error |
-| Delete cached signal groups | `delete_signal_groups(conn)` | `src/infrastructure/redis.rs` | DEL key, hard fail on error |
+| Signal-group memoization | `#[cached]` on `create_signal_group` | `src/application/signal_generator.rs` | In-memory cache keyed by `(indicator_id, instrument)` |
 | CLI binary (`ct`) | Full backtesting CLI | `src/main.rs` | `cli::build_cli()` → `cli::parse()` → `cli::execute()`. Installed at `~/.cargo/bin/ct` |
 | CLI dev tools | `ct dev create_indicators`, `ct dev create_strategies` | `src/cli/dev.rs` | Each file has its own builder, domain types, parser, and execute |
 | CLI indicator | `ct indicator/i create macd/rsi`, `bt i delete`, `bt i delete_unused` | `src/cli/indicator.rs` | Nested `create` subcommand with `macd` and `rsi` leaves |
 | CLI MMS | `ct money-management-strategy/mms create`, `ct mms delete` | `src/cli/money_management_strategy.rs` | |
 | CLI operation point | `ct operation-point/o align`, `ct o create`, `ct o delete` | `src/cli/operation_point.rs` | |
 | CLI raw point | `ct raw-point/r create`, `ct r delete` | `src/cli/raw_point.rs` | |
-| CLI redis cache | `ct redis` (check), `ct redis -v` (verbose), `ct redis --clean` | `src/cli/redis.rs` | Delegates to `bt-engine redis` via Docker exec |
 | CLI resampled point | `ct resampled-point/rr create`, `ct rr delete` | `src/cli/resampled_point.rs` | |
 | CLI strategy create | `ct strategy/s create -m <mms_id> [-i <instrument>]` | `src/cli/strategy.rs` | Forwards to `bt-engine strategy create` via Docker exec |
 | ~~CLI strategy generate~~ | _removed_ | `src/cli/strategy.rs` | The `generate` subcommand has been removed from both `ct` and `bt-engine` |
@@ -58,10 +52,8 @@
 | Engine CLI module | Command tree for `bt-engine` | `src/engine/mod.rs` | `EngineCommand` enum + `build_cli()`, `parse()`, `execute()` |
 | Engine strategy create | `bt-engine strategy create -m <mms_id> [-i <instrument>]` | `src/engine/strategy/create.rs` | Full pipeline: fetch → validate → create signals → filter signal groups → create strategies → filter → write parquet |
 | ~~Engine strategy generate~~ | _removed_ | — | The `generate` subcommand has been removed from `bt-engine` |
-| Engine redis subcommand | Redis cache under `bt-engine` | `src/engine/redis.rs` | `RedisCommand::Check { verbose }`, `RedisCommand::Clean` |
 | Refresh CLI after changes | `cargo install --path . --bin ct --force` | — | Installs updated `ct` to `~/.cargo/bin/ct` |
 | Refresh engine binary after changes | `cargo install --path . --bin bt-engine --force` | `Cargo.toml` defines both `[[bin]]` entries | Installs updated `bt-engine` to `~/.cargo/bin/bt-engine` |
-| Docker Redis service | `redis:7-alpine` container | `docker-compose.yaml` | Named volume `redis-data`, port 6379, container_name: redis |
 | Parquet files volume | `${PARQUET_FILES_PATH}:/app/parquet_files` | `docker-compose.yaml`, `.env.example` | Host path configurable via `PARQUET_FILES_PATH` env var |
 
 ## Architecture Pattern
@@ -83,8 +75,6 @@ Business Question                              Code Path
 "Which signal groups have enough ops?"    →   filter_signal_groups_by_annual_ops(groups, min_ops, start_ts, end_ts)
 "Which strategies pass the quality bar?"  →   filter_strategies(strategies, &GlobalStrategyFilter::default())
 "Create strategies from DB data?"         →   fetch_strategy_data() → validate → create_signals() → filter_signal_groups_by_annual_ops() → create_strategies() → filter_strategies() → ParquetStrategyRepository::write()
-"Is the cache HIT or MISS?"               →   bt-engine redis / ct redis → read_signal_groups()
-"Clear the signal cache?"                 →   bt-engine redis --clean / ct redis --clean → delete_signal_groups()
 ```
 
 ## Adding New Features — Where Things Go
@@ -94,7 +84,7 @@ Business Question                              Code Path
 | New entity | `src/domain/{entity}.rs` + trait | See `indicator.rs` |
 | New validation rule | `src/domain/validation/{rule}.rs` | See `same_instrument_validation.rs` |
 | New domain metric | `src/domain/{metric}.rs` as a free fn | See `max_draw_down.rs` (`&[&OperationPoint]`), `annual_operation_count.rs` (count + span), `annual_roi.rs` (span + global ROI) |
-| New data source adapter | `src/infrastructure/{adapter}.rs` | See `in_memory_repos.rs` or `redis.rs` |
+| New data source adapter | `src/infrastructure/{adapter}.rs` | See `in_memory_repos.rs` or `strategy_adapter.rs` |
 | New application orchestration | `src/application/{name}.rs` | See `strategy_data.rs` / `strategy_generator.rs` |
 | New CLI command group (ct binary) | `src/cli/{name}.rs` | See `src/cli/dev.rs` — 4 sections: builder, types, parse, execute |
 | New CLI subcommand under existing group | Inside the relevant `src/cli/{group}.rs` or `src/engine/{group}.rs` | Add to the enum + builder + parser + execute match |
