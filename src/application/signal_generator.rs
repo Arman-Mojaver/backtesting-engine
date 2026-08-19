@@ -1,5 +1,7 @@
 use rayon::prelude::*;
 
+use cached::cached;
+
 use crate::domain::indicator::Indicator;
 use crate::domain::indicators::create_indicator_output;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -16,6 +18,15 @@ pub fn create_signal_groups(
         .collect()
 }
 
+/// Memoizes a single indicator's signal group on `(indicator_id, instrument)`.
+///
+/// An indicator's parameters are immutable and uniquely identified by its `id`, and an
+/// instrument's resampled points never change, so the cache key is the stable identity
+/// rather than a hash of the (large, mixed-type) inputs.
+#[cached(
+    key = "(i32, String)",
+    convert = r#"{ (indicator.id, resampled_points.first().map(|p| p.instrument.clone()).unwrap_or_default()) }"#
+)]
 fn create_signal_group(
     indicator: &Indicator,
     resampled_points: &[ResampledPointD1],
@@ -53,7 +64,7 @@ mod tests {
         // MACD is unsupported -> produces no group, but RSI still produces one.
         let indicators = vec![
             Indicator {
-                id: 1,
+                id: 100,
                 r#type: "macd".to_string(),
                 parameters: IndicatorParameters::Macd {
                     slow_type: "ema".to_string(),
@@ -91,7 +102,7 @@ mod tests {
     #[test]
     fn all_unsupported_yields_no_signal_groups() {
         let indicators = vec![Indicator {
-            id: 1,
+            id: 100,
             r#type: "macd".to_string(),
             parameters: IndicatorParameters::Macd {
                 slow_type: "ema".to_string(),
