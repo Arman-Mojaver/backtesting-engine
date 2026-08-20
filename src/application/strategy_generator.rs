@@ -12,7 +12,7 @@ use crate::domain::strategy::Strategy;
 
 pub fn create_strategies(
     signal_groups: &[SignalGroup],
-    operation_points: &OperationPoints,
+    operation_points: &OperationPoints<'_>,
     money_management_strategy_id: i32,
     start_timestamp: i64,
     end_timestamp: i64,

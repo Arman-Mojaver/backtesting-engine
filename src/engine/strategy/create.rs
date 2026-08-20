@@ -41,7 +41,14 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
         money_management_strategy_id,
     );
 
-    let strategies = run_strategies(data, &unprocessed_ids)?;
+    let strategies = run_strategies(
+        &data.indicators,
+        &data.resampled_points,
+        &data.long_operation_points,
+        &data.short_operation_points,
+        data.money_management_strategy_id,
+        &unprocessed_ids,
+    )?;
 
     let repo = ParquetStrategyRepository::new(parquet_base_dir(resolve_environment()));
     eprintln!("Writing {} strategies to parquet ...", strategies.len());

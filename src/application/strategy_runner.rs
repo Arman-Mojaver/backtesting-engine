@@ -1,29 +1,28 @@
 use std::collections::HashSet;
 
 use crate::application::signal_generator::create_signal_groups;
-use crate::application::source_data::SourceData;
 use crate::application::strategy_generator::create_strategies;
 use crate::domain::indicator::Indicator;
-use crate::domain::operation_point::OperationPoints;
+use crate::domain::operation_point::{OperationPoint, OperationPoints};
+use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal_group::filter_signal_groups_by_annual_ops;
 use crate::domain::strategy::{filter_strategies, GlobalStrategyFilter, Strategy};
 use crate::domain::validation::combined_validation::{validate_all, CombinedValidationError};
 
-pub fn run_strategies(data: SourceData, unprocessed_ids: &[i32]) -> anyhow::Result<Vec<Strategy>> {
-    let SourceData {
-        money_management_strategy_id: mms_id,
-        indicators,
-        resampled_points,
+pub fn run_strategies(
+    indicators: &[Indicator],
+    resampled_points: &[ResampledPointD1],
+    long_operation_points: &[OperationPoint],
+    short_operation_points: &[OperationPoint],
+    money_management_strategy_id: i32,
+    unprocessed_ids: &[i32],
+) -> anyhow::Result<Vec<Strategy>> {
+    validate_all(
         long_operation_points,
         short_operation_points,
-    } = data;
-
-    validate_all(
-        &long_operation_points,
-        &short_operation_points,
-        &indicators,
-        &resampled_points,
-        mms_id,
+        indicators,
+        resampled_points,
+        money_management_strategy_id,
     )
     .map_err(|e: CombinedValidationError| anyhow::anyhow!("Validation failed: {:?}", e))?;
 
@@ -35,11 +34,12 @@ pub fn run_strategies(data: SourceData, unprocessed_ids: &[i32]) -> anyhow::Resu
 
     let unprocessed_set: HashSet<i32> = unprocessed_ids.iter().copied().collect();
     let indicators_for_compute: Vec<Indicator> = indicators
-        .into_iter()
+        .iter()
         .filter(|indicator| unprocessed_set.contains(&indicator.id))
+        .cloned()
         .collect();
 
-    let signal_groups = create_signal_groups(&indicators_for_compute, &resampled_points);
+    let signal_groups = create_signal_groups(&indicators_for_compute, resampled_points);
 
     let global_filter = GlobalStrategyFilter::default();
     let filtered_groups = filter_signal_groups_by_annual_ops(
@@ -58,7 +58,7 @@ pub fn run_strategies(data: SourceData, unprocessed_ids: &[i32]) -> anyhow::Resu
     let strategies = create_strategies(
         &filtered_groups,
         &operation_points,
-        mms_id,
+        money_management_strategy_id,
         start_timestamp,
         end_timestamp,
     );
