@@ -2,7 +2,7 @@
 name: Plan
 description: "Universal agent for answering queries, executing tasks, and coordinating workflows across any domain"
 mode: primary
-model: github-copilot/claude-sonnet-4.6
+model: opencode-go/glm-5.2
 temperature: 0.2
 permission:
   read:

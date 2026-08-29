@@ -2,7 +2,7 @@
 name: Build
 description: "Orchestration agent for complex coding, architecture, and multi-file refactoring"
 mode: primary
-model: github-copilot/claude-opus-4.6
+model: opencode-go/glm-5.2
 temperature: 0.1
 permission:
   read:
