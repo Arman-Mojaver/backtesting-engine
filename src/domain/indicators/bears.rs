@@ -55,6 +55,7 @@ mod tests {
     use super::*;
     use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::indicator_values;
 
     /// Build a resampled point with explicit close and low (the two price
     /// components Bears Power consumes).
@@ -72,10 +73,6 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
-        &buffer.items
-    }
-
     // --- synthetic hand-computed tests ---
 
     #[test]
@@ -87,7 +84,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 9.0))
             .collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, -1.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -104,7 +101,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, i as f64, (i - 1) as f64))
             .collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -135,7 +132,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 9.0))
             .collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, -1.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -162,7 +159,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 100) as i64, 10.0, 9.0))
             .collect();
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].timestamp, 102);
         assert_eq!(vals[1].timestamp, 103);
@@ -175,7 +172,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 9.0))
             .collect();
         let result = compute(&points, 3).unwrap();
-        assert_eq!(values(&result).len(), 7);
+        assert_eq!(indicator_values!(result).len(), 7);
     }
 
     // --- Level 2: real Bears Power output on real EURUSD data (placeholder baseline) ---
@@ -197,7 +194,7 @@ mod tests {
             }
         };
         let result = compute(&points, 13).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
 
         // 2400 points -> 2387 Bears values (2400 - 13).
         assert_eq!(vals.len(), 2387);

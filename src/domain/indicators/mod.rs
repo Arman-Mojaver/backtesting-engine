@@ -6,6 +6,7 @@ pub mod cho;
 pub mod chv;
 pub mod dpo;
 pub mod force;
+pub mod macros;
 pub mod moving_averages;
 pub mod osma;
 pub mod roc;
