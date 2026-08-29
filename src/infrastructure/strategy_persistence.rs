@@ -22,9 +22,7 @@ impl CellOutputDTO {
             self.processed_indicator_ids.clone(),
         )
     }
-
 }
-
 
 pub struct StrategyPersistence {
     strategies: ParquetStrategyRepository,
@@ -62,14 +60,13 @@ impl StrategyPersistence {
             });
         }
 
-        let manifest_entries: Vec<(String, i32, Vec<i32>)> = dto_cells
-            .iter()
-            .map(|c| c.manifest_entry())
-            .collect();
+        let manifest_entries: Vec<(String, i32, Vec<i32>)> =
+            dto_cells.iter().map(|c| c.manifest_entry()).collect();
 
-        dto_cells
-            .into_par_iter()
-            .try_for_each(|c| self.strategies.write_rows(&c.instrument, c.mms_id, c.strategy_rows))?;
+        dto_cells.into_par_iter().try_for_each(|c| {
+            self.strategies
+                .write_rows(&c.instrument, c.mms_id, c.strategy_rows)
+        })?;
 
         let processed_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)

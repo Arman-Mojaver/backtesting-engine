@@ -7,6 +7,7 @@ use std::sync::Arc;
 use arrow::array::{AsArray, Int32Array, Int64Array, StringBuilder};
 use arrow::datatypes::{DataType, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
+use log::{info, warn};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
@@ -44,7 +45,7 @@ impl ParquetProcessedManifest {
         }
         read_parquet(&path)
     }
-    
+
     pub fn read(&self, instrument: &str, mms_id: i32) -> anyhow::Result<Vec<ProcessedRow>> {
         Ok(self
             .read_all()?
@@ -84,7 +85,7 @@ impl ParquetProcessedManifest {
         });
 
         if !replaced_ids.is_empty() {
-            eprintln!(
+            warn!(
                 "Processed manifest: replacing {} existing row(s) for instrument={} mms_id={} (indicator_ids: {:?})",
                 replaced_ids.len(),
                 instrument,
@@ -120,7 +121,7 @@ impl ParquetProcessedManifest {
         let path = self.path();
         let mut rows = self.read_all()?;
 
-        eprintln!(
+        info!(
             "Writing manifest: {} entries ({} total indicator IDs) ...",
             entries.len(),
             entries.iter().map(|(_, _, ids)| ids.len()).sum::<usize>(),
@@ -150,7 +151,7 @@ impl ParquetProcessedManifest {
 
         Ok(())
     }
-    
+
     pub fn read_processed_ids_per_cell(
         &self,
     ) -> anyhow::Result<HashMap<(String, i32), HashSet<i32>>> {

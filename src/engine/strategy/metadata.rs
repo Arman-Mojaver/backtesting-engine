@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
+use log::info;
 
 use crate::application::metadata_report::{
     build_metadata_report, DbMetadataState, ManifestMetadataState,
@@ -21,7 +22,7 @@ pub fn execute() -> anyhow::Result<()> {
     let conn_string = db_config.connection_string();
 
     // Fetch DB state
-    eprintln!("Fetching DB metadata ...");
+    info!("Fetching DB metadata ...");
 
     let indicator_adapter =
         PgIndicatorAdapter::new(&conn_string).context("Failed to connect for indicators")?;

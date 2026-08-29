@@ -1,4 +1,5 @@
 use anyhow::Context;
+use log::info;
 
 use crate::config::environment::{DbConfig, Environment};
 use crate::domain::indicator::{Indicator, IndicatorRepository};
@@ -30,7 +31,7 @@ pub fn fetch_source_data(
     let config = DbConfig::from_env(env);
     let conn_string = config.connection_string();
 
-    eprintln!("Connecting to {} ...", config.database);
+    info!("Connecting to {} ...", config.database);
 
     let indicator_adapter =
         PgIndicatorAdapter::new(&conn_string).with_context(|| connection_diagnostics(&config))?;

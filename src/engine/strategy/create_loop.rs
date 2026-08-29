@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
+use log::{error, info};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
@@ -116,7 +117,7 @@ fn compute_cell(
     ) {
         Ok(strategies) => strategies,
         Err(e) => {
-            eprintln!("Error {} (mms_id={}): {:?}", instrument, mms_id, e);
+            error!("Error {} (mms_id={}): {:?}", instrument, mms_id, e);
             return None;
         }
     };
@@ -139,7 +140,7 @@ pub fn execute() -> anyhow::Result<()> {
     );
     let processed_ids_per_cell = persistence.read_processed_ids_per_cell()?;
 
-    eprintln!("{} cells to process.", cells.len());
+    info!("{} cells to process.", cells.len());
 
     // 2. Compute strategies in parallel.
     let computed: Vec<CellOutput> = cells
@@ -148,11 +149,11 @@ pub fn execute() -> anyhow::Result<()> {
         .collect();
 
     let cell_count = computed.len();
-    eprintln!("Compute done — {} cells. Persisting ...", cell_count);
+    info!("Compute done — {} cells. Persisting ...", cell_count);
 
     // 3. Persist (assign IDs, write partitions in parallel, commit manifest).
     persistence.persist_cells(computed)?;
 
-    eprintln!("Done — {} cells persisted.", cell_count);
+    info!("Done — {} cells persisted.", cell_count);
     Ok(())
 }
