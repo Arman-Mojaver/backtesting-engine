@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 use anyhow::Context;
 use log::{error, info};
@@ -46,11 +47,24 @@ impl SourceIndex {
         let short_adapter = PgShortOperationPointAdapter::new(&conn_string)
             .context("Failed to connect for short operation points")?;
 
-        let indicators = indicator_adapter.get_all();
+        let load_start = Instant::now();
+        let (indicators, (resampled_by_instrument, (long_by_cell, short_by_cell))) = rayon::join(
+            move || indicator_adapter.get_all(),
+            move || {
+                rayon::join(
+                    move || resampled_adapter.index_by_instrument(),
+                    move || {
+                        rayon::join(
+                            move || long_adapter.index_by_cell(),
+                            move || short_adapter.index_by_cell(),
+                        )
+                    },
+                )
+            },
+        );
+        info!("Source data loaded in {:?}", load_start.elapsed());
+
         let indicator_ids = indicators.iter().map(|indicator| indicator.id).collect();
-        let resampled_by_instrument = resampled_adapter.index_by_instrument();
-        let long_by_cell = long_adapter.index_by_cell();
-        let short_by_cell = short_adapter.index_by_cell();
 
         Ok(Self {
             indicators,
