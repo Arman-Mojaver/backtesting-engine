@@ -32,3 +32,4 @@ debug
 .opencode/.tmp/
 **/parquet_files/**
 .tmp
+logs/*

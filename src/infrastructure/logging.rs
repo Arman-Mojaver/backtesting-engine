@@ -19,7 +19,7 @@ use simplelog::{
 const DEFAULT_LOG_LEVEL: &str = "info";
 
 /// Log file name.
-const LOG_FILE: &str = "bt-engine.log";
+const LOG_FILE: &str = "logs/bt-engine.log";
 
 /// Initializes the global logger.
 ///
