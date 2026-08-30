@@ -45,7 +45,7 @@ push:  ## Push images
 
 pull:  ## Pull images
 	cat .docker_password | docker login --username armanmojaver --password-stdin
-	docker push armanmojaver/backtesting-engine:latest
+	docker pull armanmojaver/backtesting-engine:latest
 
 
 fmt:  ## Run rust formatter
