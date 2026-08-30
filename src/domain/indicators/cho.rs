@@ -2,6 +2,7 @@ use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::validate_period;
 
 /// Compute the Accumulation/Distribution (AD) line inline.
 ///
@@ -47,12 +48,7 @@ pub fn compute(
     fast_ma: i32,
     slow_ma: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
-    if fast_ma <= 0 {
-        return Err(IndicatorError::InvalidChoFastPeriod { n: fast_ma });
-    }
-    if slow_ma <= 0 {
-        return Err(IndicatorError::InvalidChoSlowPeriod { n: slow_ma });
-    }
+    validate_period!(fast_ma, InvalidChoFastPeriod; slow_ma, InvalidChoSlowPeriod);
     let fast = fast_ma as usize;
     let slow = slow_ma as usize;
 

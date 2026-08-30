@@ -2,6 +2,7 @@ use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::validate_period;
 
 /// Compute the Detrended Price Oscillator from resampled daily points.
 ///
@@ -29,9 +30,7 @@ pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
-    if period <= 0 {
-        return Err(IndicatorError::InvalidDpoPeriod { n: period });
-    }
+    validate_period!(period, InvalidDpoPeriod);
     let ext_ma_period = (period / 2 + 1) as usize;
 
     let closes: Vec<f64> = points.iter().map(|p| p.close).collect();

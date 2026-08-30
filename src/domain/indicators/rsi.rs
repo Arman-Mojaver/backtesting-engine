@@ -1,6 +1,7 @@
 use crate::domain::indicators::{IndicatorError, PriceField};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, ThresholdSeries};
+use crate::validate_period;
 
 /// A price diff tagged with the timestamp of the newer point.
 #[derive(Debug, Clone, Copy)]
@@ -22,9 +23,7 @@ pub fn compute(
     high_threshold: f64,
     low_threshold: f64,
 ) -> Result<ThresholdSeries, IndicatorError> {
-    if n <= 0 {
-        return Err(IndicatorError::InvalidRsiPeriod { n });
-    }
+    validate_period!(n, InvalidRsiPeriod);
     let period = n as usize;
 
     // Build per-step price diffs: diff[i] = price[i+1] - price[i].

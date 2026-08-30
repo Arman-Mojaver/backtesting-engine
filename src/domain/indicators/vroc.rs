@@ -1,6 +1,7 @@
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::validate_period;
 
 /// Compute the Volume Rate of Change (VROC) from resampled daily points.
 ///
@@ -24,9 +25,7 @@ pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
-    if period <= 0 {
-        return Err(IndicatorError::InvalidVrocPeriod { n: period });
-    }
+    validate_period!(period, InvalidVrocPeriod);
     let lookback = (period - 1) as usize;
     let n = points.len();
 

@@ -2,6 +2,7 @@ use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::validate_period;
 
 /// Compute the Chaikin Volatility from resampled daily points.
 ///
@@ -28,12 +29,7 @@ pub fn compute(
     smooth_period: i32,
     chv_period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
-    if smooth_period <= 0 {
-        return Err(IndicatorError::InvalidChvSmoothPeriod { n: smooth_period });
-    }
-    if chv_period <= 0 {
-        return Err(IndicatorError::InvalidChvPeriod { n: chv_period });
-    }
+    validate_period!(smooth_period, InvalidChvSmoothPeriod; chv_period, InvalidChvPeriod);
     let smooth = smooth_period as usize;
     let chv = chv_period as usize;
 

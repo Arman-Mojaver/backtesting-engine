@@ -1,6 +1,7 @@
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::validate_period;
 
 /// Compute the Rate of Change (ROC) from resampled daily points.
 ///
@@ -22,9 +23,7 @@ pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
-    if period <= 0 {
-        return Err(IndicatorError::InvalidRocPeriod { n: period });
-    }
+    validate_period!(period, InvalidRocPeriod);
     let p = period as usize;
     let n = points.len();
 

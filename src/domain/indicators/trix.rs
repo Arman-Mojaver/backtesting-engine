@@ -2,6 +2,7 @@ use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::validate_period;
 
 /// Compute the TRIX (Triple Exponential Average) from resampled daily points.
 ///
@@ -26,9 +27,7 @@ pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
-    if period <= 0 {
-        return Err(IndicatorError::InvalidTrixPeriod { n: period });
-    }
+    validate_period!(period, InvalidTrixPeriod);
     let p = period as usize;
 
     let closes: Vec<f64> = points.iter().map(|pt| pt.close).collect();
