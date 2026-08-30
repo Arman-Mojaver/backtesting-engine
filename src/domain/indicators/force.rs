@@ -58,6 +58,7 @@ mod tests {
     use super::*;
     use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::indicator_values;
 
     /// Build a resampled point with an explicit close and volume (the two
     /// components the Force Index computation consumes).
@@ -75,10 +76,6 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
-        &buffer.items
-    }
-
     // --- synthetic hand-computed tests ---
 
     #[test]
@@ -91,7 +88,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 100))
             .collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -112,7 +109,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, (i + 1) as f64, 100))
             .collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].value, 100.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -131,7 +128,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize], 50))
             .collect();
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 3);
@@ -154,7 +151,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize], 10))
             .collect();
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert_eq!(vals[0].value, 15.0);
         assert_eq!(vals[0].timestamp, 3);
@@ -200,7 +197,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 100))
             .collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -227,7 +224,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 100) as i64, 10.0, 100))
             .collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].timestamp, 103);
         assert_eq!(vals[1].timestamp, 104);
@@ -240,7 +237,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 100))
             .collect();
         let result = compute(&points, 3).unwrap();
-        assert_eq!(values(&result).len(), 7);
+        assert_eq!(indicator_values!(result).len(), 7);
     }
 
     // --- Level 2: real Force Index output on real EURUSD data (placeholder baseline) ---
@@ -262,7 +259,7 @@ mod tests {
             }
         };
         let result = compute(&points, 13).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
 
         // 2400 points -> 2387 Force Index values (2400 - 13).
         assert_eq!(vals.len(), 2387);

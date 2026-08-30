@@ -58,6 +58,7 @@ mod tests {
     use super::*;
     use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::indicator_values;
 
     /// Build a resampled point with an explicit close (the only component the
     /// ROC computation consumes).
@@ -75,10 +76,6 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
-        &buffer.items
-    }
-
     // --- synthetic hand-computed tests ---
 
     #[test]
@@ -89,7 +86,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..5).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -107,7 +104,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, (i + 1) as f64))
             .collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].value, 75.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -127,7 +124,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
             .collect();
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert!((vals[0].value - (-66.66666666666667)).abs() < 1e-9);
         assert_eq!(vals[0].timestamp, 3);
@@ -152,7 +149,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
             .collect();
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert_eq!(vals[0].value, 100.0);
         assert_eq!(vals[0].timestamp, 3);
@@ -195,7 +192,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..4).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -221,7 +218,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..5).map(|i| rp(i + 1, (i + 100) as i64, 10.0)).collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].timestamp, 103);
         assert_eq!(vals[1].timestamp, 104);
@@ -233,7 +230,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..10).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
         let result = compute(&points, 3).unwrap();
-        assert_eq!(values(&result).len(), 7);
+        assert_eq!(indicator_values!(result).len(), 7);
     }
 
     // --- Level 2: real ROC output on real EURUSD data (placeholder baseline) ---
@@ -255,7 +252,7 @@ mod tests {
             }
         };
         let result = compute(&points, 12).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
 
         // 2400 points -> 2388 ROC values (2400 - 12).
         assert_eq!(vals.len(), 2388);

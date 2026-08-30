@@ -52,6 +52,7 @@ mod tests {
     use super::*;
     use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::indicator_values;
 
     /// Build a resampled point with explicit high/low so the median
     /// `(high + low) / 2` is controlled.
@@ -74,10 +75,6 @@ mod tests {
         rp(id, ts, median + 0.5, median - 0.5)
     }
 
-    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
-        &buffer.items
-    }
-
     // --- synthetic hand-computed tests ---
 
     #[test]
@@ -87,7 +84,7 @@ mod tests {
             .map(|i| rp_median(i as i32 + 1, (i + 1) as i64, 5.0))
             .collect();
         let result = compute(&points).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 34);
@@ -103,7 +100,7 @@ mod tests {
             .map(|i| rp_median(i as i32 + 1, (i + 100) as i64, i as f64))
             .collect();
         let result = compute(&points).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         // 35 points -> AO at ending indices 33,34 -> 2 values.
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].value, 14.5);
@@ -137,11 +134,11 @@ mod tests {
             .map(|i| rp_median(i as i32 + 1, (i + 1) as i64, 1.0))
             .collect();
         let result = compute(&points).unwrap();
-        assert_eq!(values(&result).len(), 1);
+        assert_eq!(indicator_values!(result).len(), 1);
         // constant median -> AO = 0
-        assert_eq!(values(&result)[0].value, 0.0);
+        assert_eq!(indicator_values!(result)[0].value, 0.0);
         // timestamp of the 34th point (index 33)
-        assert_eq!(values(&result)[0].timestamp, 34);
+        assert_eq!(indicator_values!(result)[0].timestamp, 34);
     }
 
     #[test]
@@ -152,7 +149,7 @@ mod tests {
             .map(|i| rp_median(i as i32 + 1, (i + 100) as i64, i as f64))
             .collect();
         let result = compute(&points).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert_eq!(vals[0].timestamp, 133);
         assert_eq!(vals[1].timestamp, 134);
@@ -166,7 +163,7 @@ mod tests {
             .map(|i| rp_median(i as i32 + 1, (i + 1) as i64, i as f64))
             .collect();
         let result = compute(&points).unwrap();
-        assert_eq!(values(&result).len(), 7);
+        assert_eq!(indicator_values!(result).len(), 7);
     }
 
     // --- Level 2: real AO output on real EURUSD data (placeholder baseline) ---
@@ -187,7 +184,7 @@ mod tests {
             }
         };
         let result = compute(&points).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
 
         // 2400 points -> 2367 AO values (2400 - 33).
         assert_eq!(vals.len(), 2367);

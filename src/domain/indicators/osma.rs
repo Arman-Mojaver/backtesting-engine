@@ -77,6 +77,7 @@ mod tests {
     use super::*;
     use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::indicator_values;
 
     /// Build a resampled point with an explicit close (the only component the
     /// OsMA computation consumes).
@@ -92,10 +93,6 @@ mod tests {
             timestamp: ts,
             high_low_order: HighLowOrder::HighFirst,
         }
-    }
-
-    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
-        &buffer.items
     }
 
     // --- synthetic hand-computed tests ---
@@ -114,7 +111,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..8).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
         let result = compute(&points, 3, 5, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 6);
@@ -147,7 +144,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
             .collect();
         let result = compute(&points, 1, 3, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert_eq!(vals[0].value, 1.75);
         assert_eq!(vals[0].timestamp, 4);
@@ -178,7 +175,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
             .collect();
         let result = compute(&points, 1, 3, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert_eq!(vals[0].value, 1.75);
         assert_eq!(vals[0].timestamp, 4);
@@ -206,7 +203,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
             .collect();
         let result = compute(&points, 1, 3, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 4);
         assert_eq!(vals[0].value, 1.75);
         assert_eq!(vals[0].timestamp, 4);
@@ -253,7 +250,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..6).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
         let result = compute(&points, 3, 5, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 6);
@@ -305,7 +302,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..8).map(|i| rp(i + 1, (i + 100) as i64, 10.0)).collect();
         let result = compute(&points, 3, 5, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert_eq!(vals[0].timestamp, 105);
         assert_eq!(vals[1].timestamp, 106);
@@ -318,7 +315,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..10).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
         let result = compute(&points, 3, 5, 2).unwrap();
-        assert_eq!(values(&result).len(), 5);
+        assert_eq!(indicator_values!(result).len(), 5);
     }
 
     // --- Level 2: real OsMA output on real EURUSD data (placeholder baseline) ---
@@ -341,7 +338,7 @@ mod tests {
             }
         };
         let result = compute(&points, 12, 26, 9).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
 
         // 2400 points -> 2367 OsMA values (2400 - 26 - 9 + 2).
         assert_eq!(vals.len(), 2367);

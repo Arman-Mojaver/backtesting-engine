@@ -61,6 +61,7 @@ mod tests {
     use super::*;
     use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::indicator_values;
 
     /// Build a resampled point with an explicit volume (the only component the
     /// VROC computation consumes).
@@ -78,10 +79,6 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
-        &buffer.items
-    }
-
     // --- synthetic hand-computed tests ---
 
     #[test]
@@ -92,7 +89,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..5).map(|i| rp(i + 1, (i + 1) as i64, 100)).collect();
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 4);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 2);
@@ -116,7 +113,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, (i + 1) * 100))
             .collect();
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 4);
         assert_eq!(vals[0].value, 100.0);
         assert_eq!(vals[0].timestamp, 2);
@@ -141,7 +138,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, volumes[i as usize]))
             .collect();
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 4);
         assert_eq!(vals[0].value, -20.0);
         assert_eq!(vals[0].timestamp, 2);
@@ -166,7 +163,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, volumes[i as usize]))
             .collect();
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 4);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 2);
@@ -210,7 +207,7 @@ mod tests {
         // volume = [100, 200] -> VROC[0] = 100 * (200 - 100) / 100 = 100.0.
         let points: Vec<ResampledPointD1> = vec![rp(1, 1, 100), rp(2, 2, 200)];
         let result = compute(&points, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 100.0);
         assert_eq!(vals[0].timestamp, 2);
@@ -237,7 +234,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..5).map(|i| rp(i + 1, (i + 100) as i64, 100)).collect();
         let result = compute(&points, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
         assert_eq!(vals[0].timestamp, 102);
         assert_eq!(vals[1].timestamp, 103);
@@ -250,7 +247,7 @@ mod tests {
         let points: Vec<ResampledPointD1> =
             (0..10).map(|i| rp(i + 1, (i + 1) as i64, 100)).collect();
         let result = compute(&points, 3).unwrap();
-        assert_eq!(values(&result).len(), 8);
+        assert_eq!(indicator_values!(result).len(), 8);
     }
 
     // --- Level 2: real VROC output on real EURUSD data (placeholder baseline) ---
@@ -272,7 +269,7 @@ mod tests {
             }
         };
         let result = compute(&points, 25).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
 
         // 2400 points -> 2376 VROC values (2400 - 25 + 1).
         assert_eq!(vals.len(), 2376);

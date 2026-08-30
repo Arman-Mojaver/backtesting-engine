@@ -72,6 +72,7 @@ mod tests {
     use super::*;
     use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::indicator_values;
 
     /// Build a resampled point with explicit high and low (the two
     /// components the CHV computation consumes).
@@ -89,10 +90,6 @@ mod tests {
         }
     }
 
-    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
-        &buffer.items
-    }
-
     // --- synthetic hand-computed tests ---
 
     #[test]
@@ -105,7 +102,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 11.0, 9.0))
             .collect();
         let result = compute(&points, 2, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 5);
@@ -125,7 +122,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, (10 + i) as f64, 10.0))
             .collect();
         let result = compute(&points, 2, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].value, 400.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -143,7 +140,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 10.0))
             .collect();
         let result = compute(&points, 2, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 4);
@@ -189,7 +186,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 11.0, 9.0))
             .collect();
         let result = compute(&points, 2, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 5);
@@ -230,7 +227,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 100) as i64, (10 + i) as f64, 10.0))
             .collect();
         let result = compute(&points, 2, 2).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].timestamp, 103);
         assert_eq!(vals[1].timestamp, 104);
@@ -255,7 +252,7 @@ mod tests {
             }
         };
         let result = compute(&points, 10, 10).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
 
         // 2400 points -> 2381 CHV values (2400 - 10 - 10 + 1).
         assert_eq!(vals.len(), 2381);

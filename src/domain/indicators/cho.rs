@@ -92,6 +92,7 @@ mod tests {
     use super::*;
     use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::indicator_values;
 
     /// Build a resampled point with explicit high, low, close, and volume
     /// (the four components the AD computation consumes).
@@ -107,10 +108,6 @@ mod tests {
             timestamp: ts,
             high_low_order: HighLowOrder::HighFirst,
         }
-    }
-
-    fn values(buffer: &OscillatorSeries) -> &[IndicatorValue] {
-        &buffer.items
     }
 
     // --- synthetic hand-computed tests ---
@@ -131,7 +128,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 3.0, 1.0, 2.5, 100))
             .collect();
         let result = compute(&points, 2, 4).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 50.0);
         assert_eq!(vals[0].timestamp, 5);
@@ -149,7 +146,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 10.0, 10.0, 100))
             .collect();
         let result = compute(&points, 2, 4).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 5);
@@ -180,7 +177,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 1) as i64, 3.0, 1.0, 2.5, 100))
             .collect();
         let result = compute(&points, 2, 4).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 50.0);
         assert_eq!(vals[0].timestamp, 5);
@@ -221,7 +218,7 @@ mod tests {
             .map(|i| rp(i + 1, (i + 100) as i64, 3.0, 1.0, 2.5, 100))
             .collect();
         let result = compute(&points, 2, 3).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].timestamp, 103);
         assert_eq!(vals[1].timestamp, 104);
@@ -246,7 +243,7 @@ mod tests {
             }
         };
         let result = compute(&points, 3, 10).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
 
         // 2400 points -> 2390 CHO values (2400 - 10).
         assert_eq!(vals.len(), 2390);

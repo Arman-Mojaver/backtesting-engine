@@ -82,6 +82,7 @@ fn compute_rsi_point(window: &[PriceDiff]) -> IndicatorValue {
 mod tests {
     use super::*;
     use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::indicator_values;
 
     fn rp(id: i32, ts: i64, close: f64) -> ResampledPointD1 {
         ResampledPointD1 {
@@ -97,10 +98,6 @@ mod tests {
         }
     }
 
-    fn values(buffer: &ThresholdSeries) -> &[IndicatorValue] {
-        &buffer.items
-    }
-
     #[test]
     fn all_gains_yield_max_rsi() {
         // Prices strictly rising -> all diffs positive -> loss=0 -> rs=inf -> rsi=100.
@@ -112,7 +109,7 @@ mod tests {
             rp(5, 5, 5.0),
         ];
         let result = compute(&points, PriceField::Close, 3, 70.0, 30.0).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].timestamp, 4);
         assert_eq!(vals[0].value, 100.0);
@@ -131,7 +128,7 @@ mod tests {
             rp(5, 5, 1.0),
         ];
         let result = compute(&points, PriceField::Close, 3, 70.0, 30.0).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].timestamp, 4);
         assert_eq!(vals[0].value, 0.0);
@@ -152,7 +149,7 @@ mod tests {
             rp(5, 5, 1.0),
         ];
         let result = compute(&points, PriceField::Close, 3, 70.0, 30.0).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].timestamp, 4);
         assert_eq!(vals[0].value, 67.0);
@@ -170,7 +167,7 @@ mod tests {
             rp(4, 400, 4.0),
         ];
         let result = compute(&points, PriceField::Close, 2, 70.0, 30.0).unwrap();
-        let vals = values(&result);
+        let vals = indicator_values!(result);
         // n=2, diffs at ts 200,300,400 -> windows: [200,300]->ts300, [300,400]->ts400
         assert_eq!(vals.len(), 2);
         assert_eq!(vals[0].timestamp, 300);
@@ -204,8 +201,8 @@ mod tests {
         // 4 points -> 3 diffs -> n=3 yields exactly 1 window.
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0), rp(3, 3, 3.0), rp(4, 4, 4.0)];
         let result = compute(&points, PriceField::Close, 3, 70.0, 30.0).unwrap();
-        assert_eq!(values(&result).len(), 1);
-        assert_eq!(values(&result)[0].value, 100.0);
+        assert_eq!(indicator_values!(result).len(), 1);
+        assert_eq!(indicator_values!(result)[0].value, 100.0);
     }
 
     #[test]
@@ -235,7 +232,7 @@ mod tests {
         p4.open = 7.0;
         // Open diffs: +2,+2,+2 -> all gains -> rsi 100
         let result = compute(&[p1, p2, p3, p4], PriceField::Open, 2, 70.0, 30.0).unwrap();
-        assert_eq!(values(&result).len(), 2);
-        assert_eq!(values(&result)[0].value, 100.0);
+        assert_eq!(indicator_values!(result).len(), 2);
+        assert_eq!(indicator_values!(result)[0].value, 100.0);
     }
 }
