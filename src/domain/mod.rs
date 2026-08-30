@@ -6,6 +6,7 @@ pub mod indicator;
 pub mod indicators;
 pub mod max_draw_down;
 pub mod operation_point;
+pub mod repository_error;
 pub mod resampled_point;
 pub mod signal;
 pub mod signal_group;

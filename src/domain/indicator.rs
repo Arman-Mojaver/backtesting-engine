@@ -1,3 +1,5 @@
+use crate::domain::repository_error::RepositoryResult;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum IndicatorParameters {
     Macd {
@@ -58,6 +60,6 @@ pub struct Indicator {
 }
 
 pub trait IndicatorRepository {
-    fn get_all(&self) -> Vec<Indicator>;
-    fn get_by_type(&self, indicator_type: &str) -> Vec<Indicator>;
+    fn get_all(&self) -> RepositoryResult<Vec<Indicator>>;
+    fn get_by_type(&self, indicator_type: &str) -> RepositoryResult<Vec<Indicator>>;
 }

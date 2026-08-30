@@ -66,7 +66,14 @@ pub fn create_indicator_output(
     parameters: &IndicatorParameters,
     points: &[ResampledPointD1],
 ) -> Result<IndicatorOutput, IndicatorError> {
-    let instrument = points.first().map(|p| p.instrument.clone()).unwrap();
+    let instrument =
+        points
+            .first()
+            .map(|p| p.instrument.clone())
+            .ok_or(IndicatorError::NotEnoughData {
+                points: 0,
+                required: 1,
+            })?;
     match parameters {
         IndicatorParameters::Rsi {
             n,
@@ -994,5 +1001,18 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidVrocPeriod { n: 0 });
+    }
+
+    #[test]
+    fn empty_points_dispatch_returns_not_enough_data() {
+        let params = IndicatorParameters::AwesomeOscillator;
+        let err = create_indicator_output(&params, &[]).unwrap_err();
+        assert_eq!(
+            err,
+            IndicatorError::NotEnoughData {
+                points: 0,
+                required: 1
+            }
+        );
     }
 }

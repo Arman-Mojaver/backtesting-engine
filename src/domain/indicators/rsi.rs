@@ -73,6 +73,9 @@ fn compute_rsi_point(window: &[PriceDiff]) -> IndicatorValue {
     let raw_rsi = 100.0 - (100.0 / (1.0 + rs));
     let value = raw_rsi.round();
 
+    // Invariant: `windows(period)` with `period >= 1` yields only non-empty
+    // slices, so `last()` cannot return `None` (see the crate error-handling
+    // policy in src/lib.rs).
     let timestamp = window.last().expect("non-empty window").timestamp;
     IndicatorValue { timestamp, value }
 }

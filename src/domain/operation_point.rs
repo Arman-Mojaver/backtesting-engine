@@ -1,5 +1,7 @@
 use rustc_hash::FxHashMap;
 
+use crate::domain::repository_error::RepositoryResult;
+
 #[derive(Debug, Clone)]
 pub struct OperationPoint {
     pub instrument: String,
@@ -33,23 +35,15 @@ impl<'a> OperationPoints<'a> {
             .collect()
     }
 
-    /// Returns the (start_timestamp, end_timestamp) range for long operation points.
-    /// Both `long_operation_points` and `short_operation_points` share identical timestamps.
-    pub fn start_end_timestamps(&self) -> (i64, i64) {
-        let timestamps: Vec<i64> = self
-            .long_operation_points
-            .iter()
-            .map(|p| p.timestamp)
-            .collect();
-        let start = *timestamps
-            .iter()
-            .min()
-            .expect("long_operation_points should never be empty");
-        let end = *timestamps
-            .iter()
-            .max()
-            .expect("long_operation_points should never be empty");
-        (start, end)
+    /// Returns the (start_timestamp, end_timestamp) range over the long
+    /// operation points, or `None` when there are none.
+    ///
+    /// Both `long_operation_points` and `short_operation_points` share
+    /// identical timestamps, so the long side determines the range.
+    pub fn start_end_timestamps(&self) -> Option<(i64, i64)> {
+        let start = self.long_operation_points.iter().map(|p| p.timestamp).min();
+        let end = self.long_operation_points.iter().map(|p| p.timestamp).max();
+        Some((start?, end?))
     }
 }
 
@@ -65,22 +59,30 @@ fn group_by_cell(points: Vec<OperationPoint>) -> FxHashMap<(String, i32), Vec<Op
 }
 
 pub trait LongOperationPointRepository {
-    fn get_all(&self) -> Vec<OperationPoint>;
-    fn get_by_mms_id_and_instrument(&self, mms_id: i32, instrument: &str) -> Vec<OperationPoint>;
+    fn get_all(&self) -> RepositoryResult<Vec<OperationPoint>>;
+    fn get_by_mms_id_and_instrument(
+        &self,
+        mms_id: i32,
+        instrument: &str,
+    ) -> RepositoryResult<Vec<OperationPoint>>;
 
     /// All long operation points grouped by their `(instrument, mms_id)` cell.
-    fn index_by_cell(&self) -> FxHashMap<(String, i32), Vec<OperationPoint>> {
-        group_by_cell(self.get_all())
+    fn index_by_cell(&self) -> RepositoryResult<FxHashMap<(String, i32), Vec<OperationPoint>>> {
+        Ok(group_by_cell(self.get_all()?))
     }
 }
 
 pub trait ShortOperationPointRepository {
-    fn get_all(&self) -> Vec<OperationPoint>;
-    fn get_by_mms_id_and_instrument(&self, mms_id: i32, instrument: &str) -> Vec<OperationPoint>;
+    fn get_all(&self) -> RepositoryResult<Vec<OperationPoint>>;
+    fn get_by_mms_id_and_instrument(
+        &self,
+        mms_id: i32,
+        instrument: &str,
+    ) -> RepositoryResult<Vec<OperationPoint>>;
 
     /// All short operation points grouped by their `(instrument, mms_id)` cell.
-    fn index_by_cell(&self) -> FxHashMap<(String, i32), Vec<OperationPoint>> {
-        group_by_cell(self.get_all())
+    fn index_by_cell(&self) -> RepositoryResult<FxHashMap<(String, i32), Vec<OperationPoint>>> {
+        Ok(group_by_cell(self.get_all()?))
     }
 }
 
@@ -191,9 +193,20 @@ mod tests {
             long_operation_points: &long,
             short_operation_points: &short,
         };
-        let (start, end) = ops.start_end_timestamps();
+        let (start, end) = ops.start_end_timestamps().expect("non-empty long points");
         assert_eq!(start, 100);
         assert_eq!(end, 300);
+    }
+
+    #[test]
+    fn start_end_timestamps_empty_returns_none() {
+        let long: Vec<OperationPoint> = vec![];
+        let short: Vec<OperationPoint> = vec![];
+        let ops = OperationPoints {
+            long_operation_points: &long,
+            short_operation_points: &short,
+        };
+        assert_eq!(ops.start_end_timestamps(), None);
     }
 
     #[test]
@@ -204,7 +217,7 @@ mod tests {
             long_operation_points: &long,
             short_operation_points: &short,
         };
-        let (start, end) = ops.start_end_timestamps();
+        let (start, end) = ops.start_end_timestamps().expect("non-empty long points");
         assert_eq!(start, 42);
         assert_eq!(end, 42);
     }

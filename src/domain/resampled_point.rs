@@ -1,5 +1,7 @@
 use rustc_hash::FxHashMap;
 
+use crate::domain::repository_error::RepositoryResult;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum HighLowOrder {
     HighFirst,
@@ -30,12 +32,12 @@ fn group_by_instrument(points: Vec<ResampledPointD1>) -> FxHashMap<String, Vec<R
 }
 
 pub trait ResampledPointD1Repository {
-    fn get_all(&self) -> Vec<ResampledPointD1>;
-    fn get_by_instrument(&self, instrument: &str) -> Vec<ResampledPointD1>;
+    fn get_all(&self) -> RepositoryResult<Vec<ResampledPointD1>>;
+    fn get_by_instrument(&self, instrument: &str) -> RepositoryResult<Vec<ResampledPointD1>>;
 
     /// All points grouped by instrument.
-    fn index_by_instrument(&self) -> FxHashMap<String, Vec<ResampledPointD1>> {
-        group_by_instrument(self.get_all())
+    fn index_by_instrument(&self) -> RepositoryResult<FxHashMap<String, Vec<ResampledPointD1>>> {
+        Ok(group_by_instrument(self.get_all()?))
     }
 }
 

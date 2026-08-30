@@ -32,7 +32,11 @@ pub fn run_strategies(
         long_operation_points,
         short_operation_points,
     };
-    let (start_timestamp, end_timestamp) = operation_points.start_end_timestamps();
+    // `validate_all` above rejects empty inputs, so `None` is unreachable in
+    // practice; handled anyway so this function is total (no hidden panics).
+    let (start_timestamp, end_timestamp) = operation_points
+        .start_end_timestamps()
+        .ok_or_else(|| anyhow::anyhow!("no long operation points to derive the time range"))?;
 
     let unprocessed_set: HashSet<i32> = unprocessed_ids.iter().copied().collect();
     let indicators_for_compute: Vec<Indicator> = indicators

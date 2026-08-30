@@ -42,14 +42,14 @@ pub fn fetch_source_data(
     let resampled_adapter = PgResampledPointAdapter::new(&conn_string)
         .with_context(|| connection_diagnostics(&config))?;
 
-    let indicators = indicator_adapter.get_all();
-    let resampled_points = resampled_adapter.get_by_instrument(instrument);
+    let indicators = indicator_adapter.get_all()?;
+    let resampled_points = resampled_adapter.get_by_instrument(instrument)?;
 
     let long_operation_points: Vec<OperationPoint> =
-        long_adapter.get_by_mms_id_and_instrument(money_management_strategy_id, instrument);
+        long_adapter.get_by_mms_id_and_instrument(money_management_strategy_id, instrument)?;
 
     let short_operation_points: Vec<OperationPoint> =
-        short_adapter.get_by_mms_id_and_instrument(money_management_strategy_id, instrument);
+        short_adapter.get_by_mms_id_and_instrument(money_management_strategy_id, instrument)?;
 
     Ok(SourceData {
         money_management_strategy_id,
