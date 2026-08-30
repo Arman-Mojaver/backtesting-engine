@@ -2,6 +2,7 @@ use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::empty_oscillator;
 use crate::validate_period;
 
 /// Compute Bears Power from resampled daily points.
@@ -31,7 +32,7 @@ pub fn compute(
     // entries `1..ema_close.len()` — requiring at least two EMA entries
     // (i.e. `points.len() >= period + 1`).
     if ema_close.len() < 2 {
-        return Ok(OscillatorSeries { items: Vec::new() });
+        empty_oscillator!();
     }
 
     let items = (1..ema_close.len())

@@ -2,6 +2,7 @@ use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::empty_oscillator;
 use crate::validate_period;
 
 /// Compute the Chaikin Volatility from resampled daily points.
@@ -40,7 +41,7 @@ pub fn compute(
     // CHV[k] uses SHL[k + chv] (current) and SHL[k] (chv_period bars ago).
     // Need at least chv + 1 SHL entries for one CHV value.
     if shl.len() < chv + 1 {
-        return Ok(OscillatorSeries { items: Vec::new() });
+        empty_oscillator!();
     }
 
     let items = (0..(shl.len() - chv))

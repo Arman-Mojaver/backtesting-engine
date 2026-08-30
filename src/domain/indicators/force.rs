@@ -2,6 +2,7 @@ use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::empty_oscillator;
 use crate::validate_period;
 
 /// Compute the Force Index from resampled daily points.
@@ -36,7 +37,7 @@ pub fn compute(
     let ma = sma(&closes, p);
 
     if ma.len() < 2 {
-        return Ok(OscillatorSeries { items: Vec::new() });
+        empty_oscillator!();
     }
 
     let items = (1..ma.len())

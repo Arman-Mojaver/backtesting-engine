@@ -2,6 +2,7 @@ use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::empty_oscillator;
 use crate::validate_period;
 
 /// Compute the Accumulation/Distribution (AD) line inline.
@@ -61,7 +62,7 @@ pub fn compute(
     // consumes slow EMA entries `1..slow_ema.len()` — requiring at least
     // two slow EMA entries (i.e. `points.len() >= slow + 1`).
     if slow_ema.len() < 2 {
-        return Ok(OscillatorSeries { items: Vec::new() });
+        empty_oscillator!();
     }
 
     // Fast EMA entry `j` corresponds to original index `fast - 1 + j`.

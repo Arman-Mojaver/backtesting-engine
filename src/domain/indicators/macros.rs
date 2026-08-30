@@ -26,3 +26,18 @@ macro_rules! validate_period {
         )+
     };
 }
+
+/// Return an empty `OscillatorSeries` wrapped in `Ok`.
+///
+/// # Example
+/// ```ignore
+/// if ema_close.len() < 2 {
+///     return empty_oscillator!();
+/// }
+/// ```
+#[macro_export]
+macro_rules! empty_oscillator {
+    () => {
+        return Ok($crate::domain::signal::OscillatorSeries { items: Vec::new() })
+    };
+}
