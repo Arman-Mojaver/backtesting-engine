@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/notes | Priority: high | Version: 1.5 | Updated: 2026-08-19 -->
+<!-- Context: project-intelligence/notes | Priority: high | Version: 1.6 | Updated: 2026-08-31 -->
 
 # Living Notes
 
@@ -115,11 +115,11 @@
 ### What Works Well
 - **`build -> parse -> execute` pattern** -- Consistent across both binaries. Simple, predictable, easy to test.
 - **Pure validators as free functions** -- No object construction needed. Compose well in `combined_validation::validate_all()`.
-- **Pure metric functions** -- `max_draw_down()` and `annual_operation_count()` follow the same free-function-over-slices pattern as validators. Independently unit-tested, no I/O.
+- **Pure metric functions** -- `performance_metrics()` (single pass: global ROI + max draw down, owns the defensive chronological sort) and `annual_operation_count()` follow the free-function-over-slices pattern as validators. Independently unit-tested, no I/O.
 - **Separate engine binary** -- Clear line between Python-wrapping CLI (`ct`) and native Rust engine (`bt-engine`).
 - **Application layer** -- `fetch_strategy_data()` + `create_signals()` + `create_strategies()` keep `engine/` CLI handlers thin and reusable across binaries.
 - **Parquet partitioning by (instrument, mms_id)** -- Mirrors the single-instrument/single-MMS backtest constraint; enables partition pruning.
-- **Real metrics in generator** -- `create_strategies()` computes real `max_draw_down`/`global_roi`/`annual_roi`/`annual_operation_count` from operation points. Parallelized with rayon.
+- **Real metrics in generator** -- `create_strategies()` computes real metrics via `performance_metrics()` (global ROI + max draw down in one pass) → `annual_roi()` method, plus `annual_operation_count`, from operation points. Parallelized with rayon.
 
 ### What Could Be Better
 - **Test coverage** -- No integration tests for the engine module yet. Should have tests for `StrategyCommand::execute()`.
@@ -128,14 +128,14 @@
 ### Lessons Learned
 - **Keep context files in sync with code** -- After major refactors, update `.opencode/context/` immediately. Outdated context misleads AI agents.
 - **Delete dead code early** -- Removing the server scaffold saved ~1700 lines from Cargo.lock and eliminated misleading references to Actix-web dependencies.
-- **One file per metric** -- `max_draw_down.rs` and `annual_operation_count.rs` are each independently readable and testable. Avoids a monolithic `metrics.rs`.
+- **One file per metric, except coupled metrics** -- `annual_operation_count.rs` stands alone; `global_roi`/`max_draw_down`/`annual_roi` live together in `performance_metrics.rs` because they share one compounding curve (single pass). Still avoids a monolithic `metrics.rs`.
 
 ## Patterns & Conventions
 
 ### Code Patterns Worth Preserving
 - **`build -> parse -> execute`** -- Every binary follows this 3-step pattern. Lives in `cli/mod.rs` and `engine/mod.rs`. Consistent, predictable.
 - **Pure validation functions** -- `src/domain/validation/*.rs`. Each is a free function taking slices, returning `Result`. Composable.
-- **Pure metric functions** -- `src/domain/max_draw_down.rs`, `src/domain/annual_operation_count.rs`. Free functions over `&[OperationPoint]`. Composable, unit-tested in-file.
+- **Pure metric functions** -- `src/domain/performance_metrics.rs` (single-pass `PerformanceMetrics` + `annual_roi` method), `src/domain/annual_operation_count.rs`. Pure over `&[&OperationPoint]`. Composable, unit-tested in-file.
 - **`GlobalStrategyFilter::default()`** -- Encodes the baseline quality bar in code (DD≤30%, ROI≥10%, ops≥10). Override per-call, default for convenience.
 - **Fixture module** -- `domain::fixtures.rs` provides reusable test data across all test modules. Single source of truth.
 - **Application orchestration** -- `src/application/{name}.rs` — one file per use case. Keeps `engine/` thin.
@@ -157,6 +157,7 @@
 | Domain metric functions | `max_draw_down()` + `annual_operation_count()` as pure domain functions | Arman Mojaver | Complete (2026-06-24) |
 | Strategy filtering | `filter_strategies()` + `GlobalStrategyFilter` with baseline defaults | Arman Mojaver | Complete (2026-06-22) |
 | Wire real metrics into generator | Replace random placeholder metrics with computed `max_draw_down`/`global_roi`/`annual_roi`/`annual_operation_count` | Arman Mojaver | Complete (2026-06-28) |
+| Single-pass performance metrics | Combine `global_roi`/`max_draw_down`/`annual_roi` into `performance_metrics()` (owns defensive chronological sort) | Arman Mojaver | Complete (2026-08-31) |
 
 ## Archive (Resolved Items)
 

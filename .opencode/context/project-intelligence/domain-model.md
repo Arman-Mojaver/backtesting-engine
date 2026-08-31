@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.5 | Updated: 2026-08-19 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.6 | Updated: 2026-08-31 -->
 
 # Domain Model — Backtesting Engine
 
@@ -26,15 +26,15 @@
 | **Result** | The outcome of a trade: `1` = win, `-1` = loss. | `i32` field | `domain::operation_point` |
 | **Timestamp** | An integer epoch (seconds) identifying when a data point or trade occurred. Used to align operation points with resampled market data. | `i64` field | multiple |
 | **Strategy** | A backtested configuration: one indicator + a set of long/short operation point IDs + a money management strategy, annotated with performance metrics. | `Strategy` | `domain::strategy` |
-| **Annual ROI** | Annualized return on investment for a strategy. Computed by compounding the global ROI over the time span; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_roi` |
-| **Max Draw Down** | Largest peak-to-trough decline of the cumulative-return curve, as a percentage. Computed from operation points via compounding against a running cummax; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::max_draw_down` |
+| **Annual ROI** | Annualized return on investment for a strategy. Computed by compounding the global ROI over the time span; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` (method) |
+| **Max Draw Down** | Largest peak-to-trough decline of the cumulative-return curve, as a percentage. Computed from operation points via compounding against a running cummax; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` |
 | **Annual Operation Count** | Number of trades per year, annualized from a total count over the time span. Computed from signal-group operation counts; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_operation_count` |
 | **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 30%, min annual ROI ≥ 10%. (Annual operation count is enforced earlier, at the signal-group stage.) | `GlobalStrategyFilter` | `domain::strategy` |
 | **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` it belongs to. Lives in the domain layer. | `SignalGroup` | `domain::signal_group` |
 | **Parquet Strategy Repository** | Writes `Vec<Strategy>` to partitioned parquet files under `{base}/instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. | `ParquetStrategyRepository` | `infrastructure::strategy_adapter` |
 | **Strategy Generator** | Builds `Strategy` records from signal groups + operation points, computing real metrics (`annual_roi`, `max_draw_down`, `annual_operation_count`) for each. Parallelized with rayon. | `create_strategies`, `create_strategy` | `application::strategy_generator` |
 | **Strategy Data** | The fetched-from-PostgreSQL inputs for strategy generation: indicators, resampled points, long/short operation points for one (instrument, mms_id). | `StrategyData`, `StrategyQuery` | `application::strategy_data` |
-| **Global ROI** | Total return on investment across a sequence of operation points, as a percentage. Compounds each trade's contribution against a running cummax. | `f64` (free fn) | `domain::global_roi` |
+| **Global ROI** | Total return on investment across a sequence of operation points, as a percentage. Compounds each trade's contribution against a running cummax. Computed together with max draw down in one pass. | `f64` field on `PerformanceMetrics` | `domain::performance_metrics` |
 | **Signal Generator** | Produces `SignalGroup`s from indicators + resampled points by sampling random timestamps (excluding the first/last 200 candles). | `create_signals` | `application::signal_generator` |
 
 ---
@@ -136,14 +136,13 @@ SignalGroup {
 
 ## Domain Metric Functions (Pure)
 
-Pure functions in `domain/` — no I/O, no frameworks. Each is a free function over slices.
+Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` returns a `PerformanceMetrics` struct (both curve-derived metrics in one pass); the others are free functions over plain values.
 
 | Function | File | Signature | Behavior |
 |----------|------|-----------|----------|
 | `annual_operation_count` | `domain::annual_operation_count` | `(total_count: usize, start_ts: i64, end_ts: i64) -> f64` | `total_count / years`, where `years = (end-start)/86400/365.25` (rounded 2dp). Returns 0.0 for zero count or non-positive span. |
-| `max_draw_down` | `domain::max_draw_down` | `(ops: &[&OperationPoint]) -> f64` | Tracks `cumsum = 1 + Σ(cummax * result * risk/sl)`, maintains running `cummax`, computes deepest `(cummax - cumsum)/cummax` as a %, rounded to 2dp. Returns 0.0 for empty ops. |
-| `global_roi` | `domain::global_roi` | `(ops: &[&OperationPoint]) -> f64` | Total ROI as a %: `cumsum = 1 + Σ(cummax * result * risk/sl)`, returns `(cumsum - 1) * 100`, rounded to 2dp. Returns 0.0 for empty ops. |
-| `annual_roi` | `domain::annual_roi` | `(start_ts: i64, end_ts: i64, global_roi: f64) -> f64` | Annualizes the global ROI via compounding: `((1 + global_roi/100)^(1/years) - 1) * 100`, rounded to 2dp. Returns 0.0 for non-positive span. |
+| `performance_metrics` | `domain::performance_metrics` | `(ops: &[&OperationPoint]) -> PerformanceMetrics` | Sorts ops chronologically itself (stable; ties keep input order), then ONE pass: `cumsum = 1 + Σ(cummax * result * risk/sl)` with running `cummax`. Returns `{ global_roi: (cumsum - 1) * 100, max_draw_down: deepest (cummax - cumsum)/cummax }`, each rounded to 2dp independently. Both 0.0 for empty ops. |
+| `PerformanceMetrics::annual_roi` | `domain::performance_metrics` | `(&self, start_ts: i64, end_ts: i64) -> f64` | Annualizes `self.global_roi` via compounding: `((1 + roi/100)^(1/years) - 1) * 100`, rounded to 2dp. Returns 0.0 for non-positive span. |
 | `filter_signal_groups_by_annual_ops` | `domain::signal_group` | `(groups: Vec<SignalGroup>, min_ops: f64, start_ts: i64, end_ts: i64) -> Vec<SignalGroup>` | Keeps groups with `operation_count() > 0` and `annual_operation_count(count, start, end) >= min_ops`. |
 | `filter_strategies` | `domain::strategy` | `(strategies: Vec<Strategy>, filter: &GlobalStrategyFilter) -> Vec<Strategy>` | Keeps strategies with `max_draw_down ≤ max` and `annual_roi ≥ min`. (Annual operation count is filtered earlier at the signal-group stage.) |
 
@@ -173,7 +172,7 @@ Infrastructure provides `InMemory*Repo` (testing) and `Pg*Adapter` (PostgreSQL) 
 | `StrategyQuery` / `StrategyData` | `application::strategy_data` | `fetch_strategy_data(query)` connects to PG via `DbConfig::from_env`, fetches indicators/resampled/long/short for one (instrument, mms_id). Rich connection diagnostics on failure. |
 | `create_signals` | `application::signal_generator` | Generates `SignalGroup`s from indicators + resampled points by sampling random timestamps (skips first/last 200 candles). Intercalates long/short, no repeated timestamps. |
 | `create_strategies` | `application::strategy_generator` | Builds one `Strategy` per signal group, gathering referenced operation points and computing real metrics. Parallelized with **rayon** `par_iter()`. |
-| `create_strategy` | `application::strategy_generator` | Single-strategy builder: resolves long/short op refs by timestamp, sorts by timestamp, computes `max_draw_down`, `global_roi` → `annual_roi`, and `annual_operation_count`. |
+| `create_strategy` | `application::strategy_generator` | Single-strategy builder: resolves long/short op refs by timestamp, computes `performance_metrics` (sorts chronologically itself) → `annual_roi` method, and `annual_operation_count`. |
 
 ---
 
@@ -238,9 +237,7 @@ src/
 │   ├── signal_group.rs         # SignalGroup + filter_signal_groups_by_annual_ops()
 │   ├── strategy.rs             # Strategy + GlobalStrategyFilter + filter_strategies()
 │   ├── annual_operation_count.rs  # annual_operation_count() metric
-│   ├── annual_roi.rs           # annual_roi() metric
-│   ├── global_roi.rs           # global_roi() metric
-│   ├── max_draw_down.rs        # max_draw_down() metric
+│   ├── performance_metrics.rs  # performance_metrics() -> PerformanceMetrics (global ROI + max draw down, single pass) + annual_roi() method
 │   ├── validation/             # Domain invariant checks (5 rules + combined)
 │   └── fixtures.rs             # Test data builders
 ├── infrastructure/             # Adapters (PG, memory, parquet)
@@ -266,11 +263,11 @@ src/
 5. **Ports-and-adapters**: Repository traits live in the domain; implementations live in infrastructure. The domain has zero dependencies on infrastructure.
 6. **Dual binary layout**: `ct` (`src/main.rs`) wraps the Python CLI; `bt-engine` (`src/bin/bt-engine.rs`) is the native Rust engine. Both follow `build -> parse -> execute` and return `anyhow::Result<()>`.
 7. **Application layer introduced**: `src/application/` orchestrates domain + infrastructure (e.g. fetch-then-generate strategies). Keeps `engine/` CLI handlers thin.
-8. **Metrics as pure domain functions**: `annual_operation_count`, `max_draw_down`, `global_roi`, and `annual_roi` are free functions in `domain/`. `max_draw_down` and `global_roi` take `&[&OperationPoint]`; `annual_operation_count` takes a count + timestamp span; `annual_roi` takes a span + global ROI. No I/O, no structs — composable and unit-tested in isolation.
+8. **Metrics as pure domain functions**: `annual_operation_count` is a free function (count + timestamp span). `performance_metrics()` takes `&[&OperationPoint]` and returns a `PerformanceMetrics` struct (`global_roi` + `max_draw_down`) computed in a single pass over the shared compounding curve, sorting its input chronologically itself (stable; ties keep input order). `annual_roi` is a method on `PerformanceMetrics` (span arguments, reads `self.global_roi`). No I/O — composable and unit-tested in isolation.
 9. **Two-stage filtering**: `filter_signal_groups_by_annual_ops()` prunes signal groups by annual operation count first (cheap), then `filter_strategies(strategies, &GlobalStrategyFilter)` prunes by max draw down + annual ROI (expensive, runs on fewer candidates). `GlobalStrategyFilter::default()` encodes the baseline quality bar.
 10. **Parquet partitioning by (instrument, mms_id)**: Strategies are written as partitioned parquet files — `instrument=.../money_management_strategy_id=.../strategies.parquet`. Matches the single-instrument, single-MMS backtest constraint and enables efficient per-partition reads.
 11. **Typed indicator parameters**: `IndicatorParameters` is an enum (`Macd`/`Rsi`) — the PG adapter hand-parses the JSON `parameters` column into the correct variant by `type`. No `serde` on the hot path.
-12. **Real metrics in the generator**: `create_strategies()` computes `max_draw_down`, `global_roi` → `annual_roi`, and `annual_operation_count` from each strategy's referenced operation points — no more random placeholder metrics. Parallelized with **rayon** `par_iter()`.
+12. **Real metrics in the generator**: `create_strategies()` computes `performance_metrics()` (global ROI + max draw down in one pass; the function sorts chronologically itself) → `annual_roi()` method, plus `annual_operation_count`, from each strategy's referenced operation points — no more random placeholder metrics. Parallelized with **rayon** `par_iter()`.
 13. **`SignalGroup` lives in the domain**: `SignalGroup` was moved from infrastructure to `domain::signal_group` and now embeds `indicator_id`. The cache stores `Vec<SignalGroup>` (not a HashMap keyed by indicator ID) — the ID travels with each group.
 14. **Timestamps are `i64`**: All timestamps (`OperationPoint`, `ResampledPointD1`, signal timestamps) are `i64` epoch seconds, not `i32`. The PG adapter casts `i32` DB columns to `i64` on read.
 15. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. IDs are assigned at parquet write time by `ParquetStrategyRepository` (global max across all partitions + 1). Keeps the domain free of persistence concerns.
@@ -288,4 +285,4 @@ src/
 - **When discussing cache**: Use "signal-group memoization". The `cached` crate memoizes per `(indicator_id, instrument)` in-process.
 - **When discussing strategies**: Use "strategy" (a configured indicator + op-point sets + MMS + metrics). Reference "annual ROI", "max draw down", "annual operation count" by name.
 - **When adding new entities**: Follow the pattern — struct + repository trait in domain, in-memory impl in infrastructure, fixtures in `domain::fixtures`.
-- **When adding new metrics**: Follow `annual_operation_count`/`max_draw_down`/`global_roi`/`annual_roi` — free function in `domain/`, unit-tested in the same file. `max_draw_down` and `global_roi` take `&[&OperationPoint]`; `annual_operation_count` takes a count + timestamp span; `annual_roi` takes a span + global ROI.
+- **When adding new metrics**: Follow `annual_operation_count` (free function) or `performance_metrics` (struct-returning single-pass fn + method) — pure function in `domain/`, unit-tested in the same file. Curve-coupled metrics belong together in one pass (see `performance_metrics.rs`); standalone metrics get their own file.

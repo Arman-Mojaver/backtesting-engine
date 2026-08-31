@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.5 | Updated: 2026-08-19 -->
+<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.6 | Updated: 2026-08-31 -->
 
 # Business ↔ Tech Bridge
 
@@ -21,8 +21,8 @@
 | Money management strategy | `money_management_strategy_id` field | `src/domain/operation_point.rs`, `src/domain/strategy.rs` | Integer ID, no dedicated struct yet |
 | A backtested strategy | `Strategy` struct | `src/domain/strategy.rs` | indicator + op-point ID sets + MMS + metrics |
 | Strategy quality bar | `GlobalStrategyFilter` + `filter_strategies()` | `src/domain/strategy.rs` | Default: DD≤30%, ROI≥10% (op count filtered earlier) |
-| Annual return on investment | `annual_roi` field on `Strategy` | `src/domain/strategy.rs` | Computed by `annual_roi()` from global ROI + time span |
-| "How deep did it draw down?" | `max_draw_down()` | `src/domain/max_draw_down.rs` | Pure fn over `&[&OperationPoint]`, returns % |
+| Annual return on investment | `annual_roi` field on `Strategy` | `src/domain/strategy.rs` | Computed by `PerformanceMetrics::annual_roi()` from global ROI + time span |
+| "How deep did it draw down?" / "What is the total return?" | `performance_metrics()` → `.max_draw_down` / `.global_roi` | `src/domain/performance_metrics.rs` | Single-pass fn over `&[&OperationPoint]` (sorts chronologically itself), returns % |
 | "How many trades per year?" | `annual_operation_count()` | `src/domain/annual_operation_count.rs` | Pure fn over `(count: usize, start_ts: i64, end_ts: i64)` |
 | "Is the data valid?" | `validate_all()` | `src/domain/validation/combined_validation.rs` | Runs 5 checks, fails fast |
 | "Data must not be empty" | `validate_empty_entities()` | `src/domain/validation/empty_validation.rs` | Checks all 4 datasets |
@@ -67,9 +67,9 @@ Business Question                              Code Path
 "What instrument are we on?"              →   resampled_points[0].instrument (reference instrument)
 "What MMS are we testing?"                →   expected_mms_id parameter to validate_all()
 "What is the time span of the data?"      →   operation_points.start_end_timestamps() → (start_ts, end_ts)
-"How deep was the worst draw down?"       →   max_draw_down(&[&operation_points])
-"What is the total return?"               →   global_roi(&[&operation_points])
-"What is the annualized return?"          →   annual_roi(start_ts, end_ts, global_roi)
+"How deep was the worst draw down?"       →   performance_metrics(&[&operation_points]).max_draw_down
+"What is the total return?"               →   performance_metrics(&[&operation_points]).global_roi
+"What is the annualized return?"          →   performance_metrics(&[&operation_points]).annual_roi(start_ts, end_ts)
 "How many trades per year?"               →   annual_operation_count(count, start_ts, end_ts)
 "Generate signal groups?"                 →   create_signals(indicators, resampled_points, count)
 "Which signal groups have enough ops?"    →   filter_signal_groups_by_annual_ops(groups, min_ops, start_ts, end_ts)
@@ -83,7 +83,7 @@ Business Question                              Code Path
 |--------------------|---------------|-------------------|
 | New entity | `src/domain/{entity}.rs` + trait | See `indicator.rs` |
 | New validation rule | `src/domain/validation/{rule}.rs` | See `same_instrument_validation.rs` |
-| New domain metric | `src/domain/{metric}.rs` as a free fn | See `max_draw_down.rs` (`&[&OperationPoint]`), `annual_operation_count.rs` (count + span), `annual_roi.rs` (span + global ROI) |
+| New domain metric | `src/domain/{metric}.rs` as a pure fn | See `performance_metrics.rs` (`&[&OperationPoint]` → struct, single pass + defensive sort), `annual_operation_count.rs` (count + span) |
 | New data source adapter | `src/infrastructure/{adapter}.rs` | See `in_memory_repos.rs` or `strategy_adapter.rs` |
 | New application orchestration | `src/application/{name}.rs` | See `strategy_data.rs` / `strategy_generator.rs` |
 | New CLI command group (ct binary) | `src/cli/{name}.rs` | See `src/cli/dev.rs` — 4 sections: builder, types, parse, execute |

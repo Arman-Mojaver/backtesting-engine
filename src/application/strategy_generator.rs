@@ -3,10 +3,8 @@ use rustc_hash::FxHashMap;
 use rayon::prelude::*;
 
 use crate::domain::annual_operation_count::annual_operation_count;
-use crate::domain::annual_roi::annual_roi;
-use crate::domain::global_roi::global_roi;
-use crate::domain::max_draw_down::max_draw_down;
 use crate::domain::operation_point::{OperationPoint, OperationPoints};
+use crate::domain::performance_metrics::performance_metrics;
 use crate::domain::signal_group::SignalGroup;
 use crate::domain::strategy::Strategy;
 
@@ -62,18 +60,15 @@ pub fn create_strategy(
     let annual_operation_count =
         annual_operation_count(total_count, start_timestamp, end_timestamp);
 
-    let mut all_ops: Vec<&OperationPoint> = long_ops.into_iter().chain(short_ops).collect();
-    all_ops.sort_by_key(|op| op.timestamp);
-    let max_draw_down = max_draw_down(&all_ops);
-
-    let global_roi = global_roi(&all_ops);
-    let annual_roi = annual_roi(start_timestamp, end_timestamp, global_roi);
+    let all_ops: Vec<&OperationPoint> = long_ops.into_iter().chain(short_ops).collect();
+    let metrics = performance_metrics(&all_ops);
+    let annual_roi = metrics.annual_roi(start_timestamp, end_timestamp);
 
     Strategy {
         instrument: signal_group.instrument.clone(),
         indicator_id: signal_group.indicator_id,
         annual_roi,
-        max_draw_down,
+        max_draw_down: metrics.max_draw_down,
         annual_operation_count,
         long_operation_point_ids,
         short_operation_point_ids,

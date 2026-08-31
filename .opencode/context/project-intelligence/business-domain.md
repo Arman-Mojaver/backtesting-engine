@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/business | Priority: high | Version: 1.4 | Updated: 2026-08-19 -->
+<!-- Context: project-intelligence/business | Priority: high | Version: 1.5 | Updated: 2026-08-31 -->
 
 # Business Domain
 
@@ -48,7 +48,7 @@ The engine is in **active development**:
 - ✅ `Strategy` entity + `GlobalStrategyFilter` + `filter_strategies()`
 - ✅ Strategy generation (`create` from DB, `generate` synthetic) with partitioned parquet persistence
 - ✅ Application layer (`fetch_strategy_data`, `create_signals`, `create_strategies`)
-- ✅ Performance metric functions: `max_draw_down()`, `global_roi()`, `annual_roi()`, `annual_operation_count()` (pure domain functions)
+- ✅ Performance metric functions: `performance_metrics()` (single-pass global ROI + max draw down, `annual_roi()` method, defensive chronological sort), `annual_operation_count()` (pure domain functions)
 - ✅ Real metrics computed in the strategy generator (`create_strategies()` — no more random placeholders)
 - ✅ Signal generator (`create_signals()` — random timestamp sampling from resampled points)
 - ✅ Two-stage filtering: signal groups by annual op count, then strategies by DD + ROI

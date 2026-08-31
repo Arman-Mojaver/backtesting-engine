@@ -1,11 +1,9 @@
 pub mod annual_operation_count;
-pub mod annual_roi;
 pub mod fixtures;
-pub mod global_roi;
 pub mod indicator;
 pub mod indicators;
-pub mod max_draw_down;
 pub mod operation_point;
+pub mod performance_metrics;
 pub mod resampled_point;
 pub mod signal;
 pub mod signal_group;

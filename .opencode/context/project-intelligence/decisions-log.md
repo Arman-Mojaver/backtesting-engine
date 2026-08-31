@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.5 | Updated: 2026-08-19 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.6 | Updated: 2026-08-31 -->
 
 # Decisions Log
 
@@ -518,11 +518,52 @@ The `ParquetStrategyRepository` needed to support multiple writes to the same pa
 
 ---
 
+## Decision: Combine Metric Functions into Single-Pass `performance_metrics()`
+
+**Date**: 2026-08-31
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+`global_roi()` and `max_draw_down()` looped over the same `&[&OperationPoint]` data with an identical compounding loop (`cumsum = 1 + Σ cummax * result * risk/sl`) — `create_strategy()` paid for two full passes per strategy. The chronological sort that makes the metrics correct lived in the **caller**, so any future caller passing unsorted data would silently get wrong numbers (both metrics are order-dependent). `annual_roi()` was a free function taking a bare `global_roi: f64`, detached from the metrics it derives from.
+
+### Decision
+Replace the three metric files (`global_roi.rs`, `max_draw_down.rs`, `annual_roi.rs`) with a single `src/domain/performance_metrics.rs`:
+1. `performance_metrics(ops: &[&OperationPoint]) -> PerformanceMetrics` computes both metrics in **one pass** over the shared compounding curve. Each metric is rounded to 2dp independently — outputs are byte-identical to the old functions (`annual_roi` consumes the ROUNDED `global_roi`).
+2. The function **owns the defensive chronological sort** (stable `sort_by_key(timestamp)`; ties keep input order). Callers do not need to pass sorted data. `create_strategy()` no longer sorts.
+3. `annual_roi` became a **method** on `PerformanceMetrics`: `metrics.annual_roi(start_ts, end_ts)` — `global_roi` is already an attribute.
+4. Tests: 35 total — 34 mapped 1:1 from the old suites (same names, nested under `tests::{global_roi, max_draw_down, annual_roi}`) plus 2 new sorting tests (`unsorted_input_computed_in_chronological_order`, `equal_timestamps_preserve_input_order`).
+
+### Rationale
+- One pass instead of two over the same data. The loop is serial (loop-carried `cumsum`/`cummax`), so single-pass is the only real win available; rayon already parallelizes across strategies
+- Defensive sort closes the silent-wrong-metrics hole: order-dependent metrics must not trust caller ordering
+- Struct return is self-documenting and extensible; the method keeps `annual_roi` next to the value it consumes
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep two separate functions | No test churn | Double loop over the same data | The reason for this change |
+| Thin wrappers delegating to the combined fn | Backwards compatible | Dead code — only one caller existed | Minimal API surface preferred |
+| Merge pre-sorted long/short streams in O(n) instead of sorting | Faster (O(n) vs O(n log n)) | Requires callers to guarantee sorted input — exactly the trust this decision removes; op counts are hundreds, so sort cost is negligible | Rejected by owner: defensive design over micro-optimization |
+| Sort stays in the caller | Function stays "pure over given order" | Silent wrong metrics on unsorted input | The hole this decision closes |
+
+### Impact
+**Positive**: Halves metric iteration cost; ordering invariant enforced at the point of use; `annual_roi` colocated with its input; one test file with 1:1 mapping to the old suites
+**Negative**: Breaks the "one file per metric" convention for these three (deliberate — they share one compounding curve); `to_vec()` copy per call for the defensive sort (trivial at hundreds of ops)
+**Risk**: None — all 34 old test expectations preserved verbatim and passing
+
+### Related
+- Implementation: `src/domain/performance_metrics.rs`, `src/application/strategy_generator.rs`
+- Supersedes: the metric-file layout from "Domain metric functions" (2026-06-24) and "Compute Real Metrics in the Strategy Generator" (2026-06-28)
+
+---
+
 ## Deprecated Decisions
 
 | Decision | Date | Replaced By | Why |
 |----------|------|-------------|-----|
 | Redis-Backed Signal Groups Cache | 2026-06-08 | Remove Redis (2026-08-19) | Superseded by in-memory `cached` memoization |
+| Separate `global_roi`/`max_draw_down`/`annual_roi` metric files | 2026-06-24/28 | Single-pass `performance_metrics()` (2026-08-31) | All three derive from one compounding curve; combined into one pass with a defensive sort owned by the function |
 
 ## Onboarding Checklist
 

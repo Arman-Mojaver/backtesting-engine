@@ -1,7 +1,7 @@
 use std::cell::RefCell;
-use std::time::{Instant};
+use std::time::Instant;
 
-use log::{debug};
+use log::debug;
 use postgres::types::ToSql;
 use postgres::{Client, NoTls, Row};
 
