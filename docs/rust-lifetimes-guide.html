@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Understanding Lifetimes in Rust — A Comprehensive Guide</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/rust.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1f1f1f;
+    --muted: #5c6773;
+    --accent: #ce422b;
+    --link: #2962ff;
+    --code-bg: #f5f5f5;
+    --code-border: #e0e0e0;
+    --code-fg: #1f1f1f;
+    --note-bg: #e8f4fd;
+    --note-border: #2196f3;
+    --warn-bg: #fff4e5;
+    --warn-border: #ff9800;
+    --tip-bg: #e8f8e8;
+    --tip-border: #4caf50;
+    --sidebar-bg: #f8f9fa;
+    --sidebar-active: #ce422b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1e;
+      --fg: #d4d4d4;
+      --muted: #9e9e9e;
+      --code-bg: #2d2d2d;
+      --code-border: #3c3c3c;
+      --code-fg: #d4d4d4;
+      --note-bg: #1a2a3a;
+      --note-border: #2196f3;
+      --warn-bg: #3a2a1a;
+      --warn-border: #ff9800;
+      --tip-bg: #1a3a1a;
+      --tip-border: #4caf50;
+      --sidebar-bg: #252525;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.7;
+    font-size: 16px;
+  }
+  .layout { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 280px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--code-border);
+    padding: 24px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .sidebar h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-top: 0; }
+  .sidebar ul { list-style: none; padding: 0; margin: 0; }
+  .sidebar li { margin: 2px 0; }
+  .sidebar a {
+    display: block;
+    padding: 6px 12px;
+    color: var(--fg);
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background 0.15s;
+  }
+  .sidebar a:hover { background: var(--code-bg); }
+  .sidebar a.active { color: var(--sidebar-active); font-weight: 600; }
+  .sidebar .sub a { padding-left: 28px; font-size: 13px; color: var(--muted); }
+
+  /* Main content */
+  .content {
+    flex: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+  h1 { font-size: 2.2em; border-bottom: 2px solid var(--accent); padding-bottom: 8px; }
+  h2 {
+    font-size: 1.6em;
+    margin-top: 48px;
+    border-bottom: 1px solid var(--code-border);
+    padding-bottom: 6px;
+    scroll-margin-top: 20px;
+  }
+  h3 { font-size: 1.25em; margin-top: 32px; scroll-margin-top: 20px; }
+  h4 { font-size: 1.1em; margin-top: 24px; scroll-margin-top: 20px; }
+  p { margin: 14px 0; }
+  a { color: var(--link); }
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; }
+  strong { color: var(--accent); }
+  code.inline {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    font-size: 0.9em;
+    border: 1px solid var(--code-border);
+  }
+
+  /* Code blocks — Rust book style */
+  .code-wrapper {
+    position: relative;
+    margin: 20px 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--code-border);
+  }
+  .code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ce422b;
+    color: #fff;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  }
+  .code-header .filename { font-weight: 600; }
+  .copy-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.4);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.35); }
+  .copy-btn.copied { background: #4caf50; border-color: #4caf50; }
+  pre {
+    margin: 0;
+    padding: 16px;
+    background: var(--code-bg);
+    overflow-x: auto;
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; border: none; }
+
+  /* Error output blocks */
+  .code-header.error { background: #b71c1c; }
+  .code-header.note { background: #1565c0; }
+  .code-header.tip { background: #2e7d32; }
+
+  /* Callout boxes */
+  .callout {
+    margin: 20px 0;
+    padding: 14px 18px;
+    border-left: 4px solid;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout.note { background: var(--note-bg); border-color: var(--note-border); }
+  .callout.warn { background: var(--warn-bg); border-color: var(--warn-border); }
+  .callout.tip  { background: var(--tip-bg);  border-color: var(--tip-border); }
+  .callout .label { font-weight: 700; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; display: block; margin-bottom: 4px; }
+  .callout.note .label { color: var(--note-border); }
+  .callout.warn .label { color: var(--warn-border); }
+  .callout.tip  .label { color: var(--tip-border); }
+
+  /* Tables */
+  table { border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--code-border); padding: 8px 12px; text-align: left; }
+  th { background: var(--code-bg); font-weight: 600; }
+  tr:nth-child(even) { background: var(--code-bg); }
+
+  /* ASCII diagrams */
+  .diagram {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    padding: 16px;
+    margin: 20px 0;
+    font-family: "SF Mono", "Fira Code", Consolas, monospace;
+    font-size: 13px;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.4;
+  }
+
+  .progress-bar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    background: var(--accent);
+    width: 0%;
+    z-index: 1000;
+    transition: width 0.1s;
+  }
+
+  .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--code-border); color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="progress-bar" id="progressBar"></div>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <h2>Contents</h2>
+  <ul>
+    <li><a href="#intro">1. Introduction &amp; The "Why"</a></li>
+    <li class="sub"><a href="#why-dangling">Why We Need Lifetimes</a></li>
+    <li class="sub"><a href="#borrow-checker">The Borrow Checker</a></li>
+    <li><a href="#elision">2. Lifetimes You Already Have</a></li>
+    <li class="sub"><a href="#elision-rule-1">Rule 1: Each Input Its Own</a></li>
+    <li class="sub"><a href="#elision-rule-2">Rule 2: Single Input → Output</a></li>
+    <li class="sub"><a href="#elision-rule-3">Rule 3: &amp;self → Output</a></li>
+    <li class="sub"><a href="#elision-illegal">When Elision Fails</a></li>
+    <li><a href="#explicit">3. Explicit Lifetime Annotations</a></li>
+    <li class="sub"><a href="#explicit-syntax">The Syntax</a></li>
+    <li class="sub"><a href="#explicit-functions">Functions</a></li>
+    <li class="sub"><a href="#explicit-structs">Structs Holding References</a></li>
+    <li class="sub"><a href="#explicit-multiple">Multiple Lifetimes</a></li>
+    <li><a href="#sets-theory">4. Lifetimes as a Theory of Sets</a></li>
+    <li class="sub"><a href="#regions">Lifetimes as Regions</a></li>
+    <li class="sub"><a href="#subtyping">Subtyping: 'long &lt;: 'short</a></li>
+    <li class="sub"><a href="#coercion">Lifetime Coercion</a></li>
+    <li class="sub"><a href="#sets-intuition">The Set Intuition</a></li>
+    <li><a href="#static">5. The 'static Lifetime</a></li>
+    <li><a href="#variance">6. Variance &amp; Subtyping</a></li>
+    <li class="sub"><a href="#variance-defs">The Three Kinds</a></li>
+    <li class="sub"><a href="#variance-table">The Variance Table</a></li>
+    <li class="sub"><a href="#variance-why">Why &amp;mut Is Invariant</a></li>
+    <li><a href="#bounds-hrtb">7. Lifetime Bounds &amp; HRTB</a></li>
+    <li class="sub"><a href="#outlives">'a: 'b Outlives Bounds</a></li>
+    <li class="sub"><a href="#implied">Implied Bounds (T: 'a)</a></li>
+    <li class="sub"><a href="#hrtb">Higher-Ranked Trait Bounds</a></li>
+    <li><a href="#patterns">8. Common Patterns</a></li>
+    <li class="sub"><a href="#iterators">Iterators &amp; PhantomData</a></li>
+    <li class="sub"><a href="#self-ref">Self-Referential &amp; Pin</a></li>
+    <li class="sub"><a href="#builder">Builder / Type-State</a></li>
+    <li><a href="#deep-dives">9. Interactive Deep-Dive Scripts</a></li>
+  </ul>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="content">
+
+<h1>Understanding Lifetimes in Rust</h1>
+<p style="font-size: 1.1em; color: var(--muted);">A comprehensive, step-by-step guide — from easy to hard — with runnable examples.</p>
+
+<!-- ================================================================ -->
+<!-- SECTION 1: INTRODUCTION -->
+<!-- ================================================================ -->
+<h2 id="intro">1. Introduction &amp; The "Why"</h2>
+
+<p>
+Lifetimes are Rust's answer to one of the hardest problems in systems programming:
+<strong>how do you guarantee that a reference never points to freed memory?</strong>
+In languages like C and C++, this is left to the programmer. Get it wrong and you get
+a <em>use-after-free</em> — undefined behavior, silent corruption, or security holes.
+In Rust, the compiler checks this for you <em>at compile time</em>, with zero runtime cost.
+The mechanism that makes this possible is called <strong>lifetimes</strong>.
+</p>
+
+<p>
+A lifetime is not a thing that exists at runtime. It is a <strong>compile-time label</strong>
+that the borrow checker uses to reason about how long a reference is valid. You can think of
+a lifetime as answering the question: <em>"For what region of the program is this reference
+guaranteed to point to live, valid memory?"</em>
+</p>
+
+<h3 id="why-dangling">1.1 Why We Need Lifetimes: The Dangling Reference</h3>
+
+<p>
+Let's start with the problem lifetimes solve. Consider this code that tries to create a
+dangling reference — a reference to memory that has already been freed:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">src/main.rs — This does NOT compile</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">fn main() {
+    let r;                // ---------+-- 'a  (r is declared here)
+
+    {
+        let x = 5;        // -+-- 'b  |     (x is declared here)
+        r = &amp;x;           //  |       |     (r borrows x)
+    }                     // -+       |     (x goes out of scope — freed!)
+
+    println!("r: {r}");   //          |     (r is used here — but x is gone!)
+}                         // ---------+</code></pre>
+</div>
+
+<p>Here's what happens when you compile this:</p>
+
+<div class="code-wrapper">
+  <div class="code-header error"><span class="filename">Compiler error</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-text">error[E0597]: `x` does not live long enough
+ --> src/main.rs:5:13
+  |
+5 |         let x = 5;
+  |             - binding `x` declared here
+6 |         r = &amp;x;
+  |             ^^
+  |             |
+  |             borrowed value does not live long enough
+7 |     }
+  |     - `x` dropped here while still borrowed
+8 |
+9 |     println!("r: {r}");
+  |                  ---
+  |                  borrow later used here
+
+For more information about this error, try `rustc --explain E0597`.</code></pre>
+</div>
+
+<p>
+The compiler is telling us: <code class="inline">x</code> (lifetime <code class="inline">'b</code>)
+is dropped at line 7, but the borrow of <code class="inline">x</code> (stored in <code class="inline">r</code>,
+which has lifetime <code class="inline">'a</code>) is still used at line 9.
+The borrow checker compares these two lifetimes and finds that <code class="inline">'b</code> is
+<em>shorter</em> than <code class="inline">'a</code> — the reference outlives the data.
+This is rejected.
+</p>
+
+<div class="callout note">
+  <span class="label">Key Insight</span>
+  The borrow checker doesn't run your code. It compares <strong>scopes</strong> (regions of code)
+  statically. If a reference's scope is larger than the data's scope, it's a dangling reference
+  and the code is rejected — before the program ever runs.
+</div>
+
+<h3 id="borrow-checker">1.2 The Borrow Checker</h3>
+
+<p>
+The <strong>borrow checker</strong> is the part of the Rust compiler that verifies all borrows are valid.
+Its job is simple to state but profound in effect:
+</p>
+
+<ul>
+  <li>Every reference has a <strong>lifetime</strong> — a region where it's valid.</li>
+  <li>Every piece of data has a <strong>lifetime</strong> — a region where it exists.</li>
+  <li>A reference's lifetime must not exceed the data's lifetime. (The reference must not outlive what it points to.)</li>
+</ul>
+
+<p>
+When the borrow checker sees a function that takes references and returns a reference, it needs to
+know: <em>which input is the output borrowing from?</em> This is where <strong>lifetime annotations</strong>
+come in — they describe the relationship between input and output lifetimes so the borrow checker
+can verify correctness at every call site.
+</p>
+
+<div class="diagram">  ┌─────────────────────────────────────────────────────┐
+  │              THE BORROW CHECKER'S JOB                │
+  │                                                     │
+  │   data lifetime:  [████████████████]                │
+  │   ref  lifetime:  [████████████████████████]        │
+  │                                       ▲             │
+  │                                   ERROR! ref out-   │
+  │                                   lives data        │
+  │                                                     │
+  │   data lifetime:  [████████████████████████]        │
+  │   ref  lifetime:  [████████████████]                │
+  │                      ▲                              │
+  │                   OK! ref is within data's life     │
+  └─────────────────────────────────────────────────────┘</div>
+
+<!-- ================================================================ -->
+<!-- SECTION 2: ELISION -->
+<!-- ================================================================ -->
+<h2 id="elision">2. Lifetimes You Already Have (Elision Rules)</h2>
+
+<p>
+Here's the good news: <strong>most of the time, you don't write lifetimes at all.</strong>
+The compiler has a set of rules — called <strong>lifetime elision rules</strong> — that
+automatically insert lifetimes into your function signatures. You've been benefiting from
+these rules since your first Rust program, even if you didn't know it.
+</p>
+
+<p>
+When you write this:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">What you write</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">fn first_word(s: &amp;str) -&gt; &amp;str {</code></pre>
+</div>
+
+<p>The compiler silently rewrites it into this:</p>
+
+<div class="code-wrapper">
+  <div class="code-header note"><span class="filename">What the compiler sees</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">fn first_word&lt;'a&gt;(s: &amp;'a str) -&gt; &amp;'a str {</code></pre>
+</div>
+
+<p>
+There are <strong>three elision rules</strong>, applied in order. Let's walk through each one.
+</p>
+
+<h3 id="elision-rule-1">2.1 Rule 1 — Each Input Reference Gets Its Own Lifetime</h3>
+
+<p>
+The first rule says: <strong>every reference parameter that doesn't have an explicit lifetime
+gets a fresh, unique lifetime.</strong>
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Rule 1 in action</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">// You write:
+fn foo(x: &amp;str, y: &amp;str) { ... }
+
+// Compiler applies Rule 1 — each input gets its own lifetime:
+fn foo&lt;'a, 'b&gt;(x: &amp;'a str, y: &amp;'b str) { ... }</code></pre>
+</div>
+
+<p>
+Each <code class="inline">&amp;</code> without a lifetime gets a distinct <code class="inline">'a</code>,
+<code class="inline">'b</code>, etc. They are <em>not</em> the same lifetime — the compiler treats them
+as independent until a later rule connects them.
+</p>
+
+<h3 id="elision-rule-2">2.2 Rule 2 — Single Input Lifetime Goes to All Outputs</h3>
+
+<p>
+The second rule says: <strong>if there is exactly one input lifetime parameter, that lifetime is
+assigned to all output (return) lifetimes.</strong>
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Rule 2 in action</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">// You write:
+fn first_word(s: &amp;str) -&gt; &amp;str { ... }
+
+// Step 1 (Rule 1): input gets a lifetime
+fn first_word&lt;'a&gt;(s: &amp;'a str) -&gt; &amp;str { ... }
+
+// Step 2 (Rule 2): only one input lifetime, so it goes to output too
+fn first_word&lt;'a&gt;(s: &amp;'a str) -&gt; &amp;'a str { ... }</code></pre>
+</div>
+
+<p>
+This makes intuitive sense: if a function takes one reference and returns a reference, the output
+<em>must</em> be borrowing from the input (it can't borrow from anything else). So tying them
+together is always correct.
+</p>
+
+<h3 id="elision-rule-3">2.3 Rule 3 — In Methods, &amp;self's Lifetime Goes to Outputs</h3>
+
+<p>
+The third rule applies to <strong>methods</strong> (functions with a <code class="inline">self</code> parameter).
+It says: <strong>if there are multiple input lifetimes, but one of them is <code class="inline">&amp;self</code>
+or <code class="inline">&amp;mut self</code>, then the lifetime of <code class="inline">self</code> is assigned
+to all output lifetimes.</strong>
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Rule 3 in action</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">impl&lt;'a&gt; ImportantExcerpt&lt;'a&gt; {
+    // You write:
+    fn announce_and_return_part(&amp;self, announcement: &amp;str) -&gt; &amp;str {
+        println!("Attention please: {announcement}");
+        self.part
+    }
+
+    // Compiler applies all 3 rules:
+    // Rule 1: &amp;self -&gt; &amp;'b self, announcement: &amp;'c str
+    // Rule 2: doesn't apply (more than one input lifetime)
+    // Rule 3: &amp;self exists, so output gets self's lifetime ('b)
+    fn announce_and_return_part&lt;'b&gt;(&amp;'b self, announcement: &amp;'c str) -&gt; &amp;'b str {
+        self.part
+    }
+}</code></pre>
+</div>
+
+<p>
+This also makes sense: a method returning a reference is almost always returning something borrowed
+from <code class="inline">self</code>, not from one of its other arguments.
+</p>
+
+<h3 id="elision-illegal">2.4 When Elision Fails — You Must Be Explicit</h3>
+
+<p>
+If none of the three rules can determine the output lifetime, the compiler gives up and asks you to
+write the lifetimes explicitly. This happens in two common situations:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header error"><span class="filename">Illegal elision — no inputs to infer from</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">trait Example {
+    // ILLEGAL: no input parameters, so no lifetime to infer the output from.
+    // Where does the returned &amp;str come from? The compiler can't tell.
+    fn get_str() -&gt; &amp;str;
+}</code></pre>
+</div>
+
+<div class="code-wrapper">
+  <div class="code-header error"><span class="filename">Illegal elision — ambiguous inputs</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">trait Example {
+    // ILLEGAL: two input lifetimes, no &amp;self.
+    // Is the output borrowing from s or from t? Ambiguous.
+    fn frob(s: &amp;str, t: &amp;str) -&gt; &amp;str;
+}</code></pre>
+</div>
+
+<p>In both cases, you must write explicit lifetimes — which brings us to the next section.</p>
+
+<div class="callout tip">
+  <span class="label">Summary of Elision</span>
+  <ul style="margin: 4px 0;">
+    <li><strong>Rule 1:</strong> Each <code class="inline">&amp;</code> input gets a unique lifetime.</li>
+    <li><strong>Rule 2:</strong> One input lifetime? It goes to all outputs.</li>
+    <li><strong>Rule 3:</strong> Method with <code class="inline">&amp;self</code>? self's lifetime goes to outputs.</li>
+    <li><strong>If none apply:</strong> Write explicit lifetimes yourself.</li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<!-- SECTION 3: EXPLICIT ANNOTATIONS -->
+<!-- ================================================================ -->
+<h2 id="explicit">3. Explicit Lifetime Annotations</h2>
+
+<p>
+When the elision rules can't figure things out, you need to write lifetimes explicitly.
+Let's cover the syntax and the main use cases.
+</p>
+
+<h3 id="explicit-syntax">3.1 The Syntax</h3>
+
+<p>Lifetime annotations use a leading apostrophe followed by a name, typically short like <code class="inline">'a</code>:</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Lifetime syntax</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">&amp;i32          // a reference (lifetime elided)
+&amp;'a i32       // a reference with an explicit lifetime 'a
+&amp;'a mut i32   // a mutable reference with lifetime 'a
+
+// Generic lifetime parameter declared in angle brackets, like type generics:
+fn foo&lt;'a&gt;(x: &amp;'a i32) -&gt; &amp;'a i32 { x }</code></pre>
+</div>
+
+<div class="callout note">
+  <span class="label">Important</span>
+  Lifetime annotations <strong>do not change</strong> how long any reference lives. They only
+  describe <em>relationships</em> between lifetimes. The actual lifetimes are determined by the
+  program's structure (scopes, blocks, function calls). Annotations just tell the compiler
+  "these lifetimes are related in this way."
+</div>
+
+<h3 id="explicit-functions">3.2 Functions with Explicit Lifetimes</h3>
+
+<p>
+The classic example is a function that takes two references and returns one of them.
+The compiler can't know which one you'll return, so you must tell it:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">The longest function</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">fn longest&lt;'a&gt;(x: &amp;'a str, y: &amp;'a str) -&gt; &amp;'a str {
+    if x.len() &gt; y.len() {
+        x
+    } else {
+        y
+    }
+}</code></pre>
+</div>
+
+<p>
+Here, <code class="inline">'a</code> ties all three references together. The signature says:
+<em>"The returned reference will live at most as long as the shorter of x and y."</em>
+This is because both inputs share the same lifetime <code class="inline">'a</code>, so the output
+is constrained to the intersection of their actual lifetimes.
+</p>
+
+<div class="callout warn">
+  <span class="label">What 'a means here</span>
+  Using the same <code class="inline">'a</code> for both inputs does <strong>not</strong> mean
+  x and y must have the <em>same</em> actual lifetime. It means the function's contract is:
+  "I'll return a reference valid for as long as <em>both</em> inputs are valid." At any call site,
+  <code class="inline">'a</code> becomes the shorter of the two actual lifetimes.
+</div>
+
+<h3 id="explicit-structs">3.3 Structs Holding References</h3>
+
+<p>
+If a struct holds a reference (rather than owning the data), it needs a lifetime parameter to
+ensure the struct doesn't outlive the data it borrows:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Struct with a lifetime</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">// This struct borrows a string slice — it does NOT own it.
+// The lifetime 'a says: "this struct cannot outlive the string it references."
+struct ImportantExcerpt&lt;'a&gt; {
+    part: &amp;'a str,
+}
+
+fn main() {
+    let novel = String::from("Call me Ishmael. Some years ago...");
+    let first_sentence = novel.split('.').next().unwrap();
+
+    // 'excerpt' borrows from 'novel'. If 'novel' is dropped first, this would be
+    // a dangling reference. The lifetime 'a prevents that.
+    let excerpt = ImportantExcerpt {
+        part: first_sentence,
+    };
+
+    println!("Excerpt: {}", excerpt.part);
+}</code></pre>
+</div>
+
+<h3 id="explicit-multiple">3.4 Multiple Lifetimes</h3>
+
+<p>
+Sometimes a struct or function needs <em>different</em> lifetimes for different references.
+For example, a struct that borrows from two independent sources:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Multiple lifetimes</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">// Two independent lifetimes — the struct can borrow from two
+// different sources with different lifetimes.
+struct Context&lt;'a, 'b&gt; {
+    config: &amp;'a str,   // borrowed from config source
+    input:  &amp;'b str,   // borrowed from input source
+}
+
+// A function returning a reference tied to only ONE of its inputs:
+fn parse&lt;'a, 'b&gt;(config: &amp;'a str, input: &amp;'b str) -&gt; &amp;'a str {
+    // Returns something borrowing from config, not input.
+    // Note: output lifetime is 'a, NOT 'b — it's tied to config only.
+    config
+}</code></pre>
+</div>
+
+<p>
+You can also combine lifetimes, generics, and trait bounds in one signature:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Lifetimes + generics + trait bounds</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">use std::fmt::Display;
+
+fn longest_with_an_announcement&lt;'a, T&gt;(
+    x: &amp;'a str,
+    y: &amp;'a str,
+    ann: T,
+) -&gt; &amp;'a str
+where
+    T: Display,
+{
+    println!("Announcement! {ann}");
+    if x.len() &gt; y.len() { x } else { y }
+}</code></pre>
+</div>
+
+<!-- ================================================================ -->
+<!-- SECTION 4: SETS THEORY -->
+<!-- ================================================================ -->
+<h2 id="sets-theory">4. Lifetimes as a Theory of Sets Over Memory</h2>
+
+<p>
+This is the conceptual core that most tutorials skip. Instead of thinking about lifetimes as
+"annotations on function signatures," think about them as <strong>sets of program points</strong>
+— regions of code where a piece of memory is valid. This is the model the Rustonomicon uses,
+and it unlocks understanding of subtyping, variance, and coercion.
+</p>
+
+<h3 id="regions">4.1 Lifetimes as Regions</h3>
+
+<p>
+A lifetime <code class="inline">'a</code> defines a <strong>region of code</strong> — a set of
+program points (statements, expressions) between where a variable is created and where it's dropped.
+We can draw this as a set:
+</p>
+
+<div class="diagram">  Program point:    1    2    3    4    5    6    7    8    9
+                   │    │    │    │    │    │    │    │    │
+  'b (x's life):   │    │ [████████████] │    │    │    │    │
+                   │    │  x created    x dropped    │    │
+                   │    │    │    │    │    │    │    │    │
+  'a (r's life):   │ [████████████████████████████████] │
+                   │  r created                    r used │
+
+  As SETS:
+    'b = { 3, 4, 5 }          (points where x is alive)
+    'a = { 2, 3, 4, 5, 6, 7, 8, 9 }  (points where r is alive/used)
+
+  Is 'b ⊆ 'a?  YES  →  x's lifetime is contained in r's lifetime
+  But we need 'a ⊆ 'b for r = &x to be safe. It's NOT. → ERROR!</div>
+
+<p>
+A lifetime is a <strong>set of program points</strong>. When we say a reference has lifetime
+<code class="inline">'a</code>, we mean "this reference is valid at all points in the set <code class="inline">'a</code>."
+The borrow checker's rule is: <strong>the data's lifetime set must contain (be a superset of)
+the reference's lifetime set.</strong>
+</p>
+
+<h3 id="subtyping">4.2 Subtyping: 'long &lt;: 'short</h3>
+
+<p>
+Here's where it gets interesting. In Rust's type system, lifetimes have a
+<strong>subtyping relationship</strong>. The rule is:
+</p>
+
+<p style="text-align: center; font-size: 1.15em;">
+  <code class="inline">'long &lt;: 'short</code> &nbsp; if and only if &nbsp;
+  <code class="inline">'long</code> <strong>completely contains</strong> <code class="inline">'short</code>
+</p>
+
+<p>
+In set terms: <code class="inline">'long ⊇ 'short</code> (the longer lifetime's region is a
+<em>superset</em> of the shorter one's). This is the opposite of what many people first guess!
+A <em>longer</em> lifetime is a <em>subtype</em> of a <em>shorter</em> one.
+</p>
+
+<div class="diagram">  SUBTYPING RULE:  'long &lt;: 'short  ⟺  'long ⊇ 'short
+
+  'long:  [████████████████████████████]     (bigger region = superset)
+  'short:       [████████████████]           (smaller region = subset)
+
+  Because 'long's region CONTAINS 'short's region,
+  'long is a SUBTYPE of 'short.
+
+  Intuition: A value valid for a LONG time is also valid for a SHORT time.
+  "If it lives long enough, it certainly lives long enough for this shorter use."</div>
+
+<p>
+The practical consequence: <strong>you can use a longer-lived reference where a shorter-lived one
+is expected.</strong> For example, a <code class="inline">&amp;'static str</code> (lives forever) can be
+used anywhere a <code class="inline">&amp;'a str</code> (lives for <code class="inline">'a</code>) is needed:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Lifetime subtyping in action</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">fn debug&lt;'a&gt;(a: &amp;'a str, b: &amp;'a str) {
+    println!("a = {a:?} b = {b:?}");
+}
+
+fn main() {
+    let hello: &amp;'static str = "hello";       // lives for the entire program
+    {
+        let world = String::from("world");
+        let world = &amp;world;                   // 'world — a shorter lifetime
+
+        // hello (&amp;'static str) is silently coerced to &amp;'world str.
+        // This works because 'static &lt;: 'world (static contains world's region).
+        debug(hello, world);
+    }
+}</code></pre>
+</div>
+
+<h3 id="coercion">4.3 Lifetime Coercion</h3>
+
+<p>
+When the compiler converts a longer lifetime into a shorter one to satisfy a function's signature,
+that's called <strong>lifetime coercion</strong>. It happens automatically and silently:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Coercion: 'static → 'a</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">fn bar&lt;'a&gt;() {
+    let s: &amp;'static str = "hi";   // 'static — lives forever
+    let t: &amp;'a str = s;           // COERCED: 'static → 'a
+                                  // Legal because 'static &lt;: 'a (static outlives everything)
+}</code></pre>
+</div>
+
+<p>
+Coercion only goes one way: <strong>longer → shorter</strong>. You can never coerce a shorter
+lifetime into a longer one, because that would mean claiming a reference is valid for longer than
+its data actually exists — a dangling reference.
+</p>
+
+<h3 id="sets-intuition">4.4 The Set Intuition — Why It Matters</h3>
+
+<p>
+Thinking in sets gives you a powerful mental model:
+</p>
+
+<table>
+  <tr><th>Concept</th><th>Set Theory View</th><th>Practical Meaning</th></tr>
+  <tr><td>Lifetime <code>'a</code></td><td>A set of program points</td><td>"Valid in this region of code"</td></tr>
+  <tr><td><code>'a: 'b</code> (outlives)</td><td><code>'a ⊇ 'b</code> (superset)</td><td>"'a's region contains 'b's region"</td></tr>
+  <tr><td><code>'long &lt;: 'short</code></td><td><code>'long ⊇ 'short</code></td><td>"Longer is subtype of shorter"</td></tr>
+  <tr><td>Coercion</td><td>Restrict to a subset</td><td>"Use a long ref where a short one is needed"</td></tr>
+  <tr><td>Borrow check</td><td>data ⊇ ref</td><td>"Data's set must contain ref's set"</td></tr>
+</table>
+
+<div class="callout tip">
+  <span class="label">The 99% Intuition</span>
+  <code class="inline">'long &lt;: 'short</code> if and only if <code class="inline">'long</code> defines a
+  region that <strong>completely contains</strong> <code class="inline">'short</code>.
+  <code class="inline">'long</code> may be larger, but that's fine. This simple rule covers 99% of cases.
+  The compiler handles the corner cases automatically — unless you write unsafe code.
+</div>
+
+<!-- ================================================================ -->
+<!-- SECTION 5: STATIC -->
+<!-- ================================================================ -->
+<h2 id="static">5. The 'static Lifetime</h2>
+
+<p>
+<code class="inline">'static</code> is a special lifetime that means <strong>"valid for the entire
+duration of the program."</strong> It's the longest possible lifetime — its region is the entire program.
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">'static</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">// String literals are stored in the binary — they live for the whole program.
+let s: &amp;'static str = "I have a static lifetime.";</code></pre>
+</div>
+
+<p>
+All string literals have type <code class="inline">&amp;'static str</code> because they're baked into
+the program's read-only data section at compile time. They never get freed.
+</p>
+
+<p>
+<code class="inline">'static</code> also appears in <code class="inline">const</code> and
+<code class="inline">static</code> items:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">const and static</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">// STRING: &amp;'static str  (the 'static is implied for const/static)
+const STRING: &amp;str = "bitstring";
+
+struct BitsNStrings&lt;'a&gt; {
+    mybits: [u32; 2],
+    mystring: &amp;'a str,
+}
+
+// BITS_N_STRINGS: BitsNStrings&lt;'static&gt;
+const BITS_N_STRINGS: BitsNStrings&lt;'_&gt; = BitsNStrings {
+    mybits: [1, 2],
+    mystring: STRING,
+};</code></pre>
+</div>
+
+<div class="callout warn">
+  <span class="label">Caution</span>
+  When you get a compiler error suggesting you add <code class="inline">'static</code>, be careful.
+  It's often a sign of an underlying problem (a dangling reference or lifetime mismatch) that should
+  be <em>fixed</em>, not masked. Slapping <code class="inline">'static</code> on everything makes your
+  code inflexible — it forces all references to live forever, which often means you can't borrow
+  local data. Fix the root cause instead.
+</div>
+
+<!-- ================================================================ -->
+<!-- SECTION 6: VARIANCE -->
+<!-- ================================================================ -->
+<h2 id="variance">6. Variance &amp; Subtyping</h2>
+
+<p>
+Now we go deeper. <strong>Variance</strong> describes how the subtyping relationship of lifetimes
+(or types) propagates through generic types. If <code class="inline">'long &lt;: 'short</code>, what
+can we say about <code class="inline">&amp;'long T</code> vs <code class="inline">&amp;'short T</code>?
+That depends on the <em>variance</em> of the type constructor.
+</p>
+
+<h3 id="variance-defs">6.1 The Three Kinds of Variance</h3>
+
+<p>Given a generic type <code class="inline">F&lt;T&gt;</code> and a subtype relationship <code class="inline">Sub &lt;: Super</code>:</p>
+
+<table>
+  <tr><th>Variance</th><th>Relationship</th><th>Meaning</th></tr>
+  <tr>
+    <td><strong>Covariant</strong></td>
+    <td><code>F&lt;Sub&gt; &lt;: F&lt;Super&gt;</code></td>
+    <td>Subtyping passes through unchanged. If Sub is a subtype, F&lt;Sub&gt; is too.</td>
+  </tr>
+  <tr>
+    <td><strong>Contravariant</strong></td>
+    <td><code>F&lt;Super&gt; &lt;: F&lt;Sub&gt;</code></td>
+    <td>Subtyping is <em>inverted</em>. If Sub is a subtype, F&lt;Super&gt; is the subtype.</td>
+  </tr>
+  <tr>
+    <td><strong>Invariant</strong></td>
+    <td>No relationship</td>
+    <td>F&lt;Sub&gt; and F&lt;Super&gt; are <em>unrelated</em>. They must match exactly.</td>
+  </tr>
+</table>
+
+<h3 id="variance-table">6.2 The Variance Table</h3>
+
+<p>Here's how common Rust types behave with respect to their lifetime (<code class="inline">'a</code>) and type (<code class="inline">T</code>) parameters:</p>
+
+<table>
+  <tr><th>Type</th><th>Variance over <code>'a</code></th><th>Variance over <code>T</code></th></tr>
+  <tr><td><code>&amp;'a T</code></td><td>covariant</td><td>covariant</td></tr>
+  <tr><td><code>&amp;'a mut T</code></td><td>covariant</td><td><strong>invariant</strong></td></tr>
+  <tr><td><code>Box&lt;T&gt;</code></td><td>—</td><td>covariant</td></tr>
+  <tr><td><code>Vec&lt;T&gt;</code></td><td>—</td><td>covariant</td></tr>
+  <tr><td><code>UnsafeCell&lt;T&gt;</code></td><td>—</td><td><strong>invariant</strong></td></tr>
+  <tr><td><code>Cell&lt;T&gt;</code></td><td>—</td><td><strong>invariant</strong></td></tr>
+  <tr><td><code>fn(T) -&gt; U</code></td><td>—</td><td><strong>contravariant</strong> over T, covariant over U</td></tr>
+  <tr><td><code>*const T</code></td><td>—</td><td>covariant</td></tr>
+  <tr><td><code>*mut T</code></td><td>—</td><td><strong>invariant</strong></td></tr>
+</table>
+
+<h3 id="variance-why">6.3 Why &amp;mut T Is Invariant</h3>
+
+<p>
+This is the most important practical consequence of variance. <code class="inline">&amp;mut T</code>
+is <strong>invariant over T</strong>. This means you cannot substitute a <code class="inline">&amp;mut &'long str</code>
+where a <code class="inline">&amp;mut &'short str</code> is expected, even though
+<code class="inline">'long &lt;: 'short</code>.
+</p>
+
+<p>Why? Because allowing it would enable a use-after-free:</p>
+
+<div class="code-wrapper">
+  <div class="code-header error"><span class="filename">Why invariance matters — this is rejected</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">fn assign&lt;T&gt;(input: &amp;mut T, val: T) {
+    *input = val;
+}
+
+fn main() {
+    let mut hello: &amp;'static str = "hello";
+    {
+        let world = String::from("world");
+        // If this were allowed, 'world' (short lifetime) would be written
+        // into 'hello' (which expects 'static). After the block ends,
+        // 'world' is dropped — but hello still references it. USE-AFTER-FREE!
+        assign(&amp;mut hello, &amp;world);  // ERROR: lifetime mismatch
+    }
+    println!("{hello}");  // would print freed memory
+}</code></pre>
+</div>
+
+<p>
+Because <code class="inline">&amp;mut T</code> is invariant over <code class="inline">T</code>, the compiler
+refuses to apply any subtyping to the first argument. <code class="inline">T</code> must be exactly
+<code class="inline">&amp;'static str</code>, but <code class="inline">&amp;world</code> is
+<code class="inline">&amp;'world str</code> — not the same. Rejected. Memory safety preserved.
+</p>
+
+<div class="callout note">
+  <span class="label">Contravariance of function arguments</span>
+  Function arguments are <strong>contravariant</strong>. A function that accepts
+  <code class="inline">&amp;'static str</code> can be used where a function accepting
+  <code class="inline">&amp;'a str</code> is expected (it accepts <em>more</em>, so it's safe).
+  But the reverse is not allowed — a function accepting only short-lived references can't be used
+  where one accepting long-lived references is needed.
+</div>
+
+<!-- ================================================================ -->
+<!-- SECTION 7: BOUNDS & HRTB -->
+<!-- ================================================================ -->
+<h2 id="bounds-hrtb">7. Lifetime Bounds &amp; HRTB</h2>
+
+<h3 id="outlives">7.1 'a: 'b — Outlives Bounds</h3>
+
+<p>
+You can write <code class="inline">'a: 'b</code> to say "lifetime <code class="inline">'a</code>
+outlives lifetime <code class="inline">'b</code>" (i.e., <code class="inline">'a ⊇ 'b</code>).
+This lets you assign a longer reference to a shorter one:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Outlives bounds</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">fn f&lt;'a, 'b&gt;(x: &amp;'a i32, mut y: &amp;'b i32)
+where
+    'a: 'b,   // 'a outlives 'b
+{
+    y = x;                    // OK: &amp;'a i32 is a subtype of &amp;'b i32 because 'a: 'b
+    let r: &amp;'b &amp;'a i32 = &amp;&amp;0; // OK: &amp;'b &amp;'a i32 is well-formed because 'a: 'b
+}</code></pre>
+</div>
+
+<h3 id="implied">7.2 Implied Bounds (T: 'a)</h3>
+
+<p>
+The compiler automatically infers some lifetime bounds. If you have <code class="inline">&amp;'a T</code>,
+the compiler infers <code class="inline">T: 'a</code> — meaning "T doesn't contain any references
+shorter than <code class="inline">'a</code>." This is called an <strong>implied bound</strong>:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Implied bounds</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">// The compiler infers T: 'a from the reference type &amp;'a T.
+fn requires_t_outlives_a&lt;'a, T&gt;(x: &amp;'a T) {
+    // This compiles because T: 'a is implied by &amp;'a T.
+    requires_t_outlives_a_not_implied::&lt;'a, T&gt;();
+}
+
+fn requires_t_outlives_a_not_implied&lt;'a, T: 'a&gt;() {}
+
+// But without the &amp;'a T, T: 'a is NOT implied:
+fn not_implied&lt;'a, T&gt;() {
+    // ERROR: T: 'a is not implied by the signature.
+    // requires_t_outlives_a_not_implied::&lt;'a, T&gt;();
+}</code></pre>
+</div>
+
+<p>The same applies to structs and enums — the compiler infers bounds from fields:</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Inferred bounds in structs</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">struct Struct&lt;'a, T&gt; {
+    // This requires T: 'a to be well-formed — inferred automatically.
+    field: &amp;'a T,
+}
+
+enum Enum&lt;'a, T&gt; {
+    // T: 'a is required even when only using OtherVariant.
+    SomeVariant(&amp;'a T),
+    OtherVariant,
+}</code></pre>
+</div>
+
+<h3 id="hrtb">7.3 Higher-Ranked Trait Bounds (HRTB)</h3>
+
+<p>
+Sometimes you need a function or closure to work with references of <em>any</em> lifetime, not a
+specific one. This is what <strong>Higher-Ranked Trait Bounds</strong> (HRTBs) are for. The syntax
+is <code class="inline">for&lt;'a&gt;</code>:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">HRTB — for&lt;'a&gt;</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">// "F is a function that works for ANY lifetime 'a"
+impl&lt;F&gt; Closure&lt;F&gt;
+where
+    for&lt;'a&gt; F: Fn(&amp;'a (u8, u16)) -&gt; &amp;'a u8,
+{
+    fn call(&amp;self) -&gt; &amp;u8 {
+        (self.func)(&amp;self.data)
+    }
+}
+
+fn do_it(data: &amp;(u8, u16)) -&gt; &amp;u8 { &amp;data.0 }
+
+fn main() {
+    let clo = Closure { data: (0, 1), func: do_it };
+    println!("{}", clo.call());
+}</code></pre>
+</div>
+
+<p>
+Without <code class="inline">for&lt;'a&gt;</code>, the compiler would need to pick one specific lifetime
+for <code class="inline">'a</code>, which wouldn't work because the closure needs to accept references
+with whatever lifetime the caller provides. HRTBs say "this works for <em>all</em> lifetimes."
+</p>
+
+<p>HRTBs also appear in function pointer types and trait objects:</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">HRTB in types</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">// Elided form:
+type FunPtr1 = fn(&amp;str) -&gt; &amp;str;
+// Expanded form with HRTB:
+type FunPtr2 = for&lt;'a&gt; fn(&amp;'a str) -&gt; &amp;'a str;
+
+// Trait objects:
+type FunTrait1 = dyn Fn(&amp;str) -&gt; &amp;str;                // elided
+type FunTrait2 = dyn for&lt;'a&gt; Fn(&amp;'a str) -&gt; &amp;'a str;  // expanded</code></pre>
+</div>
+
+<!-- ================================================================ -->
+<!-- SECTION 8: PATTERNS -->
+<!-- ================================================================ -->
+<h2 id="patterns">8. Common Patterns</h2>
+
+<h3 id="iterators">8.1 Iterators &amp; PhantomData</h3>
+
+<p>
+Iterators that borrow from a collection need a lifetime parameter. But sometimes the lifetime isn't
+directly used in a field — it's only logically associated. In that case, you use
+<code class="inline">PhantomData</code> to tell the compiler about the relationship:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Iter with PhantomData</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">use std::marker;
+
+// An iterator over &amp;'a [T]. The raw pointers don't carry the lifetime,
+// so we use PhantomData to tell the type system about it.
+struct Iter&lt;'a, T: 'a&gt; {
+    ptr: *const T,
+    end: *const T,
+    _marker: marker::PhantomData&lt;&amp;'a T&gt;,  // "this struct logically holds &amp;'a T"
+}
+
+// PhantomData consumes no space but simulates a field for static analysis.
+// This gives correct variance (covariant over 'a and T) and drop checking.</code></pre>
+</div>
+
+<p>
+The <code class="inline">Drain</code> iterator (which removes elements from a <code class="inline">Vec</code>
+while borrowing it) uses the same pattern:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Drain iterator</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">use std::marker::PhantomData;
+
+pub struct Drain&lt;'a, T: 'a&gt; {
+    vec: PhantomData&lt;&amp;'a mut Vec&lt;T&gt;&gt;,  // borrows the Vec mutably
+    iter: RawValIter&lt;T&gt;,
+}
+
+impl&lt;'a, T&gt; Iterator for Drain&lt;'a, T&gt; {
+    type Item = T;
+    fn next(&amp;mut self) -&gt; Option&lt;T&gt; { self.iter.next() }
+}
+
+impl&lt;'a, T&gt; Drop for Drain&lt;'a, T&gt; {
+    fn drop(&amp;mut self) {
+        // Drain remaining elements on drop — safety mechanism.
+        for _ in &amp;mut *self {}
+    }
+}</code></pre>
+</div>
+
+<h3 id="self-ref">8.2 Self-Referential Structs &amp; Pin</h3>
+
+<p>
+When Rust compiles <code class="inline">async</code> blocks into state machines, the resulting
+structs can be <strong>self-referential</strong> — one field holds a reference to another field
+in the same struct. Moving such a struct would invalidate the internal reference. The
+<code class="inline">Pin</code> type solves this:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Pin and the Future trait</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">use std::pin::Pin;
+use std::task::{Context, Poll};
+
+pub trait Future {
+    type Output;
+
+    // Pin&lt;&amp;mut Self&gt; guarantees the future won't be moved in memory.
+    // This is essential for self-referential async state machines.
+    fn poll(self: Pin&lt;&amp;mut Self&gt;, cx: &amp;mut Context&lt;'_&gt;) -&gt; Poll&lt;Self::Output&gt;;
+}</code></pre>
+</div>
+
+<p>
+<code class="inline">Pin</code> wraps a pointer and guarantees the pointed-to value won't move.
+This keeps internal references valid. Most types are <code class="inline">Unpin</code> (safe to move
+even when pinned), but async-generated futures are <code class="inline">!Unpin</code> and require pinning.
+</p>
+
+<h3 id="builder">8.3 Builder / Type-State Pattern</h3>
+
+<p>
+Lifetimes work naturally with the type-state pattern, where the compiler enforces state transitions
+at compile time. Methods that return references from <code class="inline">&amp;self</code> benefit from
+elision Rule 3:
+</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Type-state with lifetime elision</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-rust">pub struct Post { content: String }
+pub struct DraftPost { content: String }
+pub struct PendingReviewPost { content: String }
+
+impl Post {
+    pub fn new() -&gt; DraftPost { DraftPost { content: String::new() } }
+
+    // &amp;self -&gt; &amp;str uses Rule 3: output gets self's lifetime.
+    // No explicit lifetime needed!
+    pub fn content(&amp;self) -&gt; &amp;str {
+        &amp;self.content
+    }
+}
+
+impl DraftPost {
+    pub fn add_text(&amp;mut self, text: &amp;str) {
+        self.content.push_str(text);
+    }
+    // Consumes self, transitions to next state:
+    pub fn request_review(self) -&gt; PendingReviewPost {
+        PendingReviewPost { content: self.content }
+    }
+}
+
+impl PendingReviewPost {
+    pub fn approve(self) -&gt; Post {
+        Post { content: self.content }
+    }
+}</code></pre>
+</div>
+
+<div class="callout tip">
+  <span class="label">Why this is elegant</span>
+  The type-state pattern uses <em>ownership</em> (consuming <code class="inline">self</code>) to enforce
+  transitions. You can't call <code class="inline">content()</code> on a <code class="inline">DraftPost</code>
+  because the method simply doesn't exist on that type. Invalid states are impossible at compile time.
+  And lifetime elision Rule 3 handles the borrowing automatically — no explicit lifetimes needed.
+</div>
+
+<!-- ================================================================ -->
+<!-- SECTION 9: DEEP DIVES -->
+<!-- ================================================================ -->
+<h2 id="deep-dives">9. Interactive Deep-Dive Scripts</h2>
+
+<p>
+To make these concepts concrete, I've created <strong>5 interactive Rust scripts</strong> in the
+<code class="inline">examples/</code> directory. Each is runnable with <code class="inline">cargo run --example</code>
+and has numbered sections you can run individually.
+</p>
+
+<table>
+  <tr><th>Script</th><th>Focus</th><th>Run Command</th></tr>
+  <tr><td><strong>01 — The Why</strong></td><td>Dangling references, borrow checker in action</td><td><code>cargo run --example deep-dive-lifetimes-01-why</code></td></tr>
+  <tr><td><strong>02 — Elision</strong></td><td>The 3 elision rules, before/after</td><td><code>cargo run --example deep-dive-lifetimes-02-elision</code></td></tr>
+  <tr><td><strong>03 — Explicit</strong></td><td>Explicit annotations, structs, multiple lifetimes</td><td><code>cargo run --example deep-dive-lifetimes-03-explicit</code></td></tr>
+  <tr><td><strong>04 — Sets Theory</strong></td><td>Lifetimes as regions/sets, subtyping, coercion</td><td><code>cargo run --example deep-dive-lifetimes-04-sets-theory</code></td></tr>
+  <tr><td><strong>05 — Variance</strong></td><td>Covariance, invariance, contravariance</td><td><code>cargo run --example deep-dive-lifetimes-05-variance</code></td></tr>
+</table>
+
+<p>Run a specific section by adding the section number:</p>
+
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Running specific sections</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-bash"># Show the menu of sections:
+cargo run --example deep-dive-lifetimes-01-why
+
+# Run section 1 only:
+cargo run --example deep-dive-lifetimes-01-why 1
+
+# Run section 2 only:
+cargo run --example deep-dive-lifetimes-01-why 2</code></pre>
+</div>
+
+<p>When you're done, delete the scripts:</p>
+<div class="code-wrapper">
+  <div class="code-header"><span class="filename">Cleanup</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+  <pre><code class="language-bash">rm examples/deep-dive-lifetimes-*.rs</code></pre>
+</div>
+
+<div class="footer">
+  <p><strong>Sources:</strong> Rust Book (Ch. 10, 17, 18), Rust Reference (Lifetimes, Subtyping, Trait Bounds), Rustonomicon (Subtyping, Variance, PhantomData, HRTB).</p>
+  <p>Generated for personal study — Aug 2026.</p>
+</div>
+
+</main>
+</div>
+
+<script>
+  // Syntax highlighting
+  hljs.highlightAll();
+
+  // Copy button
+  function copyCode(btn) {
+    const code = btn.closest('.code-wrapper').querySelector('pre code');
+    const text = code.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 1500);
+    });
+  }
+
+  // Reading progress bar
+  window.addEventListener('scroll', () => {
+    const scrollTop = document.documentElement.scrollTop;
+    const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+    const progress = (scrollTop / scrollHeight) * 100;
+    document.getElementById('progressBar').style.width = progress + '%';
+  });
+
+  // Active sidebar link on scroll
+  const headings = document.querySelectorAll('h2, h3');
+  const sidebarLinks = document.querySelectorAll('.sidebar a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    headings.forEach(h => {
+      if (window.scrollY >= h.offsetTop - 100) {
+        current = h.id;
+      }
+    });
+    sidebarLinks.forEach(a => {
+      a.classList.remove('active');
+      if (a.getAttribute('href') === '#' + current) {
+        a.classList.add('active');
+      }
+    });
+  });
+</script>
+</body>
+</html>
