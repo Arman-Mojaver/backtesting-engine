@@ -96,7 +96,7 @@ mod tests {
         // All medians equal 5.0 -> AO = 0 everywhere -> SMA(AO,5) = 0 -> AC = 0.
         // 38 points -> 1 AC value = 0.0 at points[37].ts.
         let points: Vec<ResampledPointD1> = (0..38)
-            .map(|i| rp_median(i as i32 + 1, (i + 1) as i64, 5.0))
+            .map(|i| rp_median(i + 1, (i + 1) as i64, 5.0))
             .collect();
         let result = compute(&points).unwrap();
         let vals = indicator_values!(result);
@@ -111,7 +111,7 @@ mod tests {
         // -> AC[k] = AO[k+4] - SMA(AO,5)[k] = 58.0 constant.
         // 40 points -> 3 AC values at points[37].ts, points[38].ts, points[39].ts.
         let points: Vec<ResampledPointD1> = (0..40)
-            .map(|i| rp_median(i as i32 + 1, (i + 100) as i64, (i * i) as f64))
+            .map(|i| rp_median(i + 1, (i + 100) as i64, (i * i) as f64))
             .collect();
         let result = compute(&points).unwrap();
         let vals = indicator_values!(result);
@@ -136,7 +136,7 @@ mod tests {
     fn fewer_than_38_points_yields_empty_buffer() {
         // 37 points -> AO has 4 values -> SMA(AO,5) has 0 windows -> empty.
         let points: Vec<ResampledPointD1> = (0..37)
-            .map(|i| rp_median(i as i32 + 1, (i + 1) as i64, 1.0))
+            .map(|i| rp_median(i + 1, (i + 1) as i64, 1.0))
             .collect();
         let result = compute(&points).unwrap();
         assert!(result.items.is_empty());
@@ -145,7 +145,7 @@ mod tests {
     #[test]
     fn exactly_38_points_yields_single_value() {
         let points: Vec<ResampledPointD1> = (0..38)
-            .map(|i| rp_median(i as i32 + 1, (i + 1) as i64, 1.0))
+            .map(|i| rp_median(i + 1, (i + 1) as i64, 1.0))
             .collect();
         let result = compute(&points).unwrap();
         let vals = indicator_values!(result);
@@ -160,7 +160,7 @@ mod tests {
     fn timestamps_track_newest_contributing_point() {
         // 40 points -> 3 AC values at ending indices 37,38,39 -> ts 137,138,139.
         let points: Vec<ResampledPointD1> = (0..40)
-            .map(|i| rp_median(i as i32 + 1, (i + 100) as i64, i as f64))
+            .map(|i| rp_median(i + 1, (i + 100) as i64, i as f64))
             .collect();
         let result = compute(&points).unwrap();
         let vals = indicator_values!(result);
@@ -174,7 +174,7 @@ mod tests {
     fn output_length_is_points_minus_37() {
         // 50 points -> 50 - 37 = 13 AC values.
         let points: Vec<ResampledPointD1> = (0..50)
-            .map(|i| rp_median(i as i32 + 1, (i + 1) as i64, i as f64))
+            .map(|i| rp_median(i + 1, (i + 1) as i64, i as f64))
             .collect();
         let result = compute(&points).unwrap();
         assert_eq!(indicator_values!(result).len(), 13);

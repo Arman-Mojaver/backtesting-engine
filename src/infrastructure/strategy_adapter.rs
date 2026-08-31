@@ -441,11 +441,11 @@ mod tests {
         let strategies: Vec<Strategy> = (0..5)
             .map(|i| Strategy {
                 instrument: "EURUSD".to_string(),
-                indicator_id: i as i32,
+                indicator_id: i,
                 annual_roi: 10.0,
                 max_draw_down: 20.0,
                 annual_operation_count: 12.0,
-                long_operation_point_ids: vec![i as i32],
+                long_operation_point_ids: vec![i],
                 short_operation_point_ids: vec![],
                 money_management_strategy_id: 1,
             })
