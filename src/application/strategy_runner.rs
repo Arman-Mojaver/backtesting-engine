@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use log::info;
+use log::debug;
 
 use crate::application::signal_generator::create_signal_groups;
 use crate::application::strategy_generator::create_strategies;
@@ -50,13 +50,12 @@ pub fn run_strategies(
         start_timestamp,
         end_timestamp,
     );
-    info!(
+    debug!(
         "After annual operation count filter (min {}): {} signal groups",
         global_filter.min_operation_count,
         filtered_groups.len(),
     );
 
-    info!("Creating strategies ...");
     let strategies = create_strategies(
         &filtered_groups,
         &operation_points,
@@ -66,7 +65,7 @@ pub fn run_strategies(
     );
 
     let strategies = filter_strategies(strategies, &global_filter);
-    info!(
+    debug!(
         "After strategy filter (min annual ROI {}, max drawdown {}): {} strategies",
         global_filter.min_annual_roi,
         global_filter.max_draw_down_max,

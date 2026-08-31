@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     environment:
       - ENVIRONMENT=${ENVIRONMENT}
+      - RUST_LOG=${RUST_LOG}
     volumes:
       - ./src:/app/src
       - ./Cargo.toml:/app/Cargo.toml

@@ -1,5 +1,8 @@
 use std::cell::RefCell;
+use std::time::{Instant};
 
+use log::{debug};
+use postgres::types::ToSql;
 use postgres::{Client, NoTls, Row};
 
 use crate::domain::indicator::{Indicator, IndicatorParameters, IndicatorRepository};
@@ -142,6 +145,31 @@ fn connect(connection_string: &str) -> anyhow::Result<Client> {
     Client::connect(connection_string, NoTls).map_err(anyhow::Error::from)
 }
 
+fn fetch_rows<T, F>(
+    conn: &RefCell<Client>,
+    label: &str,
+    sql: &str,
+    params: &[&(dyn ToSql + Sync)],
+    map: F,
+) -> Vec<T>
+where
+    F: Fn(&Row) -> T,
+{
+    let start = Instant::now();
+    let rows = conn
+        .borrow_mut()
+        .query(sql, params)
+        .unwrap_or_else(|e| panic!("failed to query {label}: {e}"));
+    let duration = start.elapsed();
+
+    debug!(
+        "query executed: {label} — {} rows in {duration:?}",
+        rows.len()
+    );
+
+    rows.iter().map(map).collect()
+}
+
 pub struct PgLongOperationPointAdapter {
     conn: RefCell<Client>,
 }
@@ -155,46 +183,38 @@ impl PgLongOperationPointAdapter {
     }
 
     pub fn get_distinct_mms_ids(&self) -> Vec<i32> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT DISTINCT money_management_strategy_id FROM long_operation_point ORDER BY 1",
-                &[],
-            )
-            .expect("failed to query money_management_strategy_id");
-        rows.iter()
-            .map(|r| r.get("money_management_strategy_id"))
-            .collect()
+        fetch_rows(
+            &self.conn,
+            "long_operation_point distinct mms_ids",
+            "SELECT DISTINCT money_management_strategy_id FROM long_operation_point ORDER BY 1",
+            &[],
+            |r| r.get("money_management_strategy_id"),
+        )
     }
 }
 
 impl LongOperationPointRepository for PgLongOperationPointAdapter {
     fn get_all(&self) -> Vec<OperationPoint> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
-                 FROM long_operation_point",
-                &[],
-            )
-            .expect("failed to query long_operation_point");
-        rows.iter().map(row_to_operation_point).collect()
+        fetch_rows(
+            &self.conn,
+            "long_operation_point get_all",
+            "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
+             FROM long_operation_point",
+            &[],
+            row_to_operation_point,
+        )
     }
 
     fn get_by_mms_id_and_instrument(&self, mms_id: i32, instrument: &str) -> Vec<OperationPoint> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
-                 FROM long_operation_point \
-                 WHERE money_management_strategy_id = $1 AND instrument = $2",
-                &[&mms_id, &instrument],
-            )
-            .expect("failed to query long_operation_point by mms_id and instrument");
-        rows.iter().map(row_to_operation_point).collect()
+        fetch_rows(
+            &self.conn,
+            "long_operation_point by mms_id and instrument",
+            "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
+             FROM long_operation_point \
+             WHERE money_management_strategy_id = $1 AND instrument = $2",
+            &[&mms_id, &instrument],
+            row_to_operation_point,
+        )
     }
 }
 
@@ -213,30 +233,26 @@ impl PgShortOperationPointAdapter {
 
 impl ShortOperationPointRepository for PgShortOperationPointAdapter {
     fn get_all(&self) -> Vec<OperationPoint> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
-                 FROM short_operation_point",
-                &[],
-            )
-            .expect("failed to query short_operation_point");
-        rows.iter().map(row_to_operation_point).collect()
+        fetch_rows(
+            &self.conn,
+            "short_operation_point get_all",
+            "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
+             FROM short_operation_point",
+            &[],
+            row_to_operation_point,
+        )
     }
 
     fn get_by_mms_id_and_instrument(&self, mms_id: i32, instrument: &str) -> Vec<OperationPoint> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
-                 FROM short_operation_point \
-                 WHERE money_management_strategy_id = $1 AND instrument = $2",
-                &[&mms_id, &instrument],
-            )
-            .expect("failed to query short_operation_point by mms_id and instrument");
-        rows.iter().map(row_to_operation_point).collect()
+        fetch_rows(
+            &self.conn,
+            "short_operation_point by mms_id and instrument",
+            "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
+             FROM short_operation_point \
+             WHERE money_management_strategy_id = $1 AND instrument = $2",
+            &[&mms_id, &instrument],
+            row_to_operation_point,
+        )
     }
 }
 
@@ -253,43 +269,37 @@ impl PgResampledPointAdapter {
     }
 
     pub fn get_distinct_instruments(&self) -> Vec<String> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT DISTINCT instrument FROM resampled_point_d1 ORDER BY 1",
-                &[],
-            )
-            .expect("failed to query instrument");
-        rows.iter().map(|r| r.get("instrument")).collect()
+        fetch_rows(
+            &self.conn,
+            "resampled_point_d1 distinct instruments",
+            "SELECT DISTINCT instrument FROM resampled_point_d1 ORDER BY 1",
+            &[],
+            |r| r.get("instrument"),
+        )
     }
 }
 
 impl ResampledPointD1Repository for PgResampledPointAdapter {
     fn get_all(&self) -> Vec<ResampledPointD1> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT id, instrument, open, high, low, close, volume, timestamp, high_low_order \
-                 FROM resampled_point_d1",
-                &[],
-            )
-            .expect("failed to query resampled_point_d1");
-        rows.iter().map(row_to_resampled_point).collect()
+        fetch_rows(
+            &self.conn,
+            "resampled_point_d1 get_all",
+            "SELECT id, instrument, open, high, low, close, volume, timestamp, high_low_order \
+             FROM resampled_point_d1",
+            &[],
+            row_to_resampled_point,
+        )
     }
 
     fn get_by_instrument(&self, instrument: &str) -> Vec<ResampledPointD1> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT id, instrument, open, high, low, close, volume, timestamp, high_low_order \
-                 FROM resampled_point_d1 WHERE instrument = $1",
-                &[&instrument],
-            )
-            .expect("failed to query resampled_point_d1 by instrument");
-        rows.iter().map(row_to_resampled_point).collect()
+        fetch_rows(
+            &self.conn,
+            "resampled_point_d1 by instrument",
+            "SELECT id, instrument, open, high, low, close, volume, timestamp, high_low_order \
+             FROM resampled_point_d1 WHERE instrument = $1",
+            &[&instrument],
+            row_to_resampled_point,
+        )
     }
 }
 
@@ -306,38 +316,35 @@ impl PgIndicatorAdapter {
     }
 
     pub fn get_all_indicator_ids(&self) -> Vec<i32> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query("SELECT id FROM indicator ORDER BY 1", &[])
-            .expect("failed to query id");
-        rows.iter().map(|r| r.get("id")).collect()
+        fetch_rows(
+            &self.conn,
+            "indicator ids",
+            "SELECT id FROM indicator ORDER BY 1",
+            &[],
+            |r| r.get("id"),
+        )
     }
 }
 
 impl IndicatorRepository for PgIndicatorAdapter {
     fn get_all(&self) -> Vec<Indicator> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT id, type, parameters::text, identifier FROM indicator",
-                &[],
-            )
-            .expect("failed to query indicator");
-        rows.iter().map(row_to_indicator).collect()
+        fetch_rows(
+            &self.conn,
+            "indicator get_all",
+            "SELECT id, type, parameters::text, identifier FROM indicator",
+            &[],
+            row_to_indicator,
+        )
     }
 
     fn get_by_type(&self, indicator_type: &str) -> Vec<Indicator> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT id, type, parameters::text, identifier FROM indicator WHERE type = $1",
-                &[&indicator_type],
-            )
-            .expect("failed to query indicator by type");
-        rows.iter().map(row_to_indicator).collect()
+        fetch_rows(
+            &self.conn,
+            "indicator by type",
+            "SELECT id, type, parameters::text, identifier FROM indicator WHERE type = $1",
+            &[&indicator_type],
+            row_to_indicator,
+        )
     }
 }
 pub struct PgMoneyManagementStrategyAdapter {
@@ -353,14 +360,12 @@ impl PgMoneyManagementStrategyAdapter {
     }
 
     pub fn get_distinct_ids(&self) -> Vec<i32> {
-        let rows = self
-            .conn
-            .borrow_mut()
-            .query(
-                "SELECT DISTINCT id FROM money_management_strategy ORDER BY 1",
-                &[],
-            )
-            .expect("failed to query money_management_strategy");
-        rows.iter().map(|r| r.get("id")).collect()
+        fetch_rows(
+            &self.conn,
+            "money_management_strategy distinct ids",
+            "SELECT DISTINCT id FROM money_management_strategy ORDER BY 1",
+            &[],
+            |r| r.get("id"),
+        )
     }
 }

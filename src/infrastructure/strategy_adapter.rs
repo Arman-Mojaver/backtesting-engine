@@ -2,12 +2,14 @@ use std::fs;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Instant;
 
 use arrow::array::{
     AsArray, Decimal128Array, Int32Array, Int32Builder, Int64Array, ListArray, PrimitiveArray,
 };
 use arrow::datatypes::{DataType, Decimal128Type, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
+use log::debug;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
@@ -92,6 +94,7 @@ impl ParquetStrategyRepository {
     }
 
     fn write_partition(&self, path: &Path, new_rows: Vec<StrategyRow>) -> anyhow::Result<()> {
+        let start = Instant::now();
         let existing_rows: Vec<StrategyRow> = if path.exists() {
             self.read_rows(path)?
         } else {
@@ -105,9 +108,17 @@ impl ParquetStrategyRepository {
             .collect();
 
         if fresh_rows.is_empty() {
+            debug!(
+                "parquet partition skipped: {} — 0 fresh rows ({} existing) in {:?}",
+                path.display(),
+                existing_rows.len(),
+                start.elapsed()
+            );
             return Ok(());
         }
 
+        let existing_count = existing_rows.len();
+        let fresh_count = fresh_rows.len();
         let mut combined = existing_rows;
         combined.extend(fresh_rows);
 
@@ -123,15 +134,26 @@ impl ParquetStrategyRepository {
         writer.write(&batch)?;
         writer.close()?;
 
+        debug!(
+            "parquet partition written: {} — {} rows ({} existing + {} fresh) in {:?}",
+            path.display(),
+            combined.len(),
+            existing_count,
+            fresh_count,
+            start.elapsed()
+        );
+
         Ok(())
     }
 
     pub fn max_strategy_id(&self) -> anyhow::Result<i64> {
+        let start = Instant::now();
         let root = PathBuf::from(&self.base_dir);
         if !root.exists() {
             return Ok(0);
         }
         let mut max_id: i64 = 0;
+        let mut partitions_scanned: usize = 0;
         let mut dirs: Vec<PathBuf> = vec![root];
         while let Some(dir) = dirs.pop() {
             for entry in fs::read_dir(&dir)? {
@@ -140,6 +162,7 @@ impl ParquetStrategyRepository {
                 if path.is_dir() {
                     dirs.push(path);
                 } else if path.file_name().is_some_and(|n| n == "strategies.parquet") {
+                    partitions_scanned += 1;
                     let file = File::open(&path)?;
                     let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
                     let mut reader = builder.build()?;
@@ -151,6 +174,12 @@ impl ParquetStrategyRepository {
                 }
             }
         }
+        debug!(
+            "parquet max strategy id scan: {} partition(s), max_id={} in {:?}",
+            partitions_scanned,
+            max_id,
+            start.elapsed()
+        );
         Ok(max_id)
     }
 

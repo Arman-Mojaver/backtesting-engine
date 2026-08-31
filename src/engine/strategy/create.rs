@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use log::info;
 
@@ -13,11 +13,14 @@ use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
 use super::resolve_environment;
 
 pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow::Result<()> {
+    let command_start = Instant::now();
     info!(
         "Fetching shared data for {} (mms_id={}) ...",
         instrument, money_management_strategy_id
     );
+    let fetch_start = Instant::now();
     let data = fetch_source_data(&instrument, money_management_strategy_id)?;
+    info!("Source data fetched in {:?}", fetch_start.elapsed());
 
     let manifest = ParquetProcessedManifest::new(parquet_root_dir(resolve_environment()));
     let processed_rows = manifest.read(&instrument, money_management_strategy_id)?;
@@ -32,6 +35,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
             instrument,
             money_management_strategy_id,
         );
+        info!("Total command time: {:?}.", command_start.elapsed());
         return Ok(());
     }
 
@@ -43,6 +47,12 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
         money_management_strategy_id,
     );
 
+    info!(
+        "Running strategies for {} unprocessed indicators (mms_id={}) ...",
+        unprocessed_ids.len(),
+        money_management_strategy_id
+    );
+    let run_start = Instant::now();
     let strategies = run_strategies(
         &data.indicators,
         &data.resampled_points,
@@ -51,10 +61,17 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
         data.money_management_strategy_id,
         &unprocessed_ids,
     )?;
+    info!(
+        "run_strategies done in {:?} — {} strategies",
+        run_start.elapsed(),
+        strategies.len()
+    );
 
     let repo = ParquetStrategyRepository::new(parquet_base_dir(resolve_environment()));
     info!("Writing {} strategies to parquet ...", strategies.len());
+    let write_start = Instant::now();
     repo.write(&instrument, money_management_strategy_id, &strategies)?;
+    info!("Parquet write done in {:?}", write_start.elapsed());
 
     let processed_at = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -79,6 +96,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
         money_management_strategy_id,
         unprocessed_ids.len(),
     );
+    info!("Total command time: {:?}.", command_start.elapsed());
 
     Ok(())
 }

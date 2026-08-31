@@ -35,6 +35,7 @@ struct SourceIndex {
 impl SourceIndex {
     /// Loads every table once and indexes the rows in memory.
     fn load() -> anyhow::Result<Self> {
+        info!("Querying db...");
         let db_config = DbConfig::from_env(resolve_environment());
         let conn_string = db_config.connection_string();
 
@@ -145,6 +146,7 @@ fn compute_cell(
 }
 
 pub fn execute() -> anyhow::Result<()> {
+    let command_start = Instant::now();
     // 1. Load and index the source data, and read the processed manifest, each once.
     let source = SourceIndex::load()?;
     let cells = source.cells();
@@ -157,17 +159,33 @@ pub fn execute() -> anyhow::Result<()> {
     info!("{} cells to process.", cells.len());
 
     // 2. Compute strategies in parallel.
+    info!("Computing strategies ...");
+    let compute_start = Instant::now();
     let computed: Vec<CellOutput> = cells
         .par_iter()
         .filter_map(|cell| compute_cell(&source, cell, &processed_ids_per_cell))
         .collect();
 
     let cell_count = computed.len();
-    info!("Compute done — {} cells. Persisting ...", cell_count);
+    info!(
+        "Compute done — {} cells in {:?}. Persisting ...",
+        cell_count,
+        compute_start.elapsed()
+    );
 
     // 3. Persist (assign IDs, write partitions in parallel, commit manifest).
+    let persist_start = Instant::now();
     persistence.persist_cells(computed)?;
+    info!(
+        "Persist done — {} cells in {:?}.",
+        cell_count,
+        persist_start.elapsed()
+    );
 
-    info!("Done — {} cells persisted.", cell_count);
+    info!(
+        "Done — {} cells persisted. Total command time: {:?}.",
+        cell_count,
+        command_start.elapsed()
+    );
     Ok(())
 }
