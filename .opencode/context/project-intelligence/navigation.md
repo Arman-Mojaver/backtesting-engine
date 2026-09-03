@@ -39,3 +39,4 @@
 - Update `domain-model.md` when entities, validation rules, or glossary terms change
 - Update `business-tech-bridge.md` when new files or features are added
 - Update `business-domain.md` when project scope or constraints change
+- Keep the README abstract (domain concepts, CLI, data contracts, tools) — code-level detail (functions, structs, file trees) lives in these context files, never in the README

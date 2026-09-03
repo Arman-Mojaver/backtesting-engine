@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/business | Priority: high | Version: 1.5 | Updated: 2026-08-31 -->
+<!-- Context: project-intelligence/business | Priority: high | Version: 1.6 | Updated: 2026-09-03 -->
 
 # Business Domain
 
@@ -13,8 +13,9 @@ Problem Statement: Traders need to evaluate whether a strategy (indicator + mone
                    management rules) would have been profitable on past data before
                    risking real capital.
 Solution: A Rust engine that loads historical OHLCV candles, long/short trade records,
-          and indicator configurations, validates data consistency, and (planned)
-          computes performance metrics.
+          and indicator configurations from PostgreSQL, validates data consistency,
+          computes real indicator signals, and evaluates strategies with performance
+          metrics — persisting survivors to partitioned Parquet output.
 ```
 
 ## Target Users
@@ -30,34 +31,40 @@ Solution: A Rust engine that loads historical OHLCV candles, long/short trade re
 - Catches data inconsistencies (mixed instruments, misaligned timestamps, wrong MMS) before they corrupt results
 - Separates long and short analysis for directional clarity
 - Pure-domain validation — no database or network required to verify data integrity
+- Real indicator mathematics (14 indicators) with explicit signal semantics — no black box
+- Idempotent batch runs — re-running never duplicates work or output
 
 **For Business**:
 - Foundation for a full backtesting platform (metrics, reporting, optimization)
 - Clean architecture enables adding new data sources, indicators, and strategies without touching core logic
+- Parquet output plugs directly into the analytical ecosystem (Arrow/Polars/Spark)
 
 ## Current State
 
-The engine is in **active development**:
+The engine is in **active development** — the strategy pipeline is real end-to-end:
 - ✅ Domain model defined (entities, repository traits)
-- ✅ Five validation rules implemented and tested
-- ✅ In-memory repository adapters for testing
+- ✅ Five validation rules implemented and tested (fail-fast, ordered)
 - ✅ CLI structure (`ct` binary with dev, indicator, mms, operation-point, raw-point, resampled-point, strategy commands)
-- ✅ Engine CLI module extracted (`bt-engine` binary with its own command tree)
-- ✅ Environment/DB configuration
-- ✅ PostgreSQL adapters for indicators, operation points, resampled points
-- ✅ `Strategy` entity + `GlobalStrategyFilter` + `filter_strategies()`
-- ✅ Strategy generation (`create` from DB, `generate` synthetic) with partitioned parquet persistence
-- ✅ Application layer (`fetch_strategy_data`, `create_signals`, `create_strategies`)
-- ✅ Performance metric functions: `performance_metrics()` (single-pass global ROI + max draw down, `annual_roi()` method, defensive chronological sort), `annual_operation_count()` (pure domain functions)
-- ✅ Real metrics computed in the strategy generator (`create_strategies()` — no more random placeholders)
-- ✅ Signal generator (`create_signals()` — random timestamp sampling from resampled points)
+- ✅ Engine CLI (`bt-engine` binary: strategy create, create_loop, metadata)
+- ✅ Environment/DB configuration (production / development / testing)
+- ✅ PostgreSQL adapters for indicators, operation points, resampled points (+ indexed batch loads)
+- ✅ `Strategy` entity + `GlobalStrategyFilter` + `filter_strategies()` (DD ≤ 30%, ROI ≥ 5%)
+- ✅ Application layer (`fetch_source_data`, `create_signal_groups`, `create_strategies`, `run_strategies`)
+- ✅ Performance metrics: single-pass `performance_metrics()` (global ROI + max draw down), `annual_roi()`, `annual_operation_count()` — pure domain functions
+- ✅ Real metrics computed in the strategy generator (rayon-parallelized)
+- ✅ **Real signal generation** — 14 indicators computed from candle data (RSI, AO, AC, Bears, Bulls, CHO, CHV, DPO, Force, OsMa, ROC, TRIX, VROC) with zero-cross / threshold / crossover signal semantics
 - ✅ Two-stage filtering: signal groups by annual op count, then strategies by DD + ROI
 - ✅ In-memory signal-group memoization (`cached` crate, keyed by `indicator_id` + instrument)
-- ✅ `SignalGroup` in domain layer with embedded `indicator_id`
+- ✅ `SignalGroup` in domain layer with embedded `indicator_id`, `instrument`, `operation_count`
 - ✅ All timestamps are `i64` (epoch seconds)
-- ⬜ Backtest execution logic (not yet implemented)
-- ⬜ Real signal generation from indicator parameters (MACD crossover, RSI thresholds — currently random timestamps)
-- ⬜ API endpoints for running backtests
+- ✅ Partitioned Parquet persistence (instrument × MMS, ZSTD, idempotent by indicator_id)
+- ✅ Processed manifest — idempotency ledger of (instrument, mms_id, indicator_id) triples
+- ✅ `create_loop` — batch pipeline over all cells, parallel compute + persist
+- ✅ `metadata` — DB vs manifest progress report
+- ✅ CI: fmt + clippy (-D warnings) + 429 tests + Docker build/push
+- ⬜ MACD signal generation (parameters parse, compute unsupported — skipped for now)
+- ⬜ Exit-date-aware metrics (ROI/DD currently assume operations close in entry order — see living-notes)
+- ⬜ API endpoints for running backtests (deliberately deferred — no consumers yet)
 
 ## Business Constraints
 

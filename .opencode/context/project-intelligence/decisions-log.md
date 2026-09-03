@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.6 | Updated: 2026-08-31 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.7 | Updated: 2026-09-03 -->
 
 # Decisions Log
 
@@ -558,12 +558,242 @@ Replace the three metric files (`global_roi.rs`, `max_draw_down.rs`, `annual_roi
 
 ---
 
+---
+
+## Decision: Port Indicators to Rust + Real Signal Generation
+
+**Date**: 2026-07-09 → 2026-07-26 (incremental ports; signal abstractions refactored 2026-07-25)
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+`create_signals()` generated `SignalGroup`s by sampling **random timestamps** from resampled points — the signals were placeholders, not derived from indicator logic. Metrics computed from those signals were real, but the strategies themselves were meaningless. This was the highest-priority technical debt item.
+
+### Decision
+Port the indicator library to Rust as pure domain functions and derive signals from real indicator mathematics:
+1. `src/domain/indicators/` — one file per indicator (AO, AC, Bears, Bulls, CHO, CHV, DPO, Force, OsMa, ROC, TRIX, VROC, RSI), shared moving-average math in `moving_averages.rs`, uniform macros (`validate_period!`, `empty_oscillator!`, `indicator_values!`).
+2. `create_indicator_output(parameters, points)` dispatches the typed `IndicatorParameters` enum to a compute function and returns an `IndicatorOutput` — `Oscillator`, `Threshold`, or `Crossover`.
+3. `src/domain/signal/` — three small semantics modules convert an output to signals: oscillator zero-cross, threshold crossing, crossover (series diff → zero-cross). `IndicatorOutput::create_signal_group()` routes to the right rule.
+4. MACD is **skipped, not aborted**: compute returns `UnsupportedIndicator`; the signal generator's `filter_map` drops it and the run continues.
+
+### Rationale
+- Signals must come from indicator mathematics or the whole pipeline is theater
+- Three output kinds cover all indicators — signal semantics are a separate, small concept
+- Typed parameter enum + dispatch makes adding an indicator mechanical (variant + compute fn + arm + tests)
+- Macros keep 14 implementations uniform (period validation, empty-series handling, buffer access)
+- Skipping unsupported indicators keeps batch runs resilient — one bad indicator must not kill a 500-indicator run
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep random timestamps | No work | Strategies are meaningless | Unacceptable |
+| Compute indicators in the Python companion | Reuses existing code | Cross-process I/O on the hot path; splits the domain | Engine must own its math |
+| Abort run on unsupported indicator | Fail-fast purity | One unsupported indicator kills the whole batch | Skip-and-continue is the right trade for batch workloads |
+
+### Impact
+**Positive**: Signals are real; the pipeline is honest end-to-end; indicator ports are uniform and testable
+**Negative**: MACD strategies are silently absent until implemented (logged via skip)
+**Risk**: Silent skips could hide coverage gaps — mitigated by `strategy metadata` reporting
+
+### Related
+- Implementation: `src/domain/indicators/`, `src/domain/signal/`, `src/application/signal_generator.rs`
+- Resolves: "Random placeholder signal timestamps" technical debt (living-notes.md)
+- Commits: `27651c5` (AO) through `d70b518` (VROC), `d8063aa` (signal abstractions), `9af8fb1` (SignalGroup attributes)
+
+---
+
+## Decision: Processed Manifest + Idempotent Partitions
+
+**Date**: 2026-08-07
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+Re-running `strategy create` recomputed every indicator and appended duplicate rows to the parquet partitions. There was no record of which `(instrument, mms_id, indicator_id)` work was already done, so batch runs were neither idempotent nor resumable.
+
+### Decision
+1. Add `ParquetProcessedManifest` — a single `processed.parquet` ledger under the environment root recording every completed `(instrument, mms_id, indicator_id)` triple with a `processed_at` timestamp. Appends dedup on the triple; writes are atomic (temp file + rename).
+2. Make partition writes idempotent: `write_partition` reads existing rows and drops fresh rows whose `indicator_id` already exists — re-runs never duplicate.
+3. Add `bt-engine strategy metadata` — a DB-vs-manifest report of done and remaining triples.
+
+### Rationale
+- Idempotency at the command level (manifest) AND the output level (partition dedup) — neither alone is sufficient: the manifest says what was attempted, the partition dedup guards the data itself
+- Parquet (not a DB table or JSON file) keeps the ledger in the same ecosystem as the output, with the same atomic-write discipline
+- Atomic rename prevents a half-written manifest from corrupting the run state
+- The metadata command falls out of the ledger for free — operators get a progress report
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Track processed state in PostgreSQL | Transactional | Write-heavy OLTP load; couples engine to DB for run state | Run state belongs with the output |
+| JSON/CSV manifest | Human-readable | No schema, no atomic rewrite discipline | Weaker guarantees |
+| Partition dedup only (no manifest) | Simpler | Must read every partition to know what's done; no processed_at history | O(partitions) per check; no audit trail |
+
+### Impact
+**Positive**: `create`/`create_loop` are safely re-runnable; runs are resumable; operators get progress reporting
+**Negative**: Manifest append rewrites the whole ledger file (fine at current scale)
+**Risk**: Manifest and partitions can drift if a run crashes between partition write and manifest commit — partition dedup makes the drift self-healing on re-run
+
+### Related
+- Implementation: `src/infrastructure/processed_manifest.rs`, `src/infrastructure/strategy_adapter.rs`, `src/engine/strategy/metadata.rs`, `src/application/metadata_report.rs`
+- Commit: `18318cf` (parquet: add processed manifest, dedup-on-write, and metadata command)
+
+---
+
+## Decision: `create_loop` Batch Pipeline
+
+**Date**: 2026-08-08 (introduced), refined through 2026-08-30 (adapter extraction, n+1 fix, parallel queries)
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+`strategy create` processes one `(instrument, mms_id)` cell per invocation. Running the whole database meant a shell loop: one DB connection set, one fetch, one parquet write per cell — n+1 query patterns and no cross-cell parallelism.
+
+### Decision
+Add `bt-engine strategy create_loop`:
+1. Load all four source tables **once**, in parallel (nested `rayon::join`), and index them in memory (`resampled_by_instrument`, `long_by_cell`, `short_by_cell`).
+2. Derive the cell list from the operation-point indexes (union of long/short cells).
+3. Compute every cell with `par_iter`, skipping cells whose indicators are all in the processed manifest.
+4. Persist as one batch via `StrategyPersistence`: assign `strategy_id`s sequentially from the global max, write partitions in parallel, commit the manifest once (`append_all`).
+
+### Rationale
+- One query per table instead of one per cell — eliminates the n+1 pattern entirely
+- Cells are independent — rayon `par_iter` is the natural fit, same as strategies within a cell
+- Batch ID assignment + single manifest commit keeps IDs contiguous and the ledger consistent
+- Reuses `run_strategies()` unchanged — the per-cell logic is identical to `create`
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Shell loop over `strategy create` | No new code | n+1 queries; serial; per-run process startup | Slow and fragile |
+| Query per cell inside the loop | Simple | Still n+1 connections/queries | The reason for this change |
+| Single threaded in-process loop | One connection set | Wastes cores; cells are independent | Rayon is trivial here |
+
+### Impact
+**Positive**: Whole-database runs are parallel, query-efficient, and idempotent
+**Negative**: Peak memory holds all source tables indexed in memory (acceptable — daily candles and trade records are small relative to RAM)
+**Risk**: A failure mid-batch leaves some partitions written but the manifest uncommitted — self-healing on re-run via partition dedup
+
+### Related
+- Implementation: `src/engine/strategy/create_loop.rs`, `src/application/cell_output.rs`, `src/infrastructure/strategy_persistence.rs`
+- Commits: `4bc124c` (create_loop), `a333f6f` (n+1 fix), `ddfb72d` (adapters), `eebac2f` (parallel queries)
+
+---
+
+## Decision: Remove In-Memory Repositories
+
+**Date**: 2026-08-29
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+`src/infrastructure/in_memory_repos.rs` implemented all four repository traits for tests. In practice, tests used `domain::fixtures` builders for domain logic and `tempfile`-based tests for the parquet adapters — the in-memory repos had no remaining consumers and duplicated fixture functionality.
+
+### Decision
+Delete `in_memory_repos.rs`. Domain tests use fixtures; adapter tests use real files under `tempfile::TempDir`.
+
+### Rationale
+- Dead code with maintenance cost and a misleading suggestion of a production in-memory mode
+- Fixtures + tempfile tests cover the same needs with less code
+- Testing adapters against real parquet files is higher-fidelity than testing against in-memory fakes
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep for future use | Available | Unused; misleading | YAGNI |
+| Move to a test-support crate | Organized | Still dead code, now with ceremony | No consumers |
+
+### Impact
+**Positive**: Less code; clearer testing story (fixtures for domain, tempfile for adapters)
+**Negative**: Re-adding an in-memory mode requires writing it again
+**Risk**: None — no consumers
+
+### Related
+- Commit: `2bc5df3` (chore: remove in_memory_repos.rs)
+- Testing patterns: `src/domain/fixtures.rs`, `src/infrastructure/processed_manifest.rs` tests
+
+---
+
+## Decision: Structured Logging via `log` + `simplelog`
+
+**Date**: 2026-08-29
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+Production code used `eprintln!` for progress output. There were no levels, no timestamps, and no way to route logs to a file — the Docker container tailed `logs/bt-engine.log`, which nothing wrote to.
+
+### Decision
+Adopt the `log` facade with `simplelog` (term + file writers, `RUST_LOG`-driven levels). Replace all `eprintln!` in production code with level-appropriate `info!`/`warn!`/`debug!`/`error!`. Propagate logs to the Docker setup (compose tails the log file).
+
+### Rationale
+- `log` facade keeps the domain free of any logging backend (infrastructure owns `logging::init()`)
+- `RUST_LOG` gives operators per-module level control without rebuilds
+- File writer feeds the container's log tail; timestamps make batch runs auditable
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep `eprintln!` | No work | No levels/timestamps/file routing | Unacceptable for batch tooling |
+| `tracing` + subscriber | Structured spans, ecosystem standard | Heavier dependency; spans unused in a batch CLI | Premature |
+| `env_logger` | Simple | File output needs shell redirection | simplelog writes files natively |
+
+### Impact
+**Positive**: Leveled, timestamped, file-routed logs; `RUST_LOG=debug` reveals filter-stage counts
+**Negative**: One more dependency (`simplelog`)
+**Risk**: None significant
+
+### Related
+- Implementation: `src/infrastructure/logging.rs`, `docker-compose.yaml` (log tail), `.env.example` (`RUST_LOG`)
+- Commits: `ed936ae` (logger), `e8b895d` (propagate to docker)
+
+---
+
+## Decision: CI Workflow (fmt + clippy -D warnings + tests + Docker)
+
+**Date**: 2026-09-03
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The repository had no CI. Formatting, lint, and test discipline existed locally but was not enforced; Docker images were built and pushed by hand via the Makefile.
+
+### Decision
+Add `.github/workflows/ci.yml`:
+1. `lint-and-test` job on push to `main` (+ workflow_dispatch): pinned Rust **1.94.0** (matching the Dockerfile's `rust:1.94`), `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test`, with `Swatinem/rust-cache`.
+2. `docker` job (gated on lint-and-test): build and push `armanmojaver/backtesting-engine` tagged `latest` + short commit SHA, with GitHub Actions layer cache.
+
+### Rationale
+- Zero-warning clippy policy enforced at the gate, not by memory
+- Pinning the toolchain to the Dockerfile's Rust version prevents CI/local/image drift
+- Docker push only after tests pass — a broken image can never be published
+- SHA tags give every image a traceable provenance point
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| No CI | No work | Discipline decays | Unacceptable |
+| Tests only (no fmt/clippy gate) | Cheaper | Style/lint drift accumulates | The gate is the point |
+| Unpinned toolchain | Always latest | CI/image version drift | Pinning is one line |
+
+### Impact
+**Positive**: Every merge to main is formatted, lint-clean, tested, and published with provenance
+**Negative**: CI minutes per push; Docker credentials must exist as secrets
+**Risk**: None significant
+
+### Related
+- Implementation: `.github/workflows/ci.yml`, `Dockerfile` (rust:1.94), `Makefile` (local equivalents)
+
 ## Deprecated Decisions
 
 | Decision | Date | Replaced By | Why |
 |----------|------|-------------|-----|
 | Redis-Backed Signal Groups Cache | 2026-06-08 | Remove Redis (2026-08-19) | Superseded by in-memory `cached` memoization |
 | Separate `global_roi`/`max_draw_down`/`annual_roi` metric files | 2026-06-24/28 | Single-pass `performance_metrics()` (2026-08-31) | All three derive from one compounding curve; combined into one pass with a defensive sort owned by the function |
+| Random-timestamp signal generation | pre-2026-07 | Port Indicators to Rust + Real Signal Generation (2026-07) | Signals must derive from indicator mathematics, not sampling |
+| In-memory repositories for tests | 2026-06 | Remove In-Memory Repositories (2026-08-29) | Fixtures + tempfile-based adapter tests cover the same needs |
+| `eprintln!` progress output | pre-2026-08 | Structured Logging via `log` + `simplelog` (2026-08-29) | Batch tooling needs levels, timestamps, and file routing |
+| Manual Docker build/push (Makefile only) | pre-2026-09 | CI Workflow (2026-09-03) | Publishing must be gated on fmt + clippy + tests |
 
 ## Onboarding Checklist
 
