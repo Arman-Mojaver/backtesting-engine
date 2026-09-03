@@ -9,7 +9,6 @@ pub struct PerformanceMetrics {
     pub max_draw_down: f64,
 }
 
-
 pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceMetrics {
     if operation_points.is_empty() {
         return PerformanceMetrics {
