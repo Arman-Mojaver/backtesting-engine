@@ -12,18 +12,15 @@ use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
 
 use super::resolve_environment;
 
-pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow::Result<()> {
+pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
     let command_start = Instant::now();
-    info!(
-        "Fetching shared data for {} (mms_id={}) ...",
-        instrument, money_management_strategy_id
-    );
+    info!("Fetching shared data for {instrument} (mms_id={money_management_strategy_id}) ...");
     let fetch_start = Instant::now();
-    let data = fetch_source_data(&instrument, money_management_strategy_id)?;
+    let data = fetch_source_data(instrument, money_management_strategy_id)?;
     info!("Source data fetched in {:?}", fetch_start.elapsed());
 
     let manifest = ParquetProcessedManifest::new(parquet_root_dir(resolve_environment()));
-    let processed_rows = manifest.read(&instrument, money_management_strategy_id)?;
+    let processed_rows = manifest.read(instrument, money_management_strategy_id)?;
     let processed_ids: HashSet<i32> = processed_rows.iter().map(|r| r.indicator_id).collect();
 
     let all_indicator_ids: Vec<i32> = data.indicators.iter().map(|i| i.id).collect();
@@ -70,7 +67,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
     let repo = ParquetStrategyRepository::new(parquet_base_dir(resolve_environment()));
     info!("Writing {} strategies to parquet ...", strategies.len());
     let write_start = Instant::now();
-    repo.write(&instrument, money_management_strategy_id, &strategies)?;
+    repo.write(instrument, money_management_strategy_id, &strategies)?;
     info!("Parquet write done in {:?}", write_start.elapsed());
 
     let processed_at = SystemTime::now()
@@ -83,7 +80,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: String) -> anyhow:
         unprocessed_ids.len(),
     );
     manifest.append(
-        &instrument,
+        instrument,
         money_management_strategy_id,
         &unprocessed_ids,
         processed_at,

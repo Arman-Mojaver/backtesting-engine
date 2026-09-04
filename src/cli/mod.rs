@@ -33,7 +33,7 @@ pub fn build_cli() -> Command {
         .subcommand(strategy::build_strategy_cli())
 }
 
-pub fn parse(matches: ArgMatches) -> AppCommand {
+pub fn parse(matches: &ArgMatches) -> AppCommand {
     match matches.subcommand() {
         Some(("dev", m)) => AppCommand::Dev(dev::parse_dev(m)),
         Some(("indicator", m)) => AppCommand::Indicator(indicator::parse_indicator(m)),
@@ -78,11 +78,11 @@ pub fn exec_python_cli(args: &[String]) -> anyhow::Result<()> {
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .status()
-        .map_err(|e| anyhow::anyhow!("Failed to execute docker exec: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute docker exec: {e}"))?;
 
     if !status.success() {
         let code = status.code().unwrap_or(-1);
-        anyhow::bail!("Python CLI exited with non-zero status: {}", code);
+        anyhow::bail!("Python CLI exited with non-zero status: {code}");
     }
     Ok(())
 }
@@ -98,11 +98,11 @@ pub fn exec_engine_cli(args: &[String]) -> anyhow::Result<()> {
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .status()
-        .map_err(|e| anyhow::anyhow!("Failed to execute docker exec: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute docker exec: {e}"))?;
 
     if !status.success() {
         let code = status.code().unwrap_or(-1);
-        anyhow::bail!("bt-engine exited with non-zero status: {}", code);
+        anyhow::bail!("bt-engine exited with non-zero status: {code}");
     }
     Ok(())
 }

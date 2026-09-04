@@ -1,0 +1,8 @@
+# Exact-pinned to match CI (.github/workflows/ci.yml) and the Docker image
+# (rust:1.94.0). rustup applies this automatically — bump all three together.
+# Excluded from the Docker build context (.dockerignore): the image pins its
+# toolchain by tag, and its rustup shims would otherwise hit the network.
+[toolchain]
+channel = "1.94.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

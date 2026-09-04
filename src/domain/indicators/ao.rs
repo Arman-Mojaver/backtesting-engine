@@ -19,7 +19,10 @@ const SLOW_PERIOD: usize = 34;
 /// Insufficient data (fewer than 34 points) yields an empty buffer, not an
 /// error — consistent with the RSI reference and umbrella PRD Decision 10.
 pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, IndicatorError> {
-    let medians: Vec<f64> = points.iter().map(|p| (p.high + p.low) / 2.0).collect();
+    let medians: Vec<f64> = points
+        .iter()
+        .map(|p| f64::midpoint(p.high, p.low))
+        .collect();
 
     let fast = sma(&medians, FAST_PERIOD);
     let slow = sma(&medians, SLOW_PERIOD);

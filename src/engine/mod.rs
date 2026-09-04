@@ -14,7 +14,7 @@ pub fn build_cli() -> Command {
         .subcommand(strategy::build_strategy_cli())
 }
 
-pub fn parse(matches: ArgMatches) -> EngineCommand {
+pub fn parse(matches: &ArgMatches) -> EngineCommand {
     match matches.subcommand() {
         Some(("strategy", m)) => EngineCommand::Strategy(strategy::parse_strategy(m)),
         _ => unreachable!("invalid engine command"),

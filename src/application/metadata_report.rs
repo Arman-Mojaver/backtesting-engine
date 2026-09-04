@@ -65,7 +65,7 @@ pub fn build_metadata_report(
             .processed_ids_per_cell
             .get(&(instrument.clone(), *mms_id));
 
-        let manifest_count = manifest_ids.map(|s| s.len()).unwrap_or(0) as i32;
+        let manifest_count = manifest_ids.map_or(0, std::collections::HashSet::len) as i32;
 
         let (db_effective, remaining_ids) = if db_cells.contains(&(instrument.clone(), *mms_id)) {
             // Which indicator IDs from the DB have NOT been processed yet?
@@ -338,7 +338,7 @@ mod tests {
         };
         let manifest = empty_manifest_state();
         let report = build_metadata_report(&db, &manifest);
-        let output = format!("{}", report);
+        let output = format!("{report}");
 
         assert!(output.contains("Metadata Report"));
         assert!(output.contains("Instrument"));
@@ -352,7 +352,7 @@ mod tests {
         let db = empty_db_state();
         let manifest = empty_manifest_state();
         let report = build_metadata_report(&db, &manifest);
-        let output = format!("{}", report);
+        let output = format!("{report}");
         assert!(output.contains("No data found"));
     }
 
@@ -370,7 +370,7 @@ mod tests {
             )]),
         };
         let report = build_metadata_report(&db, &manifest);
-        let output = format!("{}", report);
+        let output = format!("{report}");
         assert!(output.contains("All triples are processed"));
     }
 

@@ -1,4 +1,4 @@
-FROM rust:1.94 AS fetcher
+FROM rust:1.94.0 AS fetcher
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
@@ -7,7 +7,7 @@ RUN echo "fn main() {}" > src/bin/bt-engine.rs
 RUN cargo fetch
 
 
-FROM rust:1.94 AS builder
+FROM rust:1.94.0 AS builder
 WORKDIR /app
 
 COPY --from=fetcher /usr/local/cargo /usr/local/cargo
@@ -16,7 +16,7 @@ COPY . .
 RUN cargo build --bin bt-engine
 
 
-FROM rust:1.94
+FROM rust:1.94.0
 RUN apt-get update && apt-get install -y \
    ca-certificates \
    build-essential \

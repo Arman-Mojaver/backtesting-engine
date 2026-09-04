@@ -21,7 +21,10 @@ const DATA_LIMIT: usize = 37;
 /// Inlined (rather than calling `ao::compute`) per umbrella PRD Decision 6 so
 /// AC stays self-contained with no cross-module coupling to `ao.rs`.
 fn ao_series(points: &[ResampledPointD1]) -> Vec<f64> {
-    let medians: Vec<f64> = points.iter().map(|p| (p.high + p.low) / 2.0).collect();
+    let medians: Vec<f64> = points
+        .iter()
+        .map(|p| f64::midpoint(p.high, p.low))
+        .collect();
     let fast = sma(&medians, FAST_PERIOD);
     let slow = sma(&medians, SLOW_PERIOD);
     let offset = SLOW_PERIOD - FAST_PERIOD;

@@ -61,7 +61,7 @@ pub fn execute() -> anyhow::Result<()> {
     };
 
     let report = build_metadata_report(&db_state, &manifest_state);
-    println!("{}", report);
+    println!("{report}");
 
     Ok(())
 }

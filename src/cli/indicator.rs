@@ -92,7 +92,7 @@ pub fn parse_indicator(m: &ArgMatches) -> IndicatorCommand {
             identifiers: sub
                 .get_many::<String>("identifiers")
                 .unwrap_or_default()
-                .map(|s| s.to_owned())
+                .map(std::borrow::ToOwned::to_owned)
                 .collect(),
         }),
         _ => unreachable!("invalid indicator command"),
@@ -105,7 +105,7 @@ fn parse_create(m: &ArgMatches) -> CreateIndicator {
             args: sub
                 .get_many::<String>("args")
                 .unwrap_or_default()
-                .map(|s| s.to_owned())
+                .map(std::borrow::ToOwned::to_owned)
                 .collect(),
             example: sub.get_flag("example"),
         }),
@@ -113,7 +113,7 @@ fn parse_create(m: &ArgMatches) -> CreateIndicator {
             args: sub
                 .get_many::<String>("args")
                 .unwrap_or_default()
-                .map(|s| s.to_owned())
+                .map(std::borrow::ToOwned::to_owned)
                 .collect(),
             example: sub.get_flag("example"),
         }),

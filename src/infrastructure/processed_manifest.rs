@@ -10,7 +10,7 @@ use arrow::record_batch::RecordBatch;
 use log::{info, warn};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
-use parquet::basic::Compression;
+use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
 
 /// A row in the processed manifest recording a completed (instrument, mms_id, indicator_id)
@@ -239,7 +239,7 @@ fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
     )?;
 
     let props = WriterProperties::builder()
-        .set_compression(Compression::ZSTD(Default::default()))
+        .set_compression(Compression::ZSTD(ZstdLevel::default()))
         .build();
 
     let file = File::create(path)?;

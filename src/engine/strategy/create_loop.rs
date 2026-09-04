@@ -97,21 +97,14 @@ fn compute_cell(
 ) -> Option<CellOutput> {
     let (instrument, mms_id) = cell;
 
-    let resampled_points = source
+    let resampled_points: &[ResampledPointD1] = source
         .resampled_by_instrument
         .get(instrument)
-        .map(Vec::as_slice)
-        .unwrap_or(&[]);
-    let long_operation_points = source
-        .long_by_cell
-        .get(cell)
-        .map(Vec::as_slice)
-        .unwrap_or(&[]);
-    let short_operation_points = source
-        .short_by_cell
-        .get(cell)
-        .map(Vec::as_slice)
-        .unwrap_or(&[]);
+        .map_or(&[], Vec::as_slice);
+    let long_operation_points: &[OperationPoint] =
+        source.long_by_cell.get(cell).map_or(&[], Vec::as_slice);
+    let short_operation_points: &[OperationPoint] =
+        source.short_by_cell.get(cell).map_or(&[], Vec::as_slice);
 
     let processed_ids = processed_ids_per_cell
         .get(cell)
@@ -132,7 +125,7 @@ fn compute_cell(
     ) {
         Ok(strategies) => strategies,
         Err(e) => {
-            error!("Error {} (mms_id={}): {:?}", instrument, mms_id, e);
+            error!("Error {instrument} (mms_id={mms_id}): {e:?}");
             return None;
         }
     };

@@ -29,3 +29,27 @@ time = "=0.3.41"
 
 [dev-dependencies]
 tempfile = "3"
+
+[lints.clippy]
+# pedantic on; the allows below are deliberate exceptions (see decisions-log).
+pedantic = { level = "warn", priority = -1 }
+# Numeric-domain lints — intentional in a backtesting engine:
+# float thresholds/comparisons, PG adapter i32->i64 reads, timestamp arithmetic.
+float_cmp = "allow"
+cast_lossless = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+# Internal crate (not published) — doc-completeness lints deferred.
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+doc_markdown = "allow"
+# Low signal-to-noise for this codebase.
+must_use_candidate = "allow"
+similar_names = "allow"
+implicit_hasher = "allow"
+# Divisive style lints — plain if/else and let-bindings preferred over
+# match-with-wildcard and let-else; not worth the churn here.
+single_match_else = "allow"
+manual_let_else = "allow"

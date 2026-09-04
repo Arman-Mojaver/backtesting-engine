@@ -26,7 +26,7 @@ pub fn run_strategies(
         resampled_points,
         money_management_strategy_id,
     )
-    .map_err(|e: CombinedValidationError| anyhow::anyhow!("Validation failed: {:?}", e))?;
+    .map_err(|e: CombinedValidationError| anyhow::anyhow!("Validation failed: {e:?}"))?;
 
     let operation_points = OperationPoints {
         long_operation_points,

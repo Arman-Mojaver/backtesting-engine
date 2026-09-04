@@ -17,10 +17,10 @@ fn compute_ad(points: &[ResampledPointD1]) -> Vec<f64> {
     let mut ad = Vec::with_capacity(points.len());
     for pt in points {
         let range = pt.high - pt.low;
-        let ad_value = if range != 0.0 {
-            ((pt.close - pt.low) - (pt.high - pt.close)) / range * (pt.volume as f64)
-        } else {
+        let ad_value = if range == 0.0 {
             0.0
+        } else {
+            ((pt.close - pt.low) - (pt.high - pt.close)) / range * (pt.volume as f64)
         };
         let prev = ad.last().copied().unwrap_or(0.0);
         ad.push(prev + ad_value);

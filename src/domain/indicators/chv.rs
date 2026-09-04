@@ -48,10 +48,10 @@ pub fn compute(
         .map(|k| {
             let prev = shl[k];
             let curr = shl[k + chv];
-            let value = if prev != 0.0 {
-                100.0 * (curr - prev) / prev
-            } else {
+            let value = if prev == 0.0 {
                 0.0
+            } else {
+                100.0 * (curr - prev) / prev
             };
             let i = smooth - 1 + k + chv;
             IndicatorValue {

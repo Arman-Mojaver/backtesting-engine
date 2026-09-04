@@ -3,3 +3,4 @@ target/
 .docker_password.example
 .opencode/
 parquet_files/
+rust-toolchain.toml

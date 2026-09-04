@@ -286,7 +286,7 @@ credentials** — see [Known limitations](#known-limitations).
 
 ## Building and installation
 
-Requires Rust **1.94** (the toolchain is pinned in CI and in the Docker image).
+Requires Rust — the exact version is pinned in `rust-toolchain.toml` (rustup selects it automatically; CI and the Docker image use the same pin).
 
 ```bash
 cargo build                                # debug

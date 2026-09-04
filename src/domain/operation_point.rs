@@ -18,7 +18,7 @@ pub struct OperationPoints<'a> {
     pub short_operation_points: &'a [OperationPoint],
 }
 
-impl<'a> OperationPoints<'a> {
+impl OperationPoints<'_> {
     pub fn long_points_by_timestamp(&self) -> FxHashMap<i64, &OperationPoint> {
         self.long_operation_points
             .iter()

@@ -60,8 +60,10 @@ impl StrategyPersistence {
             });
         }
 
-        let manifest_entries: Vec<(String, i32, Vec<i32>)> =
-            dto_cells.iter().map(|c| c.manifest_entry()).collect();
+        let manifest_entries: Vec<(String, i32, Vec<i32>)> = dto_cells
+            .iter()
+            .map(CellOutputDTO::manifest_entry)
+            .collect();
 
         dto_cells.into_par_iter().try_for_each(|c| {
             self.strategies

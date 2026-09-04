@@ -80,7 +80,7 @@ impl StrategyCommand {
             StrategyCommand::Create {
                 money_management_strategy_id,
                 instrument,
-            } => create::execute(money_management_strategy_id, instrument),
+            } => create::execute(money_management_strategy_id, &instrument),
             StrategyCommand::CreateLoop => create_loop::execute(),
             StrategyCommand::Metadata => metadata::execute(),
         }

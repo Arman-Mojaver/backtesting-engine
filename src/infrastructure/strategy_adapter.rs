@@ -12,7 +12,7 @@ use arrow::record_batch::RecordBatch;
 use log::debug;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
-use parquet::basic::Compression;
+use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
 use rustc_hash::FxHashSet;
 
@@ -76,7 +76,7 @@ impl ParquetStrategyRepository {
         rows: Vec<StrategyRow>,
     ) -> anyhow::Result<()> {
         let path = self.partition_path(instrument, mms_id)?;
-        self.write_partition(&path, rows)
+        Self::write_partition(&path, rows)
     }
 
     /// Returns the parquet path for a single `(instrument, mms_id)` partition,
@@ -87,16 +87,13 @@ impl ParquetStrategyRepository {
             self.base_dir, instrument, mms_id
         );
         fs::create_dir_all(&partition_dir)?;
-        Ok(PathBuf::from(format!(
-            "{}/strategies.parquet",
-            partition_dir
-        )))
+        Ok(PathBuf::from(format!("{partition_dir}/strategies.parquet")))
     }
 
-    fn write_partition(&self, path: &Path, new_rows: Vec<StrategyRow>) -> anyhow::Result<()> {
+    fn write_partition(path: &Path, new_rows: Vec<StrategyRow>) -> anyhow::Result<()> {
         let start = Instant::now();
         let existing_rows: Vec<StrategyRow> = if path.exists() {
-            self.read_rows(path)?
+            Self::read_rows(path)?
         } else {
             Vec::new()
         };
@@ -126,7 +123,7 @@ impl ParquetStrategyRepository {
         let schema = batch.schema();
 
         let props = WriterProperties::builder()
-            .set_compression(Compression::ZSTD(Default::default()))
+            .set_compression(Compression::ZSTD(ZstdLevel::default()))
             .build();
 
         let file = File::create(path)?;
@@ -183,7 +180,7 @@ impl ParquetStrategyRepository {
         Ok(max_id)
     }
 
-    fn read_rows(&self, path: &Path) -> anyhow::Result<Vec<StrategyRow>> {
+    fn read_rows(path: &Path) -> anyhow::Result<Vec<StrategyRow>> {
         let file = File::open(path)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
         let mut reader = builder.build()?;
@@ -367,7 +364,7 @@ mod tests {
             "{}/instrument={}/money_management_strategy_id={}/strategies.parquet",
             repo.base_dir, instrument, mms_id
         ));
-        let rows = repo.read_rows(&path).expect("read back");
+        let rows = ParquetStrategyRepository::read_rows(&path).expect("read back");
         rows.into_iter().map(|r| r.strategy_id).collect()
     }
 
@@ -380,7 +377,7 @@ mod tests {
             "{}/instrument={}/money_management_strategy_id={}/strategies.parquet",
             repo.base_dir, instrument, mms_id
         ));
-        let rows = repo.read_rows(&path).expect("read back");
+        let rows = ParquetStrategyRepository::read_rows(&path).expect("read back");
         rows.into_iter().map(|r| r.indicator_id).collect()
     }
 
@@ -623,9 +620,6 @@ mod tests {
 
     #[test]
     fn write_rows_ignores_duplicate_incoming_rows() {
-        let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
-
         fn s(indicator_id: i32) -> Strategy {
             Strategy {
                 instrument: "EURUSD".to_string(),
@@ -638,6 +632,9 @@ mod tests {
                 money_management_strategy_id: 390,
             }
         }
+
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
 
         // First write assigns id 1 to indicator 2001.
         repo.write("EURUSD", 390, &[s(2001)]).unwrap();

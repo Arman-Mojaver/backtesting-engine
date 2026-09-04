@@ -41,10 +41,10 @@ pub fn compute(
     for k in 0..(n - lookback) {
         let curr = volumes[lookback + k];
         let prev = volumes[k];
-        let value = if prev != 0.0 {
-            100.0 * (curr - prev) / prev
-        } else {
+        let value = if prev == 0.0 {
             carry
+        } else {
+            100.0 * (curr - prev) / prev
         };
         carry = value;
         items.push(IndicatorValue {

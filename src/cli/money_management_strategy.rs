@@ -56,7 +56,7 @@ pub fn parse_money_management_strategy(m: &ArgMatches) -> MoneyManagementStrateg
                 args: sub
                     .get_many::<String>("args")
                     .unwrap_or_default()
-                    .map(|s| s.to_owned())
+                    .map(std::borrow::ToOwned::to_owned)
                     .collect(),
                 example: sub.get_flag("example"),
             })
@@ -66,7 +66,7 @@ pub fn parse_money_management_strategy(m: &ArgMatches) -> MoneyManagementStrateg
                 identifiers: sub
                     .get_many::<String>("identifiers")
                     .unwrap_or_default()
-                    .map(|s| s.to_owned())
+                    .map(std::borrow::ToOwned::to_owned)
                     .collect(),
             })
         }

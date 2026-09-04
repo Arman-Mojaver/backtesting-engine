@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.7 | Updated: 2026-09-03 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.9 | Updated: 2026-09-04 -->
 
 # Decisions Log
 
@@ -783,6 +783,89 @@ Add `.github/workflows/ci.yml`:
 
 ### Related
 - Implementation: `.github/workflows/ci.yml`, `Dockerfile` (rust:1.94), `Makefile` (local equivalents)
+
+---
+
+## Decision: Pin Rust Toolchain Exactly Across Local, Docker, and CI
+
+**Date**: 2026-09-04
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The Dockerfile pinned `rust:1.94` (floating patch), CI pinned `1.94.0` exactly (dtolnay/rust-toolchain), and local dev floated on `rustup stable` — three environments with two different pinning semantics. Local would silently drift from CI/Docker on the next stable release. A senior-engineer review suggested `rust-toolchain.toml` with `channel = "1.94"`; investigation showed a floating minor pin preserves the drift problem instead of fixing it.
+
+### Decision
+1. Add `rust-toolchain.toml`: `channel = "1.94.0"` (exact), `profile = "minimal"`, `components = ["rustfmt", "clippy"]` — rustup applies it automatically for local dev.
+2. Bump all three Dockerfile base tags `rust:1.94` → `rust:1.94.0` so Docker pins the identical version.
+3. Exclude `rust-toolchain.toml` from the Docker build context via `.dockerignore`.
+4. Add `rustfmt.toml` (`edition = "2021"`, all defaults) as an explicit formatting-policy marker; enforcement remains `cargo fmt --check` in CI.
+
+### Rationale
+- Exact pins in all three environments eliminate drift by construction
+- Empirical finding (validated with `--network none` containers): official `rust` images run `cargo` through **rustup shims**. A `rust-toolchain.toml` inside the build context triggers a channel-manifest network sync + component download (the image's `minimal` profile lacks clippy) **even when the version matches the installed toolchain**. Excluding the file keeps Docker builds offline-clean; the image tag remains Docker's native pin
+- `rustfmt.toml` documents intent; the actual gate is CI's `cargo fmt --check` (unchanged)
+- docker-compose `engine` mounts only `src/`, `Cargo.toml`, `Cargo.lock` — the compose flow never sees the toolchain file; only `make bash` (full repo mount) does, costing a one-time ~5s sync per fresh container
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| `channel = "1.94"` (floating minor, as suggested) | Looks simpler | Resolves to latest 1.94.x patch — preserves drift vs CI's exact 1.94.0 | Drift is the problem being fixed |
+| Keep `rust-toolchain.toml` in Docker context | Single file visible in image | rustup shim hits the network in every build (manifest + clippy download) even on matching versions | Zero benefit — image tag already pins |
+| No toolchain file | Status quo | Local floats; drifts from CI/Docker on next stable | The gap this decision closes |
+| `clippy.toml` (empty) | Ceremony | No settings to configure | Rejected as noise |
+
+### Impact
+**Positive**: Local, CI, and Docker compile with the identical toolchain; Docker builds stay offline-clean
+**Negative**: Version bumps touch three places (`rust-toolchain.toml`, `Dockerfile`, `ci.yml`) — deliberate trade for exactness
+**Risk**: Removing the `.dockerignore` exclusion would silently reintroduce the network sync — mitigated by comments in both files and this entry
+
+### Related
+- Implementation: `rust-toolchain.toml`, `rustfmt.toml`, `.dockerignore`, `Dockerfile`, `README.md` (toolchain line)
+- CI: `.github/workflows/ci.yml` (pins 1.94.0 via dtolnay/rust-toolchain)
+- Complements: "CI Workflow" (2026-09-03), which pinned the CI side only
+
+---
+
+## Decision: Deliberate clippy Lint Policy via `[lints]` (pedantic + curated allows)
+
+**Date**: 2026-09-04
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+A senior-engineer review suggested `#![warn(clippy::all, clippy::pedantic)]` + `#![warn(missing_docs)]` in `src/lib.rs`. Measured against this codebase: `clippy::all` is warn-by-default (a no-op); lib.rs inner attributes cover only the lib target, not the `ct`/`bt-engine` binaries; `clippy::pedantic` fires 1,429 warnings which CI's `-D warnings` gate (added 2026-09-03) would turn into build errors; `missing_docs` fires 366 warnings on an internal, unpublished crate. As written, the suggestion would break CI.
+
+### Decision
+1. Enable pedantic via the `[lints.clippy]` table in `Cargo.toml` — one declaration covering all targets (lib, both binaries, tests) — with a commented allow list.
+2. Allow list (each entry commented in `Cargo.toml`): numeric-domain lints (`float_cmp`, `cast_lossless`, `cast_sign_loss`, `cast_precision_loss`, `cast_possible_truncation`, `cast_possible_wrap`); deferred doc lints (`missing_errors_doc`, `missing_panics_doc`, `doc_markdown`); low-signal lints (`must_use_candidate`, `similar_names`, `implicit_hasher`); divisive style lints (`single_match_else`, `manual_let_else`).
+3. Test-scoped exemption in `src/lib.rs`: `#![cfg_attr(test, allow(clippy::unreadable_literal))]` — all 672 hits are in test code (exact float literals); the lint stays armed for production code via the plain lib target.
+4. Fixed every remaining production violation: `cargo clippy --fix` campaign (~20 files of mechanical style fixes) plus manual fixes — 3 `map_unwrap_or` sites in `create_loop.rs` rewritten as type-annotated `map_or` (dodging a rustfix bug: the `&[]` default loses its coercion site, E0271, which rolls back the whole campaign); `read_rows`/`write_partition` became associated functions; `parse()` takes `&ArgMatches`; `create::execute` takes `&str`; `Compression::ZSTD(ZstdLevel::default())`.
+5. `missing_docs` deferred: 366 undocumented public items on an internal crate — permanent warnings train developers to ignore the warning stream. Revisit if the crate is ever published.
+
+### Rationale
+- `[lints]` (stable since 1.74) is the correct mechanism — the suggested lib.rs attributes would leave both binaries un-linted
+- The allow list is policy, not noise: every entry has a reason tied to this codebase (float math, PG adapter casts, internal crate)
+- `f64::midpoint` replacing `(h+l)/2.0` in AO/AC median price is bit-identical for all finite values ≤ `f64::MAX/2` (verified against the std source); all 429 tests pass unchanged
+- The rustfix `map_unwrap_or`/`&[]` bug made the 3 sites manual-first; the rest of the campaign then applied cleanly
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Senior suggestion as written (lib.rs attributes) | One file | `clippy::all` no-op; misses both binaries; 1,429 CI errors | Breaks the gate; wrong mechanism |
+| pedantic with no allows | Strictest | ~1,400 violations — a refactor project, not a config change | Most hits are domain noise |
+| No pedantic (clippy::all only) | Status quo | Misses the ~45 genuine fixes that landed | The campaign was cheap and is done |
+| `missing_docs` now | Doc completeness | 366 warnings of noise on an internal crate | Deferred deliberately |
+
+### Impact
+**Positive**: pedantic armed across all targets with a documented policy; ~45 genuine fixes landed; production code is pedantic-clean under `-D warnings`
+**Negative**: allow list must be revisited as the codebase evolves (re-enable doc lints if published); test literals exempt from `unreadable_literal`
+**Risk**: New code could drift into allowed-lint territory — mitigated by per-entry comments and this entry
+
+### Related
+- Implementation: `Cargo.toml` (`[lints.clippy]`), `src/lib.rs` (cfg_attr), ~20 src files (fix campaign)
+- Complements: "CI Workflow" (2026-09-03) — the `-D warnings` gate now enforces pedantic
+- Complements: "Pin Rust Toolchain Exactly" (2026-09-04)
 
 ## Deprecated Decisions
 
