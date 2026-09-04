@@ -11,7 +11,8 @@ Parquet output.
 
 **Status: pre-1.0, under active development.** The pipeline is real end-to-end, but the
 metric model has a known simplification (see [Known limitations](#known-limitations))
-and the HTTP API is deliberately absent. Read that section before drawing conclusions
+and there is deliberately no public JSON API (an internal HTML dashboard,
+`webapp`, does exist). Read that section before drawing conclusions
 from the output.
 
 ## Table of contents
@@ -25,6 +26,7 @@ from the output.
 - [Performance metrics](#performance-metrics)
 - [Strategy filtering](#strategy-filtering)
 - [CLI reference](#cli-reference)
+- [The webapp](#the-webapp)
 - [Output format](#output-format)
 - [Configuration](#configuration)
 - [Building and installation](#building-and-installation)
@@ -68,6 +70,7 @@ and unit-tested in complete isolation.
 CLI              ct        operator frontend — routes commands to the engine
                            or to the companion Python service
                  bt-engine the native Rust engine
+                 webapp    internal HTML dashboard (axum, async-only)
 
 Application      use-case orchestration: fetching inputs, generating signals,
                  building and filtering candidate strategies
@@ -223,6 +226,32 @@ ct dev | indicator (i) | money-management-strategy (mms) |
    operation-point (o) | raw-point (r) | resampled-point (rr) …   # → Python CLI
 ```
 
+## The webapp
+
+`webapp` is a third binary: a small internal dashboard that renders one page
+of system information as server-side HTML — no JSON, no hand-written JavaScript.
+It is named `webapp` (not `sysinfo-server`) because it may grow beyond read-only
+system info.
+
+- **Stack**: axum 0.8 on tokio, askama compile-time templates (`src/web/templates`,
+  configured via `askama.toml`), vendored htmx 2.0.10 + hand-rolled CSS embedded into
+  the binary (`include_str!`) — the binary is fully self-contained.
+- **Page layout** (auto-refreshed every 5 s via htmx): a three-column grid —
+  everything visible without scrolling. Cards: **System** (environment, CPU usage,
+  memory usage — `sysinfo` crate), **Database** (connection status, table row
+  counts, instruments with date ranges), and **Processing** (manifest entries,
+  strategy partitions, progress via the same pure report logic as
+  `bt-engine strategy metadata`).
+- **Sync/async boundary**: all async code lives in `src/web/`. The CLI binaries stay
+  100% sync. The webapp owns its async DB adapter (tokio-postgres + deadpool pool,
+  aggregate queries pipelined with `tokio::join!`); parquet reads reuse the engine's
+  sync adapters behind `spawn_blocking`. Nothing outside `src/web` knows about async.
+- **Running**: `cargo run --bin webapp` (binds `0.0.0.0:3000`, override with
+  `PORT`), or via Docker: the `webapp` compose service uses the same image, waits for
+  the binary in the shared `target` volume, and serves on port 3000. Every data source
+  degrades gracefully — a down DB or missing parquet tree renders as an inline status
+  message, never a 500.
+
 ## Output format
 
 Strategies are written as Parquet (ZSTD-compressed) under an environment-scoped
@@ -271,6 +300,7 @@ appends are deduplicated on the triple, and writes are atomic (temp file + renam
 | `ENVIRONMENT` | Selects DB target and Parquet subdirectory | `development` |
 | `PARQUET_FILES_PATH` | Host path mounted at the container's Parquet root | `./parquet_files` |
 | `RUST_LOG` | Log level | `info` |
+| `PORT` | webapp listen port | `3000` |
 
 Database targets are fixed per environment (Docker-oriented — the host is always
 `host.docker.internal`):
@@ -346,7 +376,8 @@ Honest list — read before trusting the numbers:
 4. **DB configuration is hardcoded per environment** (host, ports, credentials). Fine
    for the Docker workflow; limiting if you want to point the engine at arbitrary
    PostgreSQL instances.
-5. **No HTTP API.** Deliberate (YAGNI) — CLI only until real API consumers exist.
+5. **No public JSON API.** Deliberate (YAGNI). The internal `webapp` HTML
+dashboard exists, but it is a monitoring page, not a data API.
 6. **One instrument, one MMS, one indicator type per run.** Enforced by validation —
    this is a domain constraint, not an accident, but it shapes how you batch work.
 7. **Parquet write cost.** Appending to a partition rewrites the whole file, and

@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.7 | Updated: 2026-09-03 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.8 | Updated: 2026-09-03 -->
 
 # Decisions Log
 
@@ -808,3 +808,43 @@ Add `.github/workflows/ci.yml`:
 - `technical-domain.md` - Technical implementation affected by these decisions
 - `business-tech-bridge.md` - How decisions connect business and technical
 - `living-notes.md` - Current open questions that may become decisions
+
+## Decision: webapp — Internal HTML Dashboard (axum + askama + htmx)
+
+**Date**: 2026-09-03
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+An internal tool was wanted to display system information (machine stats, parquet manifest/strategy stats, DB stats) as a small web service: one main page (subpages later), server-side rendered HTML (no JSON API), htmx for dynamic behavior, hand-rolled CSS, 0% hand-written JavaScript. This reverses the CLI-only stance of "Remove Actix-web HTTP Server Scaffold" (2026-06-04) — that decision's own rationale said "HTTP endpoints can be added later when there's an actual use case"; an actual use case now exists.
+
+### Decision
+Add a third binary `webapp` (`src/bin/webapp.rs` + the `src/web/` module) in the SAME crate. It is named `webapp` (not `sysinfo-server`) because it may grow beyond read-only system info — one holistic system, not a workspace. Stack: **axum 0.8** (tokio-team framework, purest tokio fit), **askama 0.16** (compile-time templates; dir configured to `src/web/templates` via `askama.toml`), vendored **htmx 2.0.10** + hand-rolled CSS embedded via `include_str!` (fully self-contained binary), **tokio-postgres + deadpool** pool (webapp-owned async DB adapter), **sysinfo 0.38** (NOT 0.39 — its MSRV 1.95 exceeds the pinned Rust 1.94). Same Docker image as the engine; a separate compose container (port 3000) waits for the binary in the shared target volume and execs it — no compiling inside the webapp container.
+
+### Sync/async boundary (load-bearing rules)
+- The CLI binaries stay 100% sync — tokio never enters their path.
+- No function is ever dual sync+async; existing sync code is reused AS-IS.
+- Dependency direction: `web -> {config, application, infrastructure}`, never reverse.
+- The webapp owns its async DB adapter (aggregate queries only — the stats SQL does not exist in the sync entity repositories, so there is no real duplication); parquet reads reuse the sync adapters behind `spawn_blocking` (the parquet/arrow ecosystem is sync — this is the intended tokio pattern for blocking work, not a workaround).
+- Async showcase: multi-threaded runtime, pooled connections, `tokio::join!` pipelining of all DB queries on one client, and concurrent collection of the page's three sections.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| actix-web | Highest raw throughput | Own runtime variant layered over tokio; repo precedent removed it | axum is the community default and first-party tokio |
+| Rocket | Most ergonomic | Macro-heavy, hidden runtime, slower release cadence | Weaker tokio/ecosystem composability |
+| Separate workspace crate | Dependency isolation | Structural churn; one holistic system wanted | Explicit user decision — shared deps/compile time accepted |
+| spawn_blocking for DB too | Zero new DB code | No pooling/pipelining — not "async as intended" | User explicitly wants a production-grade async showcase |
+| JSON API + JS frontend | Industry standard | Explicitly unwanted | Requirement: HTML + htmx + 0% hand-written JS |
+
+### Impact
+**Positive**: Live visibility into machine/DB/processing state; pure report logic reused (`build_metadata_report`); an async reference implementation in-tree.
+**Negative**: Web deps (axum/tokio/askama/…) compile for all targets; both containers carry code they do not use (accepted).
+**Risk**: sysinfo must stay <=0.38.x until the toolchain pin passes 1.95; single-file bind mounts in compose need a container restart when `Cargo.toml`/`askama.toml` are replaced on disk (macOS Docker Desktop inode quirk).
+
+### Related
+- "Remove Actix-web HTTP Server Scaffold" (2026-06-04) — stance superseded, rationale fulfilled
+- "Dual Binary Layout (ct + bt-engine)" — now a triple-binary layout
+- "CI Workflow" — fmt/clippy/test gates cover the new module automatically
+
+---

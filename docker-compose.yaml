@@ -10,6 +10,7 @@ services:
       - ./src:/app/src
       - ./Cargo.toml:/app/Cargo.toml
       - ./Cargo.lock:/app/Cargo.lock
+      - ./askama.toml:/app/askama.toml
       - ${PARQUET_FILES_PATH}:/app/parquet_files
       - ./logs:/app/logs
       - cargo-registry:/usr/local/cargo/registry
@@ -17,6 +18,25 @@ services:
       - target:/app/target
     working_dir: /app
     command: ["sh", "-c", "touch logs/bt-engine.log && tail -F logs/bt-engine.log"]
+
+  webapp:
+    container_name: webapp
+    image: armanmojaver/backtesting-engine
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT}
+      - RUST_LOG=${RUST_LOG}
+    volumes:
+      - ${PARQUET_FILES_PATH}:/app/parquet_files
+      - ./logs:/app/logs
+      - target:/app/target
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    # Runtime-only container: waits for the server binary in the shared
+    # target volume (seeded by `make build`, refreshed by in-container
+    # builds), then execs it. Restart the container to pick up a rebuild.
+    command: ["sh", "-c", "while [ ! -f target/debug/webapp ]; do echo 'waiting for target/debug/webapp (run make build)'; sleep 5; done; exec target/debug/webapp"]
 
 volumes:
   cargo-registry:

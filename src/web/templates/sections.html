@@ -1,0 +1,94 @@
+<div id="stats" hx-get="/fragments/stats" hx-trigger="every 5s" hx-swap="outerHTML">
+
+<section class="card">
+    <h2>System</h2>
+    <dl class="kv">
+        <dt>environment</dt>
+        <dd>{{ data.environment }}</dd>
+        <dt>cpu usage</dt>
+        <dd>
+            {{ data.host.cpu_usage_percent|fmt("{:.1}") }} %
+            <div class="bar"><div class="bar-fill" style="width: {{ data.host.cpu_usage_percent|fmt("{:.1}") }}%"></div></div>
+        </dd>
+        <dt>memory</dt>
+        <dd>
+            {{ data.host.memory_used_bytes|filesizeformat }} / {{ data.host.memory_total_bytes|filesizeformat }}
+            ({{ data.host.memory_percent|fmt("{:.1}") }} %)
+            <div class="bar"><div class="bar-fill" style="width: {{ data.host.memory_percent|fmt("{:.1}") }}%"></div></div>
+        </dd>
+    </dl>
+</section>
+
+<section class="card">
+    <h2>Database</h2>
+    {% if data.database.connected %}
+    <p class="status ok">connected · {{ data.database.target }}</p>
+    <h3>Tables</h3>
+    <table>
+        <tbody>
+        {% for table in data.database.table_counts %}
+            <tr><td>{{ table.table }}</td><td class="num">{{ table.rows }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <h3>Instruments (resampled D1)</h3>
+    <table>
+        <thead>
+            <tr><th>instrument</th><th>points</th><th>first</th><th>last</th></tr>
+        </thead>
+        <tbody>
+        {% for instrument in data.database.instruments %}
+            <tr>
+                <td>{{ instrument.instrument }}</td>
+                <td class="num">{{ instrument.points }}</td>
+                <td>{{ instrument.first_date }}</td>
+                <td>{{ instrument.last_date }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="status err">unreachable · {{ data.database.target }}</p>
+    {% if !data.database.error.is_empty() %}
+    <p class="error-detail">{{ data.database.error }}</p>
+    {% endif %}
+    {% endif %}
+</section>
+
+<section class="card">
+    <h2>Processing</h2>
+    {% if !data.processing.error.is_empty() %}
+    <p class="status err">parquet unavailable</p>
+    <p class="error-detail">{{ data.processing.error }}</p>
+    {% else %}
+    <dl class="kv">
+        <dt>manifest entries</dt>
+        <dd>{{ data.processing.manifest_entries }}</dd>
+        <dt>manifest instruments</dt>
+        <dd>{{ data.processing.manifest_instruments }}</dd>
+        <dt>manifest mms ids</dt>
+        <dd>{{ data.processing.manifest_mms_ids }}</dd>
+        <dt>strategy partitions</dt>
+        <dd>{{ data.processing.strategy_partitions }}</dd>
+        <dt>strategies stored</dt>
+        <dd>{{ data.processing.total_strategies }}</dd>
+        <dt>parquet size</dt>
+        <dd>{{ data.processing.parquet_bytes|filesizeformat }}</dd>
+    </dl>
+    <h3>Progress</h3>
+    {% if data.processing.progress_available %}
+    <div class="bar big"><div class="bar-fill" style="width: {{ data.processing.progress_percent|fmt("{:.1}") }}%"></div></div>
+    <p>
+        {{ data.processing.progress_processed }} / {{ data.processing.progress_total }} triples processed
+        · {{ data.processing.progress_remaining }} remaining
+        · {{ data.processing.progress_percent|fmt("{:.1}") }} %
+    </p>
+    {% else %}
+    <p class="muted">progress unavailable (database or parquet unreachable)</p>
+    {% endif %}
+    {% endif %}
+</section>
+
+<p class="updated">generated {{ data.generated_at }}</p>
+
+</div>
