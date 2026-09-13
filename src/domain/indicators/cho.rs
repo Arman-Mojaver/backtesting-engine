@@ -223,7 +223,7 @@ mod tests {
 
     // --- Level 2: real CHO output on real EURUSD data (placeholder baseline) ---
 
-    /// Placeholder baseline captured from the real EURUSD development DB.
+    /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
     /// These values are **not ground-truth** — they were produced by running
     /// `cho::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
@@ -232,13 +232,7 @@ mod tests {
     /// compare them against an external source of truth.
     #[test]
     fn level2_real_cho_output_matches_captured_baseline() {
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level2_baseline_test: development DB unavailable");
-                return;
-            }
-        };
+        let points = test_support::eurusd_points();
         let result = compute(&points, 3, 10).unwrap();
         let vals = indicator_values!(result);
 
@@ -251,21 +245,21 @@ mod tests {
 
         // First 15 (timestamp, value) pairs captured from real EURUSD data.
         let expected_first_15: &[(i64, f64)] = &[
-            (1355788800, 60766.70101710541),
-            (1355875200, 40824.511365500395),
-            (1355961600, 28556.48592076765),
-            (1356048000, 14371.356291183656),
-            (1356307200, 2421.8975570088005),
-            (1356480000, -2111.2616619745168),
-            (1356566400, -6828.8181610761385),
-            (1356652800, -6934.880532428819),
-            (1356912000, -8704.03704898086),
-            (1356998400, -8764.890945062587),
-            (1357084800, -22579.430754434325),
-            (1357171200, -39904.35438919618),
-            (1357257600, -34830.0456571444),
-            (1357516800, -14726.830312166116),
-            (1357603200, -12032.810867213253),
+            (1355788800, 60766.70101710621),
+            (1355875200, 40824.51136550082),
+            (1355961600, 28556.485920767875),
+            (1356048000, 14371.35629118378),
+            (1356307200, 2421.8975570085386),
+            (1356480000, -2111.261661974917),
+            (1356566400, -6828.8181610760585),
+            (1356652800, -6934.8805324285495),
+            (1356912000, -8704.037048980033),
+            (1356998400, -8764.890945061612),
+            (1357084800, -22579.43075443337),
+            (1357171200, -39904.35438919536),
+            (1357257600, -34830.04565714371),
+            (1357516800, -14726.830312164915),
+            (1357603200, -12032.810867211956),
         ];
 
         for (i, (ts, val)) in expected_first_15.iter().enumerate() {

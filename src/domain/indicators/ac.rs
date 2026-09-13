@@ -185,7 +185,7 @@ mod tests {
 
     // --- Level 2: real AC output on real EURUSD data (placeholder baseline) ---
 
-    /// Placeholder baseline captured from the real EURUSD development DB.
+    /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
     /// These values are **not ground-truth** — they were produced by running
     /// `ac::compute` on the 2400 real EURUSD `resampled_point_d1` rows and
@@ -193,13 +193,7 @@ mod tests {
     /// will later compare them against an external source of truth.
     #[test]
     fn level2_real_ac_output_matches_captured_baseline() {
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level2_baseline_test: development DB unavailable");
-                return;
-            }
-        };
+        let points = test_support::eurusd_points();
         let result = compute(&points).unwrap();
         let vals = indicator_values!(result);
 
@@ -217,13 +211,13 @@ mod tests {
             (1359417600, 0.0015999176470589578),
             (1359504000, 0.0036922588235297933),
             (1359590400, 0.005059188235293943),
-            (1359676800, 0.005819888235294536),
-            (1359936000, 0.004748764705882414),
-            (1360022400, 0.003015517647058985),
-            (1360108800, 0.000900158823529295),
-            (1360195200, -0.0019731647058824457),
-            (1360281600, -0.0062300411764705035),
-            (1360540800, -0.007949582352941187),
+            (1359676800, 0.005819888235294179),
+            (1359936000, 0.004748764705882501),
+            (1360022400, 0.003015517647058718),
+            (1360108800, 0.0009001588235294719),
+            (1360195200, -0.0019731647058822688),
+            (1360281600, -0.006230041176470413),
+            (1360540800, -0.007949582352941097),
             (1360627200, -0.007525770588235538),
             (1360713600, -0.006176770588235358),
             (1360800000, -0.0050496058823526375),

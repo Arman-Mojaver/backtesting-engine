@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum HighLowOrder {
     HighFirst,
     LowFirst,

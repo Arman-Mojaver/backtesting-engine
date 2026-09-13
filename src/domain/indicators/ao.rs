@@ -171,7 +171,7 @@ mod tests {
 
     // --- Level 2: real AO output on real EURUSD data (placeholder baseline) ---
 
-    /// Placeholder baseline captured from the real EURUSD development DB.
+    /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
     /// These values are **not ground-truth** — they were produced by running
     /// `ao::compute` on the 2400 real EURUSD `resampled_point_d1` rows and
@@ -179,13 +179,7 @@ mod tests {
     /// will later compare them against an external source of truth.
     #[test]
     fn level2_real_ao_output_matches_captured_baseline() {
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level2_baseline_test: development DB unavailable");
-                return;
-            }
-        };
+        let points = test_support::eurusd_points();
         let result = compute(&points).unwrap();
         let vals = indicator_values!(result);
 
@@ -207,9 +201,9 @@ mod tests {
             (1359417600, 0.016081823529411565),
             (1359504000, 0.019139235294117762),
             (1359590400, 0.022236911764705436),
-            (1359676800, 0.02533444117647088),
+            (1359676800, 0.025334441176470435),
             (1359936000, 0.026634058823529427),
-            (1360022400, 0.027105558823529607),
+            (1360022400, 0.027105558823529163),
             (1360108800, 0.026452941176470457),
             (1360195200, 0.023915294117647035),
             (1360281600, 0.018239411764706004),

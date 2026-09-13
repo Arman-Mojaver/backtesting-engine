@@ -177,7 +177,7 @@ mod tests {
 
     // --- Level 2: real Bulls Power output on real EURUSD data (placeholder baseline) ---
 
-    /// Placeholder baseline captured from the real EURUSD development DB.
+    /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
     /// These values are **not ground-truth** — they were produced by running
     /// `bulls::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
@@ -186,13 +186,7 @@ mod tests {
     /// external source of truth.
     #[test]
     fn level2_real_bulls_output_matches_captured_baseline() {
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level2_baseline_test: development DB unavailable");
-                return;
-            }
-        };
+        let points = test_support::eurusd_points();
         let result = compute(&points, 13).unwrap();
         let vals = indicator_values!(result);
 
@@ -206,14 +200,14 @@ mod tests {
         // First 15 (timestamp, value) pairs captured from real EURUSD data.
         let expected_first_15: &[(i64, f64)] = &[
             (1356048000, 0.01453615384615392),
-            (1356307200, 0.011928131868131908),
+            (1356307200, 0.011928131868131686),
             (1356480000, 0.012479827315541536),
             (1356566400, 0.013961280556178401),
             (1356652800, 0.01023824047672428),
             (1356912000, 0.007389920408620743),
             (1356998400, 0.0052813603502464),
             (1357084800, 0.012961166014496817),
-            (1357171200, 0.003830999440997074),
+            (1357171200, 0.003830999440997296),
             (1357257600, -0.005034857622002509),
             (1357516800, -0.0009213065331450387),
             (1357603200, 0.0010074515430185116),

@@ -242,7 +242,7 @@ mod tests {
 
     // --- Level 2: real Force Index output on real EURUSD data (placeholder baseline) ---
 
-    /// Placeholder baseline captured from the real EURUSD development DB.
+    /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
     /// These values are **not ground-truth** — they were produced by running
     /// `force::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
@@ -251,13 +251,7 @@ mod tests {
     /// external source of truth.
     #[test]
     fn level2_real_force_output_matches_captured_baseline() {
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level2_baseline_test: development DB unavailable");
-                return;
-            }
-        };
+        let points = test_support::eurusd_points();
         let result = compute(&points, 13).unwrap();
         let vals = indicator_values!(result);
 

@@ -66,13 +66,14 @@ pub fn create_indicator_output(
     parameters: &IndicatorParameters,
     points: &[ResampledPointD1],
 ) -> Result<IndicatorOutput, IndicatorError> {
-    let instrument = points
-        .first()
-        .map(|p| p.instrument.clone())
-        .ok_or(IndicatorError::NotEnoughData {
-            points: 0,
-            required: 1,
-        })?;
+    let instrument =
+        points
+            .first()
+            .map(|p| p.instrument.clone())
+            .ok_or(IndicatorError::NotEnoughData {
+                points: 0,
+                required: 1,
+            })?;
     match parameters {
         IndicatorParameters::Rsi {
             n,

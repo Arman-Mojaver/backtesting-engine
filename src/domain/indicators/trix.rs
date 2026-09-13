@@ -262,7 +262,7 @@ mod tests {
 
     // --- Level 2: real TRIX output on real EURUSD data (placeholder baseline) ---
 
-    /// Placeholder baseline captured from the real EURUSD development DB.
+    /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
     /// These values are **not ground-truth** — they were produced by running
     /// `trix::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
@@ -271,13 +271,7 @@ mod tests {
     /// external source of truth.
     #[test]
     fn level2_real_trix_output_matches_captured_baseline() {
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level2_baseline_test: development DB unavailable");
-                return;
-            }
-        };
+        let points = test_support::eurusd_points();
         let result = compute(&points, 14).unwrap();
         let vals = indicator_values!(result);
 
@@ -304,7 +298,7 @@ mod tests {
             (1360800000, 0.0007600023207534008),
             (1360886400, 0.0006748917332256184),
             (1361145600, 0.0005864279691686364),
-            (1361232000, 0.0005046042394199655),
+            (1361232000, 0.0005046042394197993),
         ];
 
         for (i, (ts, val)) in expected_first_15.iter().enumerate() {

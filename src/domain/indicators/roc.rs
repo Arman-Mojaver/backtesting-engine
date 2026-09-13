@@ -235,7 +235,7 @@ mod tests {
 
     // --- Level 2: real ROC output on real EURUSD data (placeholder baseline) ---
 
-    /// Placeholder baseline captured from the real EURUSD development DB.
+    /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
     /// These values are **not ground-truth** — they were produced by running
     /// `roc::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
@@ -244,13 +244,7 @@ mod tests {
     /// external source of truth.
     #[test]
     fn level2_real_roc_output_matches_captured_baseline() {
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level2_baseline_test: development DB unavailable");
-                return;
-            }
-        };
+        let points = test_support::eurusd_points();
         let result = compute(&points, 12).unwrap();
         let vals = indicator_values!(result);
 
@@ -273,8 +267,8 @@ mod tests {
             (1356998400, 0.9905113855800307),
             (1357084800, 0.20168627926726515),
             (1357171200, -0.9411963241949589),
-            (1357257600, -1.1922526534891318),
-            (1357516800, -0.5592295736446016),
+            (1357257600, -1.1922526534891489),
+            (1357516800, -0.5592295736445846),
             (1357603200, -1.2629776303114701),
             (1357689600, -1.0165466523670823),
             (1357776000, 0.6015014924473194),

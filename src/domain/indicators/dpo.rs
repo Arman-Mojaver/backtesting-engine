@@ -224,7 +224,7 @@ mod tests {
 
     // --- Level 2: real DPO output on real EURUSD data (placeholder baseline) ---
 
-    /// Placeholder baseline captured from the real EURUSD development DB.
+    /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
     /// These values are **not ground-truth** — they were produced by running
     /// `dpo::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
@@ -233,13 +233,7 @@ mod tests {
     /// external source of truth.
     #[test]
     fn level2_real_dpo_output_matches_captured_baseline() {
-        let points = match test_support::fetch_eurusd_points() {
-            Some(p) => p,
-            None => {
-                eprintln!("skipping level2_baseline_test: development DB unavailable");
-                return;
-            }
-        };
+        let points = test_support::eurusd_points();
         let result = compute(&points, 12).unwrap();
         let vals = indicator_values!(result);
 
@@ -256,7 +250,7 @@ mod tests {
             (1355356800, 0.006801428571428625),
             (1355443200, 0.01425571428571426),
             (1355702400, 0.011077142857143008),
-            (1355788800, 0.013248571428571276),
+            (1355788800, 0.013248571428571498),
             (1355875200, 0.007064285714285745),
             (1355961600, 0.008349999999999858),
             (1356048000, 0.0008099999999999774),
