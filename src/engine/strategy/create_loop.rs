@@ -63,6 +63,11 @@ impl SourceIndex {
                 )
             },
         );
+        let indicators = indicators.context("failed to load indicators")?;
+        let resampled_by_instrument =
+            resampled_by_instrument.context("failed to load resampled points")?;
+        let long_by_cell = long_by_cell.context("failed to load long operation points")?;
+        let short_by_cell = short_by_cell.context("failed to load short operation points")?;
         info!("Source data loaded in {:?}", load_start.elapsed());
 
         let indicator_ids = indicators.iter().map(|indicator| indicator.id).collect();

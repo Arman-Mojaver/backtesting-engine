@@ -65,11 +65,8 @@ exit = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 unreachable = "deny"
-#
-# Phase 2 -- pg_adapter JSON parsing:
-# json_extract_str/json_extract_i32 -> Result; fixes both lints together.
-# panic = "deny"              # 6 errors -- all in the two JSON helpers
-# string_slice = "deny"       # 5 errors -- same two functions
+panic = "deny"
+string_slice = "deny"
 #
 # Phase 3 -- mechanical nursery cleanup:
 # use_self = "deny"                      # 48 -- StructName:: -> Self:: (try cargo clippy --fix)

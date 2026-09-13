@@ -31,9 +31,9 @@ pub fn execute() -> anyhow::Result<()> {
     let long_adapter = PgLongOperationPointAdapter::new(&conn_string)
         .context("Failed to connect for operation points")?;
 
-    let indicator_ids = indicator_adapter.get_all_indicator_ids();
-    let instruments = resampled_adapter.get_distinct_instruments();
-    let mms_ids = long_adapter.get_distinct_mms_ids();
+    let indicator_ids = indicator_adapter.get_all_indicator_ids()?;
+    let instruments = resampled_adapter.get_distinct_instruments()?;
+    let mms_ids = long_adapter.get_distinct_mms_ids()?;
 
     // Fetch manifest state
     let root_dir = parquet_root_dir(env);

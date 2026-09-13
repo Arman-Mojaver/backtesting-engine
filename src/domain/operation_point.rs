@@ -63,22 +63,30 @@ fn group_by_cell(points: Vec<OperationPoint>) -> FxHashMap<(String, i32), Vec<Op
 }
 
 pub trait LongOperationPointRepository {
-    fn get_all(&self) -> Vec<OperationPoint>;
-    fn get_by_mms_id_and_instrument(&self, mms_id: i32, instrument: &str) -> Vec<OperationPoint>;
+    fn get_all(&self) -> anyhow::Result<Vec<OperationPoint>>;
+    fn get_by_mms_id_and_instrument(
+        &self,
+        mms_id: i32,
+        instrument: &str,
+    ) -> anyhow::Result<Vec<OperationPoint>>;
 
     /// All long operation points grouped by their `(instrument, mms_id)` cell.
-    fn index_by_cell(&self) -> FxHashMap<(String, i32), Vec<OperationPoint>> {
-        group_by_cell(self.get_all())
+    fn index_by_cell(&self) -> anyhow::Result<FxHashMap<(String, i32), Vec<OperationPoint>>> {
+        Ok(group_by_cell(self.get_all()?))
     }
 }
 
 pub trait ShortOperationPointRepository {
-    fn get_all(&self) -> Vec<OperationPoint>;
-    fn get_by_mms_id_and_instrument(&self, mms_id: i32, instrument: &str) -> Vec<OperationPoint>;
+    fn get_all(&self) -> anyhow::Result<Vec<OperationPoint>>;
+    fn get_by_mms_id_and_instrument(
+        &self,
+        mms_id: i32,
+        instrument: &str,
+    ) -> anyhow::Result<Vec<OperationPoint>>;
 
     /// All short operation points grouped by their `(instrument, mms_id)` cell.
-    fn index_by_cell(&self) -> FxHashMap<(String, i32), Vec<OperationPoint>> {
-        group_by_cell(self.get_all())
+    fn index_by_cell(&self) -> anyhow::Result<FxHashMap<(String, i32), Vec<OperationPoint>>> {
+        Ok(group_by_cell(self.get_all()?))
     }
 }
 
