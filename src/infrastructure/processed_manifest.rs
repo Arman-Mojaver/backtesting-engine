@@ -30,8 +30,8 @@ pub struct ParquetProcessedManifest {
 }
 
 impl ParquetProcessedManifest {
-    pub fn new(root_dir: String) -> Self {
-        ParquetProcessedManifest { root_dir }
+    pub const fn new(root_dir: String) -> Self {
+        Self { root_dir }
     }
 
     fn path(&self) -> PathBuf {

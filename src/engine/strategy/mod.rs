@@ -79,12 +79,12 @@ pub fn resolve_environment() -> Environment {
 impl StrategyCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            StrategyCommand::Create {
+            Self::Create {
                 money_management_strategy_id,
                 instrument,
             } => create::execute(money_management_strategy_id, &instrument),
-            StrategyCommand::CreateLoop => create_loop::execute(),
-            StrategyCommand::Metadata => metadata::execute(),
+            Self::CreateLoop => create_loop::execute(),
+            Self::Metadata => metadata::execute(),
         }
     }
 }

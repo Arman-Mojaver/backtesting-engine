@@ -42,11 +42,11 @@ pub fn parse_operation_point(m: &ArgMatches) -> anyhow::Result<OperationPointCom
 impl OperationPointCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            OperationPointCommand::Align(cmd) => cmd.execute(),
-            OperationPointCommand::Create => {
+            Self::Align(cmd) => cmd.execute(),
+            Self::Create => {
                 super::exec_python_cli(&["operation-point".to_string(), "create".to_string()])
             }
-            OperationPointCommand::Delete => {
+            Self::Delete => {
                 super::exec_python_cli(&["operation-point".to_string(), "delete".to_string()])
             }
         }

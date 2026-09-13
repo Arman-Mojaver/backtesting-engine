@@ -26,10 +26,10 @@ pub fn parse_raw_point(m: &ArgMatches) -> anyhow::Result<RawPointCommand> {
 impl RawPointCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            RawPointCommand::Create => {
+            Self::Create => {
                 super::exec_python_cli(&["raw-point".to_string(), "create".to_string()])
             }
-            RawPointCommand::Delete => {
+            Self::Delete => {
                 super::exec_python_cli(&["raw-point".to_string(), "delete".to_string()])
             }
         }

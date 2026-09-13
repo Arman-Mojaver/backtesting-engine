@@ -124,8 +124,8 @@ fn parse_create(m: &ArgMatches) -> anyhow::Result<CreateIndicator> {
 impl IndicatorCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            IndicatorCommand::Create(cmd) => cmd.execute(),
-            IndicatorCommand::Delete(cmd) => cmd.execute(),
+            Self::Create(cmd) => cmd.execute(),
+            Self::Delete(cmd) => cmd.execute(),
         }
     }
 }
@@ -133,8 +133,8 @@ impl IndicatorCommand {
 impl CreateIndicator {
     fn execute(self) -> anyhow::Result<()> {
         match self {
-            CreateIndicator::Macd(cmd) => cmd.execute(),
-            CreateIndicator::Rsi(cmd) => cmd.execute(),
+            Self::Macd(cmd) => cmd.execute(),
+            Self::Rsi(cmd) => cmd.execute(),
         }
     }
 }

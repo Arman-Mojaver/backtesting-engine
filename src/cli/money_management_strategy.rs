@@ -79,8 +79,8 @@ pub fn parse_money_management_strategy(
 impl MoneyManagementStrategyCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            MoneyManagementStrategyCommand::Create(cmd) => cmd.execute(),
-            MoneyManagementStrategyCommand::Delete(cmd) => cmd.execute(),
+            Self::Create(cmd) => cmd.execute(),
+            Self::Delete(cmd) => cmd.execute(),
         }
     }
 }

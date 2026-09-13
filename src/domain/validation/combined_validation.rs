@@ -8,7 +8,7 @@ use super::same_instrument_validation;
 use super::same_mms_validation;
 use super::same_timestamp_validation;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CombinedValidationError {
     Empty(empty_validation::EmptyRepoValidationError),
     IndicatorTypeMismatch,

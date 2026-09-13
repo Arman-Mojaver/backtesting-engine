@@ -4,7 +4,7 @@ use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
 
 // Operation Point fixtures
 
-pub fn op_points_empty() -> Vec<OperationPoint> {
+pub const fn op_points_empty() -> Vec<OperationPoint> {
     Vec::new()
 }
 pub fn op_points_default() -> Vec<OperationPoint> {
@@ -204,7 +204,7 @@ pub fn op_points_ts_124() -> Vec<OperationPoint> {
 
 // Resampled Point fixtures
 
-pub fn resampled_points_empty() -> Vec<ResampledPointD1> {
+pub const fn resampled_points_empty() -> Vec<ResampledPointD1> {
     Vec::new()
 }
 pub fn resampled_points_default() -> Vec<ResampledPointD1> {
@@ -327,7 +327,7 @@ pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
 
 // Indicator fixtures
 
-pub fn indicators_empty() -> Vec<Indicator> {
+pub const fn indicators_empty() -> Vec<Indicator> {
     Vec::new()
 }
 

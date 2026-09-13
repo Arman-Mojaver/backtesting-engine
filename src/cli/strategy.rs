@@ -95,7 +95,7 @@ pub fn parse_strategy(m: &ArgMatches) -> anyhow::Result<StrategyCommand> {
 impl StrategyCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            StrategyCommand::Create {
+            Self::Create {
                 money_management_strategy_id,
                 instrument,
             } => super::exec_engine_cli(&[
@@ -106,13 +106,13 @@ impl StrategyCommand {
                 "--instrument".to_string(),
                 instrument,
             ]),
-            StrategyCommand::CreateLoop => {
+            Self::CreateLoop => {
                 super::exec_engine_cli(&["strategy".to_string(), "create_loop".to_string()])
             }
-            StrategyCommand::Metadata => {
+            Self::Metadata => {
                 super::exec_engine_cli(&["strategy".to_string(), "metadata".to_string()])
             }
-            StrategyCommand::Display {
+            Self::Display {
                 strategy_id,
                 verbose,
             } => {

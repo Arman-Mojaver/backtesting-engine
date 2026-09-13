@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Environment {
     Production,
     Development,
@@ -12,9 +12,9 @@ impl FromStr for Environment {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match &*s.to_lowercase() {
-            "production" => Ok(Environment::Production),
-            "development" => Ok(Environment::Development),
-            "testing" => Ok(Environment::Testing),
+            "production" => Ok(Self::Production),
+            "development" => Ok(Self::Development),
+            "testing" => Ok(Self::Testing),
             _ => Err(()),
         }
     }
@@ -31,7 +31,7 @@ pub struct DbConfig {
 
 impl DbConfig {
     pub fn production() -> Self {
-        DbConfig {
+        Self {
             host: "host.docker.internal".into(),
             port: 5432,
             user: "postgres".into(),
@@ -41,7 +41,7 @@ impl DbConfig {
     }
 
     pub fn development() -> Self {
-        DbConfig {
+        Self {
             host: "host.docker.internal".into(),
             port: 54320,
             user: "postgres".into(),
@@ -51,7 +51,7 @@ impl DbConfig {
     }
 
     pub fn testing() -> Self {
-        DbConfig {
+        Self {
             host: "host.docker.internal".into(),
             port: 54321,
             user: "postgres".into(),
@@ -62,9 +62,9 @@ impl DbConfig {
 
     pub fn from_env(env: Environment) -> Self {
         match env {
-            Environment::Production => DbConfig::production(),
-            Environment::Development => DbConfig::development(),
-            Environment::Testing => DbConfig::testing(),
+            Environment::Production => Self::production(),
+            Environment::Development => Self::development(),
+            Environment::Testing => Self::testing(),
         }
     }
 

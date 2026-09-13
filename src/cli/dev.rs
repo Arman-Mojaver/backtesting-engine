@@ -39,7 +39,7 @@ pub fn parse_dev(m: &ArgMatches) -> anyhow::Result<DevCommand> {
 impl DevCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            DevCommand::CreateIndicators(cmd) => cmd.execute(),
+            Self::CreateIndicators(cmd) => cmd.execute(),
         }
     }
 }

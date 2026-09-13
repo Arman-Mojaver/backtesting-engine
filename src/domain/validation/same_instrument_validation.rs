@@ -1,7 +1,7 @@
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidationError {
     InstrumentMismatch,
 }

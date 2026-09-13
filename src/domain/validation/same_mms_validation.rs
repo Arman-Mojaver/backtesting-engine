@@ -1,6 +1,6 @@
 use crate::domain::operation_point::OperationPoint;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidationError {
     MoneyManagementStrategyMismatch,
 }

@@ -43,7 +43,7 @@ pub fn ema(values: &[f64], period: usize) -> Vec<f64> {
     for j in 1..n {
         let prev = out[j - 1];
         let current = values[period - 1 + j];
-        out.push((current - prev) * k + prev);
+        out.push((current - prev).mul_add(k, prev));
     }
     out
 }

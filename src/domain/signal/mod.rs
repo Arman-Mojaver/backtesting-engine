@@ -47,21 +47,21 @@ pub enum IndicatorOutput {
 impl IndicatorOutput {
     pub fn create_signal_group(&self, indicator_id: i32) -> SignalGroup {
         let (long_signals, short_signals, instrument) = match self {
-            IndicatorOutput::Oscillator {
+            Self::Oscillator {
                 instrument,
                 buffer: series,
             } => {
                 let (long, short) = oscillator::create(series);
                 (long, short, instrument.clone())
             }
-            IndicatorOutput::Threshold {
+            Self::Threshold {
                 instrument,
                 buffer: series,
             } => {
                 let (long, short) = thresholds::create(series);
                 (long, short, instrument.clone())
             }
-            IndicatorOutput::Crossover {
+            Self::Crossover {
                 instrument,
                 buffer: pair,
             } => {

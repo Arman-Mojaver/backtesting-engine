@@ -30,7 +30,7 @@ pub struct StrategyPersistence {
 }
 
 impl StrategyPersistence {
-    pub fn new(base_dir: String, root_dir: String) -> Self {
+    pub const fn new(base_dir: String, root_dir: String) -> Self {
         Self {
             strategies: ParquetStrategyRepository::new(base_dir),
             manifest: ParquetProcessedManifest::new(root_dir),

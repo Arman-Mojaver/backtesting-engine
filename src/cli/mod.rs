@@ -55,13 +55,13 @@ pub fn parse(matches: &ArgMatches) -> anyhow::Result<AppCommand> {
 impl AppCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            AppCommand::Dev(cmd) => cmd.execute(),
-            AppCommand::Indicator(cmd) => cmd.execute(),
-            AppCommand::MoneyManagementStrategy(cmd) => cmd.execute(),
-            AppCommand::OperationPoint(cmd) => cmd.execute(),
-            AppCommand::RawPoint(cmd) => cmd.execute(),
-            AppCommand::ResampledPoint(cmd) => cmd.execute(),
-            AppCommand::Strategy(cmd) => cmd.execute(),
+            Self::Dev(cmd) => cmd.execute(),
+            Self::Indicator(cmd) => cmd.execute(),
+            Self::MoneyManagementStrategy(cmd) => cmd.execute(),
+            Self::OperationPoint(cmd) => cmd.execute(),
+            Self::RawPoint(cmd) => cmd.execute(),
+            Self::ResampledPoint(cmd) => cmd.execute(),
+            Self::Strategy(cmd) => cmd.execute(),
         }
     }
 }

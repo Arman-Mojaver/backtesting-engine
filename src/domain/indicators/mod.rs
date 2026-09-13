@@ -22,7 +22,7 @@ use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::IndicatorOutput;
 
 /// Which price component of a resampled point an indicator consumes.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PriceField {
     Open,
     High,
@@ -31,17 +31,17 @@ pub enum PriceField {
 }
 
 impl PriceField {
-    pub fn select(&self, point: &ResampledPointD1) -> f64 {
+    pub const fn select(&self, point: &ResampledPointD1) -> f64 {
         match self {
-            PriceField::Open => point.open,
-            PriceField::High => point.high,
-            PriceField::Low => point.low,
-            PriceField::Close => point.close,
+            Self::Open => point.open,
+            Self::High => point.high,
+            Self::Low => point.low,
+            Self::Close => point.close,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndicatorError {
     InvalidRsiPeriod { n: i32 },
     InvalidBearsPeriod { n: i32 },

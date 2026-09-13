@@ -69,10 +69,10 @@ pub fn build_metadata_report(
 
         let (db_effective, remaining_ids) = if db_cells.contains(&(instrument.clone(), *mms_id)) {
             // Which indicator IDs from the DB have NOT been processed yet?
-            let remaining: Vec<i32> = match manifest_ids {
-                Some(processed) => db_ids.difference(processed).copied().collect(),
-                None => db_state.indicator_ids.clone(),
-            };
+            let remaining: Vec<i32> = manifest_ids.map_or_else(
+                || db_state.indicator_ids.clone(),
+                |processed| db_ids.difference(processed).copied().collect(),
+            );
             let mut r = remaining;
             r.sort_unstable();
             (db_count as i32, r)

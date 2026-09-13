@@ -2,7 +2,7 @@ use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EmptyRepoValidationError {
     LongOperationPointsEmpty,
     ShortOperationPointsEmpty,
@@ -10,7 +10,7 @@ pub enum EmptyRepoValidationError {
     ResampledPointsEmpty,
 }
 
-pub fn validate_empty_entities(
+pub const fn validate_empty_entities(
     long_ops: &[OperationPoint],
     short_ops: &[OperationPoint],
     indicators: &[Indicator],

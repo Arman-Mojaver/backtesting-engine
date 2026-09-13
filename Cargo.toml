@@ -67,13 +67,11 @@ expect_used = "deny"
 unreachable = "deny"
 panic = "deny"
 string_slice = "deny"
-#
-# Phase 3 -- mechanical nursery cleanup:
-# use_self = "deny"                      # 48 -- StructName:: -> Self:: (try cargo clippy --fix)
-# derive_partial_eq_without_eq = "deny"  # 11 -- add Eq; check f64 fields first
-# missing_const_for_fn = "deny"          # 7 -- add const
-# suboptimal_flops = "deny"              # 1
-# option_if_let_else = "deny"            # 1
+use_self = "deny"
+derive_partial_eq_without_eq = "deny"
+missing_const_for_fn = "deny"
+suboptimal_flops = "deny"
+option_if_let_else = "deny"
 #
 # Phase 4 -- indicator math hardening:
 # indexing + arithmetic fire on the SAME lines (points[start + k]) -- fix together.

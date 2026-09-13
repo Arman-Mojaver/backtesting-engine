@@ -32,7 +32,7 @@ pub struct StrategyRow {
 
 impl StrategyRow {
     pub fn from_strategy(s: &Strategy, id: i64) -> Self {
-        StrategyRow {
+        Self {
             strategy_id: id,
             indicator_id: s.indicator_id,
             annual_roi: s.annual_roi,
@@ -50,8 +50,8 @@ pub struct ParquetStrategyRepository {
 }
 
 impl ParquetStrategyRepository {
-    pub fn new(base_dir: String) -> Self {
-        ParquetStrategyRepository { base_dir }
+    pub const fn new(base_dir: String) -> Self {
+        Self { base_dir }
     }
 
     pub fn write(

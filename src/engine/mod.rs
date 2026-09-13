@@ -24,7 +24,7 @@ pub fn parse(matches: &ArgMatches) -> anyhow::Result<EngineCommand> {
 impl EngineCommand {
     pub fn execute(self) -> anyhow::Result<()> {
         match self {
-            EngineCommand::Strategy(cmd) => cmd.execute(),
+            Self::Strategy(cmd) => cmd.execute(),
         }
     }
 }
