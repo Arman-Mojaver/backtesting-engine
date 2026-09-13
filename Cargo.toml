@@ -31,9 +31,7 @@ time = "=0.3.41"
 tempfile = "3"
 
 [lints.clippy]
-# pedantic on; the allows below are deliberate exceptions (see decisions-log).
-pedantic = { level = "warn", priority = -1 }
-# Numeric-domain lints — intentional in a backtesting engine:
+pedantic = { level = "deny", priority = -1 }
 # float thresholds/comparisons, PG adapter i32->i64 reads, timestamp arithmetic.
 float_cmp = "allow"
 cast_lossless = "allow"
@@ -41,7 +39,7 @@ cast_sign_loss = "allow"
 cast_precision_loss = "allow"
 cast_possible_truncation = "allow"
 cast_possible_wrap = "allow"
-# Internal crate (not published) — doc-completeness lints deferred.
+# Internal crate (not published) -- doc-completeness lints deferred.
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 doc_markdown = "allow"
@@ -49,7 +47,48 @@ doc_markdown = "allow"
 must_use_candidate = "allow"
 similar_names = "allow"
 implicit_hasher = "allow"
-# Divisive style lints — plain if/else and let-bindings preferred over
+# Divisive style lints -- plain if/else and let-bindings preferred over
 # match-with-wildcard and let-else; not worth the churn here.
 single_match_else = "allow"
 manual_let_else = "allow"
+
+# --- Strict-lint adoption plan ---------------------------------------------
+# Uncomment one phase at a time -> fix errors -> commit. Error counts are
+# from the 1.94.0 baseline run (398 errors total across all phases).
+#
+# Phase 0 -- ACTIVE, zero errors (verified):
+todo = "deny"
+unimplemented = "deny"
+unchecked_time_subtraction = "deny"
+panic_in_result_fn = "deny"
+exit = "deny"
+#
+# Phase 1 -- CLI error handling:
+# parse_* fns -> anyhow::Result; clap get_one() -> ok_or_else.
+#unwrap_used = "deny"        # 6 errors -- get_one::<T>("arg").unwrap()
+#expect_used = "deny"        # 3 errors -- same pattern
+#unreachable = "deny"        # 11 errors -- _ => unreachable!("invalid ... command")
+#
+# Phase 2 -- pg_adapter JSON parsing:
+# json_extract_str/json_extract_i32 -> Result; fixes both lints together.
+# panic = "deny"              # 6 errors -- all in the two JSON helpers
+# string_slice = "deny"       # 5 errors -- same two functions
+#
+# Phase 3 -- mechanical nursery cleanup:
+# use_self = "deny"                      # 48 -- StructName:: -> Self:: (try cargo clippy --fix)
+# derive_partial_eq_without_eq = "deny"  # 11 -- add Eq; check f64 fields first
+# missing_const_for_fn = "deny"          # 7 -- add const
+# suboptimal_flops = "deny"              # 1
+# option_if_let_else = "deny"            # 1
+#
+# Phase 4 -- indicator math hardening:
+# indexing + arithmetic fire on the SAME lines (points[start + k]) -- fix together.
+# indexing_slicing = "deny"           # 51 -- .get() + error strategy
+# arithmetic_side_effects = "deny"    # 77 (52 prod / 25 test; no test exemption)
+#
+# Phase 5 -- casts:
+# as_conversions = "deny"             # 171 (41 prod / 130 test fixtures; no test exemption)
+#
+# Capstone -- uncomment AFTER phases 2-4: enables the whole nursery group.
+# Should be clean by then; catches future nursery lints. (BETA LINTS)
+# nursery = { level = "deny", priority = -1 }
