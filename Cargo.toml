@@ -72,11 +72,8 @@ derive_partial_eq_without_eq = "deny"
 missing_const_for_fn = "deny"
 suboptimal_flops = "deny"
 option_if_let_else = "deny"
-#
-# Phase 4 -- indicator math hardening:
-# indexing + arithmetic fire on the SAME lines (points[start + k]) -- fix together.
-# indexing_slicing = "deny"           # 51 -- .get() + error strategy
-# arithmetic_side_effects = "deny"    # 77 (52 prod / 25 test; no test exemption)
+indexing_slicing = "deny"
+arithmetic_side_effects = "deny"
 #
 # Phase 5 -- casts:
 # as_conversions = "deny"             # 171 (41 prod / 130 test fixtures; no test exemption)

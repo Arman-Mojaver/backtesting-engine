@@ -69,7 +69,7 @@ impl IndicatorOutput {
                 (long, short, instrument.clone())
             }
         };
-        let operation_count = long_signals.len() + short_signals.len();
+        let operation_count = long_signals.len().saturating_add(short_signals.len());
         SignalGroup {
             indicator_id,
             long_signals,

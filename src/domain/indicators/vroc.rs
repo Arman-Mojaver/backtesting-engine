@@ -27,28 +27,28 @@ pub fn compute(
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(period, InvalidVrocPeriod);
-    let lookback = (period - 1) as usize;
+    let lookback = period.saturating_sub(1) as usize;
     let n = points.len();
 
     if n <= lookback {
         empty_oscillator!();
     }
 
-    let volumes: Vec<f64> = points.iter().map(|pt| pt.volume as f64).collect();
-
-    let mut items: Vec<IndicatorValue> = Vec::with_capacity(n - lookback);
+    let mut items: Vec<IndicatorValue> = Vec::with_capacity(n.saturating_sub(lookback));
     let mut carry = 0.0;
-    for k in 0..(n - lookback) {
-        let curr = volumes[lookback + k];
-        let prev = volumes[k];
-        let value = if prev == 0.0 {
+    // VROC entry k pairs the point at index lookback + k (current) with the
+    // point at index k (lookback bars earlier).
+    for (curr, prev) in points.iter().skip(lookback).zip(points.iter()) {
+        let curr_volume = curr.volume as f64;
+        let prev_volume = prev.volume as f64;
+        let value = if prev_volume == 0.0 {
             carry
         } else {
-            100.0 * (curr - prev) / prev
+            100.0 * (curr_volume - prev_volume) / prev_volume
         };
         carry = value;
         items.push(IndicatorValue {
-            timestamp: points[lookback + k].timestamp,
+            timestamp: curr.timestamp,
             value,
         });
     }

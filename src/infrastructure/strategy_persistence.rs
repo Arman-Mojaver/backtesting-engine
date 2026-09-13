@@ -44,13 +44,13 @@ impl StrategyPersistence {
     }
 
     pub fn persist_cells(&self, cells: Vec<CellOutput>) -> anyhow::Result<()> {
-        let mut next_id = self.strategies.max_strategy_id()? + 1;
+        let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
         let mut dto_cells: Vec<CellOutputDTO> = Vec::with_capacity(cells.len());
         for cell in cells {
             let mut strategy_rows = Vec::with_capacity(cell.strategies.len());
             for strategy in cell.strategies {
                 strategy_rows.push(StrategyRow::from_strategy(&strategy, next_id));
-                next_id += 1;
+                next_id = next_id.saturating_add(1);
             }
             dto_cells.push(CellOutputDTO {
                 instrument: cell.instrument,

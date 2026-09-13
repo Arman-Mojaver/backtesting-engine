@@ -35,7 +35,8 @@ fn compute_ad(points: &[ResampledPointD1]) -> Vec<f64> {
 /// computed via the shared `ema` helper from `moving_averages.rs` (MQL5
 /// `CHO.mq5`, `MODE_EMA` on the AD buffer, `VOLUME_TICK`).
 ///
-/// The slow EMA is the limiting factor (by convention `slow_ma > fast_ma`).
+/// The slow EMA is the limiting factor (`slow_ma >= fast_ma` is validated;
+/// a reversed order is an error).
 /// The slow EMA seed is at index `slow_ma - 1`; CHO starts one bar later at
 /// index `slow_ma` (the MQL5 source sets `PLOT_DRAW_BEGIN = InpSlowMA`). Each
 /// value is tagged with the timestamp of the resampled point at the evaluated
@@ -50,6 +51,12 @@ pub fn compute(
     slow_ma: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(fast_ma, InvalidChoFastPeriod; slow_ma, InvalidChoSlowPeriod);
+    if fast_ma > slow_ma {
+        return Err(IndicatorError::InvalidChoPeriodOrder {
+            fast: fast_ma,
+            slow: slow_ma,
+        });
+    }
     let fast = fast_ma as usize;
     let slow = slow_ma as usize;
 
@@ -66,18 +73,20 @@ pub fn compute(
     }
 
     // Fast EMA entry `j` corresponds to original index `fast - 1 + j`.
-    // At original index `slow + k`, fast EMA entry = `slow + k - fast + 1`
-    // = `delta + 1 + k` where `delta = slow - fast`.
-    let delta = slow - fast;
+    // At original index `slow + k`, fast EMA entry = `delta + 1 + k` where
+    // `delta = slow - fast` (fast <= slow validated above).
+    let delta = slow.saturating_sub(fast);
 
-    let items = (1..slow_ema.len())
-        .map(|j| {
-            let k = j - 1;
-            let i = slow - 1 + j;
-            IndicatorValue {
-                timestamp: points[i].timestamp,
-                value: fast_ema[delta + 1 + k] - slow_ema[j],
-            }
+    // CHO entry k (slow EMA entry j = k + 1) evaluates the bar at original
+    // index `slow + k`.
+    let items = slow_ema
+        .iter()
+        .skip(1)
+        .zip(fast_ema.iter().skip(delta.saturating_add(1)))
+        .zip(points.iter().skip(slow))
+        .map(|((slow_val, fast_val), point)| IndicatorValue {
+            timestamp: point.timestamp,
+            value: fast_val - slow_val,
         })
         .collect();
 

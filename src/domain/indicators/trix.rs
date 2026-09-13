@@ -41,16 +41,19 @@ pub fn compute(
     }
 
     // TRIX entry k corresponds to original index 3*p - 2 + k.
-    let start = 3 * p - 2;
-    let items = (0..(ema3.len() - 1))
-        .map(|k| {
-            let value = if ema3[k] == 0.0 {
+    let start = p.saturating_mul(3).saturating_sub(2);
+    let items = ema3
+        .iter()
+        .zip(ema3.iter().skip(1))
+        .zip(points.iter().skip(start))
+        .map(|((prev, curr), point)| {
+            let value = if *prev == 0.0 {
                 0.0
             } else {
-                (ema3[k + 1] - ema3[k]) / ema3[k]
+                (curr - prev) / prev
             };
             IndicatorValue {
-                timestamp: points[start + k].timestamp,
+                timestamp: point.timestamp,
                 value,
             }
         })

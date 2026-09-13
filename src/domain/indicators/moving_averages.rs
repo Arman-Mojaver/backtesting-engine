@@ -34,16 +34,16 @@ pub fn ema(values: &[f64], period: usize) -> Vec<f64> {
         return Vec::new();
     }
     let k = 2.0 / (period as f64 + 1.0);
-    let n = values.len() - period + 1;
-    let mut out = Vec::with_capacity(n);
+    let mut out = Vec::with_capacity(values.len().saturating_sub(period.saturating_sub(1)));
     // Seed: SMA of the first `period` values (index period-1 in the series).
-    let seed = values[..period].iter().sum::<f64>() / period as f64;
+    let seed = values.iter().take(period).sum::<f64>() / period as f64;
     out.push(seed);
-    // Recurse: ema[j] from ema[j-1] and values[period-1+j].
-    for j in 1..n {
-        let prev = out[j - 1];
-        let current = values[period - 1 + j];
-        out.push((current - prev).mul_add(k, prev));
+    // Recurse: ema[j] from ema[j-1] and values[period-1+j] (j = 1..).
+    let mut prev = seed;
+    for &current in values.iter().skip(period) {
+        let next = (current - prev).mul_add(k, prev);
+        out.push(next);
+        prev = next;
     }
     out
 }

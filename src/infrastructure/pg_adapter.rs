@@ -30,7 +30,7 @@ fn json_extract_str(json: &str, key: &str) -> anyhow::Result<String> {
     let start = json
         .find(&search)
         .with_context(|| format!("key \"{key}\" not found in JSON: {json}"))?;
-    let value_start = start + search.len();
+    let value_start = start.saturating_add(search.len());
     let rest = get_slice(json, value_start.., key)?;
     let value_end = rest
         .find('"')
@@ -43,7 +43,7 @@ fn json_extract_i32(json: &str, key: &str) -> anyhow::Result<i32> {
     let start = json
         .find(&search)
         .with_context(|| format!("key \"{key}\" not found in JSON: {json}"))?;
-    let value_start = start + search.len();
+    let value_start = start.saturating_add(search.len());
     let value_slice = get_slice(json, value_start.., key)?;
     let value_slice = value_slice.trim_start();
     let end = value_slice

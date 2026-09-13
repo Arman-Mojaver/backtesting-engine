@@ -36,7 +36,7 @@ mod tests {
             indicator_id: 1,
             long_signals: vec![0; long_count],
             short_signals: vec![0; short_count],
-            operation_count: long_count + short_count,
+            operation_count: long_count.saturating_add(short_count),
             instrument: "EURUSD".to_string(),
         }
     }

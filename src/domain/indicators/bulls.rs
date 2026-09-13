@@ -35,15 +35,15 @@ pub fn compute(
         empty_oscillator!();
     }
 
-    let items = (1..ema_close.len())
-        .map(|j| {
-            // EMA entry j -> original index period - 1 + j; Bulls evaluates
-            // the bar at that same original index.
-            let i = p - 1 + j;
-            IndicatorValue {
-                timestamp: points[i].timestamp,
-                value: points[i].high - ema_close[j],
-            }
+    // EMA entry j -> original index period - 1 + j; Bulls evaluates the
+    // bar at that same original index (j starts at 1 -> bar index p).
+    let items = ema_close
+        .iter()
+        .skip(1)
+        .zip(points.iter().skip(p))
+        .map(|(ema_val, point)| IndicatorValue {
+            timestamp: point.timestamp,
+            value: point.high - ema_val,
         })
         .collect();
 

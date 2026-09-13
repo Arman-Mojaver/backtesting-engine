@@ -56,7 +56,9 @@ pub fn create_strategy(
     let long_operation_point_ids: Vec<i32> = long_ops.iter().map(|op| op.id).collect();
     let short_operation_point_ids: Vec<i32> = short_ops.iter().map(|op| op.id).collect();
 
-    let total_count = long_operation_point_ids.len() + short_operation_point_ids.len();
+    let total_count = long_operation_point_ids
+        .len()
+        .saturating_add(short_operation_point_ids.len());
     let annual_operation_count =
         annual_operation_count(total_count, start_timestamp, end_timestamp);
 

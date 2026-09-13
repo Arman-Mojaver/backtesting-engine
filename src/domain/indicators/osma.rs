@@ -13,7 +13,8 @@ use crate::validate_period;
 /// - Signal[k]` (MQL5 `OsMA.mq5`, `MODE_EMA` on `PRICE_CLOSE` for fast/slow,
 /// `MODE_SMA` via `SimpleMAOnBuffer` for the signal line).
 ///
-/// The slow EMA is the limiting factor (by convention `slow_ema > fast_ema`).
+/// The slow EMA is the limiting factor (`slow_ema >= fast_ema` is validated;
+/// a reversed order is an error).
 /// The slow EMA seed is at index `slow_ema - 1`; MACD starts at the same
 /// index. Signal starts at `slow_ema + signal_sma - 2`; OsMA starts at the
 /// same index. The MQL5 source sets
@@ -31,6 +32,12 @@ pub fn compute(
     signal_sma: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(fast_ema, InvalidOsMaFastPeriod; slow_ema, InvalidOsMaSlowPeriod; signal_sma, InvalidOsMaSignalPeriod);
+    if fast_ema > slow_ema {
+        return Err(IndicatorError::InvalidOsMaPeriodOrder {
+            fast: fast_ema,
+            slow: slow_ema,
+        });
+    }
     let fast = fast_ema as usize;
     let slow = slow_ema as usize;
     let signal = signal_sma as usize;
@@ -41,10 +48,12 @@ pub fn compute(
 
     // Slow EMA entry `j_s` corresponds to original index `slow - 1 + j_s`.
     // MACD[j_s] = FastEMA[delta + j_s] - SlowEMA[j_s] where
-    // `delta = slow - fast` (by convention `slow >= fast`).
-    let delta = slow - fast;
-    let macd: Vec<f64> = (0..slow_ema_result.len())
-        .map(|j_s| fast_ema_result[delta + j_s] - slow_ema_result[j_s])
+    // `delta = slow - fast` (fast <= slow validated above).
+    let delta = slow.saturating_sub(fast);
+    let macd: Vec<f64> = slow_ema_result
+        .iter()
+        .zip(fast_ema_result.iter().skip(delta))
+        .map(|(slow_val, fast_val)| fast_val - slow_val)
         .collect();
 
     let signal_line = sma(&macd, signal);
@@ -55,11 +64,14 @@ pub fn compute(
 
     // OsMA[k] = macd[k + signal - 1] - signal[k] for k = 0..(signal.len()).
     // OsMA entry `k` corresponds to original index `slow + signal - 2 + k`.
-    let start = slow + signal - 2;
-    let items = (0..signal_line.len())
-        .map(|k| IndicatorValue {
-            timestamp: points[start + k].timestamp,
-            value: macd[k + signal - 1] - signal_line[k],
+    let start = slow.saturating_add(signal).saturating_sub(2);
+    let items = signal_line
+        .iter()
+        .zip(macd.iter().skip(signal.saturating_sub(1)))
+        .zip(points.iter().skip(start))
+        .map(|((signal_val, macd_val), point)| IndicatorValue {
+            timestamp: point.timestamp,
+            value: macd_val - signal_val,
         })
         .collect();
 

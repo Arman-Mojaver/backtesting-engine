@@ -34,16 +34,15 @@ pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, Indicato
     // indices 33..n, i.e. one value per slow entry.
     let offset = SLOW_PERIOD - FAST_PERIOD;
 
+    // AO at ending index k + SLOW_PERIOD - 1 pairs slow[k] with
+    // fast[k + offset].
     let items = slow
         .iter()
-        .enumerate()
-        .map(|(k, slow_val)| {
-            let fast_val = fast[k + offset];
-            let ending_index = k + SLOW_PERIOD - 1;
-            IndicatorValue {
-                timestamp: points[ending_index].timestamp,
-                value: fast_val - slow_val,
-            }
+        .zip(fast.iter().skip(offset))
+        .zip(points.iter().skip(SLOW_PERIOD - 1))
+        .map(|((slow_val, fast_val), point)| IndicatorValue {
+            timestamp: point.timestamp,
+            value: fast_val - slow_val,
         })
         .collect();
 

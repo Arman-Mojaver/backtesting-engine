@@ -11,7 +11,12 @@ pub fn validate_same_instrument(
     long_operation_points: &[OperationPoint],
     short_operation_points: &[OperationPoint],
 ) -> Result<(), ValidationError> {
-    let reference_instrument = &resampled_points[0].instrument;
+    // Empty input is vacuously valid (and pre-validated upstream by
+    // `empty_validation` via `validate_all`).
+    let reference_instrument = match resampled_points.first() {
+        Some(point) => &point.instrument,
+        None => return Ok(()),
+    };
 
     let all_match = resampled_points
         .iter()

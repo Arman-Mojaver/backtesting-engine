@@ -7,18 +7,16 @@ pub fn create(buffer: &OscillatorSeries) -> (Vec<i64>, Vec<i64>) {
     let mut long_signals: Vec<i64> = Vec::with_capacity(n / 2);
     let mut short_signals: Vec<i64> = Vec::with_capacity(n / 2);
 
-    if n == 0 {
-        return (long_signals, short_signals);
-    }
-
-    let mut prev = &values[0];
-    for curr in &values[1..] {
-        if prev.value < 0.0 && curr.value > 0.0 {
-            long_signals.push(curr.timestamp);
-        } else if prev.value > 0.0 && curr.value < 0.0 {
-            short_signals.push(curr.timestamp);
+    if let Some((first, rest)) = values.split_first() {
+        let mut prev = first;
+        for curr in rest {
+            if prev.value < 0.0 && curr.value > 0.0 {
+                long_signals.push(curr.timestamp);
+            } else if prev.value > 0.0 && curr.value < 0.0 {
+                short_signals.push(curr.timestamp);
+            }
+            prev = curr;
         }
-        prev = curr;
     }
 
     (long_signals, short_signals)

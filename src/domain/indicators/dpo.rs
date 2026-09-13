@@ -32,7 +32,10 @@ pub fn compute(
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(period, InvalidDpoPeriod);
-    let ext_ma_period = (period / 2 + 1) as usize;
+    // ExtMAPeriod = period / 2 + 1; DPO entry j evaluates the bar at index
+    // period / 2 + j (= ExtMAPeriod - 1 + j).
+    let skip_count = (period / 2) as usize;
+    let ext_ma_period = skip_count.saturating_add(1);
 
     let closes: Vec<f64> = points.iter().map(|p| p.close).collect();
     let sma_close = sma(&closes, ext_ma_period);
@@ -41,13 +44,13 @@ pub fn compute(
         empty_oscillator!();
     }
 
-    let items = (0..sma_close.len())
-        .map(|j| {
-            let i = ext_ma_period - 1 + j;
-            IndicatorValue {
-                timestamp: points[i].timestamp,
-                value: closes[i] - sma_close[j],
-            }
+    let items = sma_close
+        .iter()
+        .zip(closes.iter().skip(skip_count))
+        .zip(points.iter().skip(skip_count))
+        .map(|((sma_val, close), point)| IndicatorValue {
+            timestamp: point.timestamp,
+            value: close - sma_val,
         })
         .collect();
 

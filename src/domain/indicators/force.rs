@@ -40,13 +40,15 @@ pub fn compute(
         empty_oscillator!();
     }
 
-    let items = (1..ma.len())
-        .map(|j| {
-            let i = p - 1 + j;
-            IndicatorValue {
-                timestamp: points[i].timestamp,
-                value: points[i].volume as f64 * (ma[j] - ma[j - 1]),
-            }
+    // F[j] = volume[p - 1 + j] * (ma[j] - ma[j - 1]) for j = 1..ma.len();
+    // pair ma[j-1] with ma[j] and the bar at index p - 1 + j.
+    let items = ma
+        .iter()
+        .zip(ma.iter().skip(1))
+        .zip(points.iter().skip(p))
+        .map(|((prev_ma, curr_ma), point)| IndicatorValue {
+            timestamp: point.timestamp,
+            value: point.volume as f64 * (curr_ma - prev_ma),
         })
         .collect();
 

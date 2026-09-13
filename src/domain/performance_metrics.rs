@@ -60,7 +60,7 @@ impl PerformanceMetrics {
 
 /// Span between two unix timestamps in years; `0.0` for a non-positive span.
 fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
-    let days = (end_timestamp - start_timestamp) as f64 / SECONDS_PER_DAY;
+    let days = end_timestamp.saturating_sub(start_timestamp) as f64 / SECONDS_PER_DAY;
     if days <= 0.0 {
         return 0.0;
     }

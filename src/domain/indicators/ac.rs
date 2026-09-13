@@ -29,8 +29,8 @@ fn ao_series(points: &[ResampledPointD1]) -> Vec<f64> {
     let slow = sma(&medians, SLOW_PERIOD);
     let offset = SLOW_PERIOD - FAST_PERIOD;
     slow.iter()
-        .enumerate()
-        .map(|(k, slow_val)| fast[k + offset] - slow_val)
+        .zip(fast.iter().skip(offset))
+        .map(|(slow_val, fast_val)| fast_val - slow_val)
         .collect()
 }
 
@@ -48,16 +48,15 @@ pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, Indicato
     let ao = ao_series(points);
     let sma_ao = sma(&ao, FAST_PERIOD);
 
+    // AC[k] = AO[k + 4] − SMA(AO, 5)[k]; AO[k+4] ends at index k + 37
+    // (= DATA_LIMIT + k), the newest contributing point.
     let items = sma_ao
         .iter()
-        .enumerate()
-        .map(|(k, sma_ao_val)| {
-            // AC[k] = AO[k + 4] − SMA(AO, 5)[k]; AO[k+4] ends at index k+4+33 = k+37.
-            let ending_index = DATA_LIMIT + k;
-            IndicatorValue {
-                timestamp: points[ending_index].timestamp,
-                value: ao[k + FAST_PERIOD - 1] - sma_ao_val,
-            }
+        .zip(ao.iter().skip(FAST_PERIOD - 1))
+        .zip(points.iter().skip(DATA_LIMIT))
+        .map(|((sma_ao_val, ao_val), point)| IndicatorValue {
+            timestamp: point.timestamp,
+            value: ao_val - sma_ao_val,
         })
         .collect();
 

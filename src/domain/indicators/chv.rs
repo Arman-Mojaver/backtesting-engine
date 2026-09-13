@@ -39,23 +39,25 @@ pub fn compute(
 
     // SHL entry j -> original index smooth - 1 + j.
     // CHV[k] uses SHL[k + chv] (current) and SHL[k] (chv_period bars ago).
-    // Need at least chv + 1 SHL entries for one CHV value.
-    if shl.len() < chv + 1 {
+    // Need more than `chv` SHL entries for at least one CHV value.
+    if shl.len() <= chv {
         empty_oscillator!();
     }
 
-    let items = (0..(shl.len() - chv))
-        .map(|k| {
-            let prev = shl[k];
-            let curr = shl[k + chv];
-            let value = if prev == 0.0 {
+    // CHV entry k evaluates the bar at original index smooth - 1 + k + chv.
+    let skip_count = smooth.saturating_sub(1).saturating_add(chv);
+    let items = shl
+        .iter()
+        .zip(shl.iter().skip(chv))
+        .zip(points.iter().skip(skip_count))
+        .map(|((prev, curr), point)| {
+            let value = if *prev == 0.0 {
                 0.0
             } else {
                 100.0 * (curr - prev) / prev
             };
-            let i = smooth - 1 + k + chv;
             IndicatorValue {
-                timestamp: points[i].timestamp,
+                timestamp: point.timestamp,
                 value,
             }
         })

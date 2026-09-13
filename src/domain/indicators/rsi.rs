@@ -28,14 +28,11 @@ pub fn compute(
 
     // Build per-step price diffs: diff[i] = price[i+1] - price[i].
     let diffs: Vec<PriceDiff> = points
-        .windows(2)
-        .map(|w| {
-            let prev = &w[0];
-            let cur = &w[1];
-            PriceDiff {
-                timestamp: cur.timestamp,
-                diff: field.select(cur) - field.select(prev),
-            }
+        .iter()
+        .zip(points.iter().skip(1))
+        .map(|(prev, cur)| PriceDiff {
+            timestamp: cur.timestamp,
+            diff: field.select(cur) - field.select(prev),
         })
         .collect();
 

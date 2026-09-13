@@ -60,11 +60,11 @@ impl ParquetStrategyRepository {
         mms_id: i32,
         strategies: &[Strategy],
     ) -> anyhow::Result<()> {
-        let mut next_id = self.max_strategy_id()? + 1;
+        let mut next_id = self.max_strategy_id()?.saturating_add(1);
         let mut rows = Vec::with_capacity(strategies.len());
         for strategy in strategies {
             rows.push(StrategyRow::from_strategy(strategy, next_id));
-            next_id += 1;
+            next_id = next_id.saturating_add(1);
         }
         self.write_rows(instrument, mms_id, rows)
     }
@@ -159,7 +159,7 @@ impl ParquetStrategyRepository {
                 if path.is_dir() {
                     dirs.push(path);
                 } else if path.file_name().is_some_and(|n| n == "strategies.parquet") {
-                    partitions_scanned += 1;
+                    partitions_scanned = partitions_scanned.saturating_add(1);
                     let file = File::open(&path)?;
                     let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
                     let mut reader = builder.build()?;
@@ -310,7 +310,7 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
 
 fn build_list_column(rows: &[StrategyRow], extract: fn(&StrategyRow) -> &[i32]) -> ListArray {
     let mut values_builder = Int32Builder::new();
-    let mut offsets: Vec<i32> = Vec::with_capacity(rows.len() + 1);
+    let mut offsets: Vec<i32> = Vec::with_capacity(rows.len().saturating_add(1));
     let mut offset: i32 = 0;
     offsets.push(offset);
     for r in rows {
@@ -318,7 +318,7 @@ fn build_list_column(rows: &[StrategyRow], extract: fn(&StrategyRow) -> &[i32]) 
         for id in ids {
             values_builder.append_value(*id);
         }
-        offset += ids.len() as i32;
+        offset = offset.saturating_add(ids.len() as i32);
         offsets.push(offset);
     }
     let values = values_builder.finish();

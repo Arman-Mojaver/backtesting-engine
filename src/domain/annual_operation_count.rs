@@ -2,7 +2,7 @@ const SECONDS_PER_DAY: f64 = 86400.0;
 const DAYS_PER_YEAR: f64 = 365.25;
 
 fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
-    let days = (end_timestamp - start_timestamp) as f64 / SECONDS_PER_DAY;
+    let days = end_timestamp.saturating_sub(start_timestamp) as f64 / SECONDS_PER_DAY;
     if days <= 0.0 {
         return 0.0;
     }

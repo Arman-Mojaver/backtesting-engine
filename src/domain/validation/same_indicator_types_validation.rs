@@ -6,7 +6,12 @@ pub enum ValidationError {
 }
 
 pub fn validate_same_indicator_types(indicators: &[Indicator]) -> Result<(), ValidationError> {
-    let reference = &indicators[0].r#type;
+    // Empty input is vacuously valid (and pre-validated upstream by
+    // `empty_validation` via `validate_all`).
+    let reference = match indicators.first() {
+        Some(indicator) => &indicator.r#type,
+        None => return Ok(()),
+    };
 
     if indicators
         .iter()

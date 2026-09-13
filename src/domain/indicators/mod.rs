@@ -48,6 +48,7 @@ pub enum IndicatorError {
     InvalidBullsPeriod { n: i32 },
     InvalidChoFastPeriod { n: i32 },
     InvalidChoSlowPeriod { n: i32 },
+    InvalidChoPeriodOrder { fast: i32, slow: i32 },
     InvalidChvSmoothPeriod { n: i32 },
     InvalidChvPeriod { n: i32 },
     InvalidDpoPeriod { n: i32 },
@@ -55,6 +56,7 @@ pub enum IndicatorError {
     InvalidOsMaFastPeriod { n: i32 },
     InvalidOsMaSlowPeriod { n: i32 },
     InvalidOsMaSignalPeriod { n: i32 },
+    InvalidOsMaPeriodOrder { fast: i32, slow: i32 },
     InvalidRocPeriod { n: i32 },
     InvalidTrixPeriod { n: i32 },
     InvalidVrocPeriod { n: i32 },
@@ -173,18 +175,18 @@ mod tests {
 
     /// 34 points with constant median -> exactly one AO value.
     fn rp_ao_34() -> Vec<ResampledPointD1> {
-        (0..34)
+        (1..=34)
             .map(|i| {
                 let m = 1.0;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m + 0.5,
                     low: m - 0.5,
                     close: m,
                     volume: 1000,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -293,18 +295,18 @@ mod tests {
 
     /// 38 points with constant median -> exactly one AC value.
     fn rp_ac_38() -> Vec<ResampledPointD1> {
-        (0..38)
+        (1..=38)
             .map(|i| {
                 let m = 1.0;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m + 0.5,
                     low: m - 0.5,
                     close: m,
                     volume: 1000,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -344,18 +346,18 @@ mod tests {
     /// 14 points with constant close/low -> exactly one Bears value
     /// (period 13 -> needs 14 points).
     fn rp_bears_14() -> Vec<ResampledPointD1> {
-        (0..14)
+        (1..=14)
             .map(|i| {
                 let m = 10.0;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m,
                     low: 9.0,
                     close: m,
                     volume: 1000,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -402,18 +404,18 @@ mod tests {
     /// 14 points with constant close/high -> exactly one Bulls value
     /// (period 13 -> needs 14 points).
     fn rp_bulls_14() -> Vec<ResampledPointD1> {
-        (0..14)
+        (1..=14)
             .map(|i| {
                 let m = 10.0;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: 11.0,
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -461,16 +463,16 @@ mod tests {
     /// 5 points with constant positive AD -> exactly one CHO value
     /// (slow_ma=4 -> needs 5 points).
     fn rp_cho_5() -> Vec<ResampledPointD1> {
-        (0..5)
+        (1..=5)
             .map(|i| ResampledPointD1 {
-                id: i + 1,
+                id: i,
                 instrument: "EURUSD".to_string(),
                 open: 2.5,
                 high: 3.0,
                 low: 1.0,
                 close: 2.5,
                 volume: 100,
-                timestamp: (i + 1) as i64,
+                timestamp: i as i64,
                 high_low_order: HighLowOrder::HighFirst,
             })
             .collect()
@@ -537,16 +539,16 @@ mod tests {
     /// 5 points with constant high-low spread -> exactly one CHV value
     /// (smooth_period=2, chv_period=3 -> needs 5 points).
     fn rp_chv_5() -> Vec<ResampledPointD1> {
-        (0..5)
+        (1..=5)
             .map(|i| ResampledPointD1 {
-                id: i + 1,
+                id: i,
                 instrument: "EURUSD".to_string(),
                 open: 9.0,
                 high: 11.0,
                 low: 9.0,
                 close: 11.0,
                 volume: 1000,
-                timestamp: (i + 1) as i64,
+                timestamp: i as i64,
                 high_low_order: HighLowOrder::HighFirst,
             })
             .collect()
@@ -613,18 +615,18 @@ mod tests {
     /// 7 points with constant close -> exactly one DPO value
     /// (period 12 -> ExtMAPeriod = 7 -> needs 7 points).
     fn rp_dpo_7() -> Vec<ResampledPointD1> {
-        (0..7)
+        (1..=7)
             .map(|i| {
                 let m = 10.0;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m,
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -673,18 +675,18 @@ mod tests {
     /// 4 points with constant close -> exactly one Force Index value
     /// (period 3 -> needs 4 points).
     fn rp_force_4() -> Vec<ResampledPointD1> {
-        (0..4)
+        (1..=4)
             .map(|i| {
                 let m = 10.0;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m,
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -733,18 +735,18 @@ mod tests {
     /// 6 points with constant close -> exactly one OsMA value
     /// (fast=3, slow=5, signal=2 -> needs 6 points).
     fn rp_osma_6() -> Vec<ResampledPointD1> {
-        (0..6)
+        (1..=6)
             .map(|i| {
                 let m = 10.0;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m,
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -829,18 +831,18 @@ mod tests {
     /// 5 points with constant close -> 2 ROC values
     /// (period 3 -> needs 4 points, 5 points -> 2 ROC values).
     fn rp_roc_5() -> Vec<ResampledPointD1> {
-        (0..5)
+        (1..=5)
             .map(|i| {
                 let m = 10.0;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m,
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -888,18 +890,18 @@ mod tests {
     /// 5 points with constant close -> exactly 1 TRIX value
     /// (period 2 -> needs 5 points = 3*2 - 1).
     fn rp_trix_5() -> Vec<ResampledPointD1> {
-        (0..5)
+        (1..=5)
             .map(|i| {
                 let m = 10.0;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: m,
                     high: m,
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -947,18 +949,18 @@ mod tests {
     /// 5 points with constant volume -> 4 VROC values
     /// (period 2 -> lookback 1 -> needs 2 points, 5 points -> 4 VROC values).
     fn rp_vroc_5() -> Vec<ResampledPointD1> {
-        (0..5)
+        (1..=5)
             .map(|i| {
                 let v = 1000;
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i,
                     instrument: "EURUSD".to_string(),
                     open: 10.0,
                     high: 10.0,
                     low: 10.0,
                     close: 10.0,
                     volume: v,
-                    timestamp: (i + 1) as i64,
+                    timestamp: i as i64,
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })

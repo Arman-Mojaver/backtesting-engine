@@ -32,19 +32,20 @@ pub fn compute(
         empty_oscillator!();
     }
 
-    let closes: Vec<f64> = points.iter().map(|pt| pt.close).collect();
-
-    let items = (0..(n - p))
-        .map(|k| {
-            let curr = closes[p + k];
-            let prev = closes[k];
-            let value = if curr == 0.0 {
+    // ROC entry k pairs the point at index p + k (current) with the point
+    // at index k (period bars earlier).
+    let items = points
+        .iter()
+        .skip(p)
+        .zip(points.iter())
+        .map(|(curr, prev)| {
+            let value = if curr.close == 0.0 {
                 0.0
             } else {
-                (curr - prev) / curr * 100.0
+                (curr.close - prev.close) / curr.close * 100.0
             };
             IndicatorValue {
-                timestamp: points[p + k].timestamp,
+                timestamp: curr.timestamp,
                 value,
             }
         })
