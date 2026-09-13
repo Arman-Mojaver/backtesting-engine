@@ -27,12 +27,12 @@ pub struct CreateIndicators {
     pub count: i32,
 }
 
-pub fn parse_dev(m: &ArgMatches) -> DevCommand {
+pub fn parse_dev(m: &ArgMatches) -> anyhow::Result<DevCommand> {
     match m.subcommand() {
-        Some(("create_indicators", sub)) => DevCommand::CreateIndicators(CreateIndicators {
+        Some(("create_indicators", sub)) => Ok(DevCommand::CreateIndicators(CreateIndicators {
             count: *sub.get_one::<i32>("count").unwrap_or(&10000),
-        }),
-        _ => unreachable!("invalid dev command"),
+        })),
+        _ => anyhow::bail!("invalid dev command"),
     }
 }
 

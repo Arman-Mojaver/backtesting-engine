@@ -32,7 +32,9 @@ pub fn run_strategies(
         long_operation_points,
         short_operation_points,
     };
-    let (start_timestamp, end_timestamp) = operation_points.start_end_timestamps();
+    let (start_timestamp, end_timestamp) = operation_points
+        .start_end_timestamps()
+        .ok_or_else(|| anyhow::anyhow!("long operation points should never be empty"))?;
 
     let unprocessed_set: HashSet<i32> = unprocessed_ids.iter().copied().collect();
     let indicators_for_compute: Vec<Indicator> = indicators

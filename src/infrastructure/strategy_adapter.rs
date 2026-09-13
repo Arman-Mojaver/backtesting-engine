@@ -310,13 +310,16 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
 
 fn build_list_column(rows: &[StrategyRow], extract: fn(&StrategyRow) -> &[i32]) -> ListArray {
     let mut values_builder = Int32Builder::new();
-    let mut offsets: Vec<i32> = vec![0];
+    let mut offsets: Vec<i32> = Vec::with_capacity(rows.len() + 1);
+    let mut offset: i32 = 0;
+    offsets.push(offset);
     for r in rows {
         let ids = extract(r);
         for id in ids {
             values_builder.append_value(*id);
         }
-        offsets.push(offsets.last().unwrap() + ids.len() as i32);
+        offset += ids.len() as i32;
+        offsets.push(offset);
     }
     let values = values_builder.finish();
     let offset_buf = arrow::buffer::OffsetBuffer::new(arrow::buffer::ScalarBuffer::from(offsets));

@@ -54,13 +54,21 @@ pub fn compute(
 }
 
 /// Compute one RSI value for a window of price diffs.
+///
+/// The window comes from `windows(period)` with `period >= 1` (validated),
+/// so it is never empty; the loop leaves `timestamp` at the last diff's.
 fn compute_rsi_point(window: &[PriceDiff]) -> IndicatorValue {
-    let gain: f64 = window.iter().filter(|d| d.diff > 0.0).map(|d| d.diff).sum();
-    let loss: f64 = window
-        .iter()
-        .filter(|d| d.diff < 0.0)
-        .map(|d| d.diff.abs())
-        .sum();
+    let mut gain: f64 = 0.0;
+    let mut loss: f64 = 0.0;
+    let mut timestamp: i64 = 0;
+    for d in window {
+        if d.diff > 0.0 {
+            gain += d.diff;
+        } else if d.diff < 0.0 {
+            loss += d.diff.abs();
+        }
+        timestamp = d.timestamp;
+    }
 
     let rs = if loss == 0.0 {
         f64::INFINITY
@@ -73,7 +81,6 @@ fn compute_rsi_point(window: &[PriceDiff]) -> IndicatorValue {
     let raw_rsi = 100.0 - (100.0 / (1.0 + rs));
     let value = raw_rsi.round();
 
-    let timestamp = window.last().expect("non-empty window").timestamp;
     IndicatorValue { timestamp, value }
 }
 

@@ -85,39 +85,39 @@ pub struct DeleteIndicators {
     pub identifiers: Vec<String>,
 }
 
-pub fn parse_indicator(m: &ArgMatches) -> IndicatorCommand {
+pub fn parse_indicator(m: &ArgMatches) -> anyhow::Result<IndicatorCommand> {
     match m.subcommand() {
-        Some(("create", sub)) => IndicatorCommand::Create(parse_create(sub)),
-        Some(("delete", sub)) => IndicatorCommand::Delete(DeleteIndicators {
+        Some(("create", sub)) => Ok(IndicatorCommand::Create(parse_create(sub)?)),
+        Some(("delete", sub)) => Ok(IndicatorCommand::Delete(DeleteIndicators {
             identifiers: sub
                 .get_many::<String>("identifiers")
                 .unwrap_or_default()
                 .map(std::borrow::ToOwned::to_owned)
                 .collect(),
-        }),
-        _ => unreachable!("invalid indicator command"),
+        })),
+        _ => anyhow::bail!("invalid indicator command"),
     }
 }
 
-fn parse_create(m: &ArgMatches) -> CreateIndicator {
+fn parse_create(m: &ArgMatches) -> anyhow::Result<CreateIndicator> {
     match m.subcommand() {
-        Some(("macd", sub)) => CreateIndicator::Macd(Macd {
+        Some(("macd", sub)) => Ok(CreateIndicator::Macd(Macd {
             args: sub
                 .get_many::<String>("args")
                 .unwrap_or_default()
                 .map(std::borrow::ToOwned::to_owned)
                 .collect(),
             example: sub.get_flag("example"),
-        }),
-        Some(("rsi", sub)) => CreateIndicator::Rsi(Rsi {
+        })),
+        Some(("rsi", sub)) => Ok(CreateIndicator::Rsi(Rsi {
             args: sub
                 .get_many::<String>("args")
                 .unwrap_or_default()
                 .map(std::borrow::ToOwned::to_owned)
                 .collect(),
             example: sub.get_flag("example"),
-        }),
-        _ => unreachable!("invalid indicator create subcommand"),
+        })),
+        _ => anyhow::bail!("invalid indicator create subcommand"),
     }
 }
 

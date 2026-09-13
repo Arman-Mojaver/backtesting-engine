@@ -62,12 +62,9 @@ unimplemented = "deny"
 unchecked_time_subtraction = "deny"
 panic_in_result_fn = "deny"
 exit = "deny"
-#
-# Phase 1 -- CLI error handling:
-# parse_* fns -> anyhow::Result; clap get_one() -> ok_or_else.
-#unwrap_used = "deny"        # 6 errors -- get_one::<T>("arg").unwrap()
-#expect_used = "deny"        # 3 errors -- same pattern
-#unreachable = "deny"        # 11 errors -- _ => unreachable!("invalid ... command")
+unwrap_used = "deny"
+expect_used = "deny"
+unreachable = "deny"
 #
 # Phase 2 -- pg_adapter JSON parsing:
 # json_extract_str/json_extract_i32 -> Result; fixes both lints together.

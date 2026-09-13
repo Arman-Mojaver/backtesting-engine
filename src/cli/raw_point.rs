@@ -15,11 +15,11 @@ pub enum RawPointCommand {
     Delete,
 }
 
-pub fn parse_raw_point(m: &ArgMatches) -> RawPointCommand {
+pub fn parse_raw_point(m: &ArgMatches) -> anyhow::Result<RawPointCommand> {
     match m.subcommand() {
-        Some(("create", _)) => RawPointCommand::Create,
-        Some(("delete", _)) => RawPointCommand::Delete,
-        _ => unreachable!("invalid raw point command"),
+        Some(("create", _)) => Ok(RawPointCommand::Create),
+        Some(("delete", _)) => Ok(RawPointCommand::Delete),
+        _ => anyhow::bail!("invalid raw point command"),
     }
 }
 

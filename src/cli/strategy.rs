@@ -67,24 +67,28 @@ pub enum StrategyCommand {
     Metadata,
 }
 
-pub fn parse_strategy(m: &ArgMatches) -> StrategyCommand {
+pub fn parse_strategy(m: &ArgMatches) -> anyhow::Result<StrategyCommand> {
     match m.subcommand() {
-        Some(("create", sub_m)) => StrategyCommand::Create {
+        Some(("create", sub_m)) => Ok(StrategyCommand::Create {
             money_management_strategy_id: *sub_m
                 .get_one::<i32>("money_management_strategy_id")
-                .unwrap(),
+                .ok_or_else(|| {
+                    anyhow::anyhow!("missing required argument 'money_management_strategy_id'")
+                })?,
             instrument: sub_m
                 .get_one::<String>("instrument")
                 .cloned()
                 .unwrap_or_else(|| "EURUSD".to_string()),
-        },
-        Some(("create_loop", _sub_m)) => StrategyCommand::CreateLoop,
-        Some(("metadata", _sub_m)) => StrategyCommand::Metadata,
-        Some(("display", sub_m)) => StrategyCommand::Display {
-            strategy_id: *sub_m.get_one::<i64>("strategy_id").unwrap(),
+        }),
+        Some(("create_loop", _sub_m)) => Ok(StrategyCommand::CreateLoop),
+        Some(("metadata", _sub_m)) => Ok(StrategyCommand::Metadata),
+        Some(("display", sub_m)) => Ok(StrategyCommand::Display {
+            strategy_id: *sub_m
+                .get_one::<i64>("strategy_id")
+                .ok_or_else(|| anyhow::anyhow!("missing required argument 'strategy_id'"))?,
             verbose: sub_m.get_flag("verbose"),
-        },
-        _ => unreachable!("invalid strategy command"),
+        }),
+        _ => anyhow::bail!("invalid strategy command"),
     }
 }
 

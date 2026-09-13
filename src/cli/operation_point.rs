@@ -25,14 +25,17 @@ pub struct AlignOperationPoint {
     pub instrument: String,
 }
 
-pub fn parse_operation_point(m: &ArgMatches) -> OperationPointCommand {
+pub fn parse_operation_point(m: &ArgMatches) -> anyhow::Result<OperationPointCommand> {
     match m.subcommand() {
-        Some(("align", sub)) => OperationPointCommand::Align(AlignOperationPoint {
-            instrument: sub.get_one::<String>("instrument").cloned().unwrap(),
-        }),
-        Some(("create", _)) => OperationPointCommand::Create,
-        Some(("delete", _)) => OperationPointCommand::Delete,
-        _ => unreachable!("invalid operation point command"),
+        Some(("align", sub)) => Ok(OperationPointCommand::Align(AlignOperationPoint {
+            instrument: sub
+                .get_one::<String>("instrument")
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("missing required argument 'instrument'"))?,
+        })),
+        Some(("create", _)) => Ok(OperationPointCommand::Create),
+        Some(("delete", _)) => Ok(OperationPointCommand::Delete),
+        _ => anyhow::bail!("invalid operation point command"),
     }
 }
 

@@ -49,28 +49,30 @@ pub struct DeleteMoneyManagementStrategies {
     pub identifiers: Vec<String>,
 }
 
-pub fn parse_money_management_strategy(m: &ArgMatches) -> MoneyManagementStrategyCommand {
+pub fn parse_money_management_strategy(
+    m: &ArgMatches,
+) -> anyhow::Result<MoneyManagementStrategyCommand> {
     match m.subcommand() {
-        Some(("create", sub)) => {
-            MoneyManagementStrategyCommand::Create(CreateMoneyManagementStrategy {
+        Some(("create", sub)) => Ok(MoneyManagementStrategyCommand::Create(
+            CreateMoneyManagementStrategy {
                 args: sub
                     .get_many::<String>("args")
                     .unwrap_or_default()
                     .map(std::borrow::ToOwned::to_owned)
                     .collect(),
                 example: sub.get_flag("example"),
-            })
-        }
-        Some(("delete", sub)) => {
-            MoneyManagementStrategyCommand::Delete(DeleteMoneyManagementStrategies {
+            },
+        )),
+        Some(("delete", sub)) => Ok(MoneyManagementStrategyCommand::Delete(
+            DeleteMoneyManagementStrategies {
                 identifiers: sub
                     .get_many::<String>("identifiers")
                     .unwrap_or_default()
                     .map(std::borrow::ToOwned::to_owned)
                     .collect(),
-            })
-        }
-        _ => unreachable!("invalid mms command"),
+            },
+        )),
+        _ => anyhow::bail!("invalid mms command"),
     }
 }
 

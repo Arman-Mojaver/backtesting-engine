@@ -33,22 +33,22 @@ pub fn build_cli() -> Command {
         .subcommand(strategy::build_strategy_cli())
 }
 
-pub fn parse(matches: &ArgMatches) -> AppCommand {
+pub fn parse(matches: &ArgMatches) -> anyhow::Result<AppCommand> {
     match matches.subcommand() {
-        Some(("dev", m)) => AppCommand::Dev(dev::parse_dev(m)),
-        Some(("indicator", m)) => AppCommand::Indicator(indicator::parse_indicator(m)),
-        Some(("money-management-strategy", m)) => AppCommand::MoneyManagementStrategy(
-            money_management_strategy::parse_money_management_strategy(m),
-        ),
-        Some(("operation-point", m)) => {
-            AppCommand::OperationPoint(operation_point::parse_operation_point(m))
-        }
-        Some(("raw-point", m)) => AppCommand::RawPoint(raw_point::parse_raw_point(m)),
-        Some(("resampled-point", m)) => {
-            AppCommand::ResampledPoint(resampled_point::parse_resampled_point(m))
-        }
-        Some(("strategy", m)) => AppCommand::Strategy(strategy::parse_strategy(m)),
-        _ => unreachable!("invalid top-level command"),
+        Some(("dev", m)) => Ok(AppCommand::Dev(dev::parse_dev(m)?)),
+        Some(("indicator", m)) => Ok(AppCommand::Indicator(indicator::parse_indicator(m)?)),
+        Some(("money-management-strategy", m)) => Ok(AppCommand::MoneyManagementStrategy(
+            money_management_strategy::parse_money_management_strategy(m)?,
+        )),
+        Some(("operation-point", m)) => Ok(AppCommand::OperationPoint(
+            operation_point::parse_operation_point(m)?,
+        )),
+        Some(("raw-point", m)) => Ok(AppCommand::RawPoint(raw_point::parse_raw_point(m)?)),
+        Some(("resampled-point", m)) => Ok(AppCommand::ResampledPoint(
+            resampled_point::parse_resampled_point(m)?,
+        )),
+        Some(("strategy", m)) => Ok(AppCommand::Strategy(strategy::parse_strategy(m)?)),
+        _ => anyhow::bail!("invalid top-level command"),
     }
 }
 

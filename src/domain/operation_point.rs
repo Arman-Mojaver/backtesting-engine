@@ -33,23 +33,21 @@ impl OperationPoints<'_> {
             .collect()
     }
 
-    /// Returns the (start_timestamp, end_timestamp) range for long operation points.
+    /// Returns the (start_timestamp, end_timestamp) range for long operation points,
+    /// or `None` when there are no long operation points.
     /// Both `long_operation_points` and `short_operation_points` share identical timestamps.
-    pub fn start_end_timestamps(&self) -> (i64, i64) {
-        let timestamps: Vec<i64> = self
+    pub fn start_end_timestamps(&self) -> Option<(i64, i64)> {
+        let start = self
             .long_operation_points
             .iter()
             .map(|p| p.timestamp)
-            .collect();
-        let start = *timestamps
+            .min()?;
+        let end = self
+            .long_operation_points
             .iter()
-            .min()
-            .expect("long_operation_points should never be empty");
-        let end = *timestamps
-            .iter()
-            .max()
-            .expect("long_operation_points should never be empty");
-        (start, end)
+            .map(|p| p.timestamp)
+            .max()?;
+        Some((start, end))
     }
 }
 
@@ -191,7 +189,7 @@ mod tests {
             long_operation_points: &long,
             short_operation_points: &short,
         };
-        let (start, end) = ops.start_end_timestamps();
+        let (start, end) = ops.start_end_timestamps().unwrap();
         assert_eq!(start, 100);
         assert_eq!(end, 300);
     }
@@ -204,7 +202,7 @@ mod tests {
             long_operation_points: &long,
             short_operation_points: &short,
         };
-        let (start, end) = ops.start_end_timestamps();
+        let (start, end) = ops.start_end_timestamps().unwrap();
         assert_eq!(start, 42);
         assert_eq!(end, 42);
     }

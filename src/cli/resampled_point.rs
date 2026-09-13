@@ -15,11 +15,11 @@ pub enum ResampledPointCommand {
     Delete,
 }
 
-pub fn parse_resampled_point(m: &ArgMatches) -> ResampledPointCommand {
+pub fn parse_resampled_point(m: &ArgMatches) -> anyhow::Result<ResampledPointCommand> {
     match m.subcommand() {
-        Some(("create", _)) => ResampledPointCommand::Create,
-        Some(("delete", _)) => ResampledPointCommand::Delete,
-        _ => unreachable!("invalid resampled point command"),
+        Some(("create", _)) => Ok(ResampledPointCommand::Create),
+        Some(("delete", _)) => Ok(ResampledPointCommand::Delete),
+        _ => anyhow::bail!("invalid resampled point command"),
     }
 }
 
