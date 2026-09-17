@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-.PHONY: help bash logs up in down ps build fmt push pull
+.PHONY: help bash logs up in down build fmt push pull fmt test
 
 .DEFAULT_GOAL := help
 
@@ -31,9 +31,6 @@ in:  ## Start a bash shell in started container
 down:  ## Remove containers
 	docker compose -f docker-compose.yaml down
 
-ps:  ## Display containers
-	docker compose ps
-
 
 # Docker image commands
 build:  ## Build image
@@ -50,3 +47,6 @@ pull:  ## Pull images
 
 fmt:  ## Run rust formatter
 	cd $(PWD) && cargo fmt
+
+test: ## Run tests
+	cargo-nextest nextest run
