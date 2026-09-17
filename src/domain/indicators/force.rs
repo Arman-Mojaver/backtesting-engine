@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -31,7 +32,7 @@ pub fn compute(
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(period, InvalidForcePeriod);
-    let p = period as usize;
+    let p = cast::i32_to_usize(period);
 
     let closes: Vec<f64> = points.iter().map(|pt| pt.close).collect();
     let ma = sma(&closes, p);
@@ -48,7 +49,7 @@ pub fn compute(
         .zip(points.iter().skip(p))
         .map(|((prev_ma, curr_ma), point)| IndicatorValue {
             timestamp: point.timestamp,
-            value: point.volume as f64 * (curr_ma - prev_ma),
+            value: f64::from(point.volume) * (curr_ma - prev_ma),
         })
         .collect();
 
@@ -87,7 +88,7 @@ mod tests {
         // F[j] = volume[2+j] * (MA[j] - MA[j-1]) = 100 * 0.0 = 0.0 for j=1,2.
         // 5 points -> 2 Force Index values = 0.0 at points[3].ts, points[4].ts.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 100))
             .collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
@@ -108,7 +109,7 @@ mod tests {
         //   at points[4].ts.
         // 5 points -> 2 Force Index values = 100.0 each.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, (i + 1) as f64, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), f64::from(i + 1), 100))
             .collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
@@ -127,7 +128,14 @@ mod tests {
         // 5 points -> 3 Force Index values = 0.0 each.
         let closes = [1.0, 3.0, 1.0, 3.0, 1.0];
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize], 50))
+            .map(|i| {
+                rp(
+                    i + 1,
+                    i64::from(i + 1),
+                    closes[usize::try_from(i).unwrap()],
+                    50,
+                )
+            })
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -150,7 +158,14 @@ mod tests {
         // 5 points -> 3 Force Index values = 15.0, 30.0, 60.0.
         let closes = [1.0, 2.0, 4.0, 8.0, 16.0];
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize], 10))
+            .map(|i| {
+                rp(
+                    i + 1,
+                    i64::from(i + 1),
+                    closes[usize::try_from(i).unwrap()],
+                    10,
+                )
+            })
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -175,7 +190,7 @@ mod tests {
     fn fewer_than_period_plus_one_points_yields_empty_buffer() {
         // period=13, 13 points -> SMA has 1 entry -> no Force Index values.
         let points: Vec<ResampledPointD1> = (0..13)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 100))
             .collect();
         let result = compute(&points, 13).unwrap();
         assert!(result.items.is_empty());
@@ -185,7 +200,7 @@ mod tests {
     fn exactly_period_points_yields_empty_buffer() {
         // period=13, 13 points -> SMA has 1 entry -> no Force Index values.
         let points: Vec<ResampledPointD1> = (0..13)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 100))
             .collect();
         let result = compute(&points, 13).unwrap();
         assert!(result.items.is_empty());
@@ -196,7 +211,7 @@ mod tests {
         // period=3, 4 points -> SMA has 2 entries -> 1 Force Index value.
         // SMA([10,10,10,10], 3) = [10.0, 10.0]. F[1] = 100 * 0.0 = 0.0.
         let points: Vec<ResampledPointD1> = (0..4)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 100))
             .collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
@@ -223,7 +238,7 @@ mod tests {
         // period=3, 5 points -> SMA has 3 entries -> 2 Force Index values at
         // original indices 3 and 4 -> timestamps points[3].ts, points[4].ts.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 100) as i64, 10.0, 100))
+            .map(|i| rp(i + 1, i64::from(i + 100), 10.0, 100))
             .collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
@@ -236,7 +251,7 @@ mod tests {
     fn output_length_is_points_minus_period() {
         // 10 points, period 3 -> 10 - 3 = 7 Force Index values.
         let points: Vec<ResampledPointD1> = (0..10)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 100))
             .collect();
         let result = compute(&points, 3).unwrap();
         assert_eq!(indicator_values!(result).len(), 7);

@@ -186,7 +186,7 @@ mod tests {
                     low: m - 0.5,
                     close: m,
                     volume: 1000,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -306,7 +306,7 @@ mod tests {
                     low: m - 0.5,
                     close: m,
                     volume: 1000,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -357,7 +357,7 @@ mod tests {
                     low: 9.0,
                     close: m,
                     volume: 1000,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -415,7 +415,7 @@ mod tests {
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -472,7 +472,7 @@ mod tests {
                 low: 1.0,
                 close: 2.5,
                 volume: 100,
-                timestamp: i as i64,
+                timestamp: i64::from(i),
                 high_low_order: HighLowOrder::HighFirst,
             })
             .collect()
@@ -548,7 +548,7 @@ mod tests {
                 low: 9.0,
                 close: 11.0,
                 volume: 1000,
-                timestamp: i as i64,
+                timestamp: i64::from(i),
                 high_low_order: HighLowOrder::HighFirst,
             })
             .collect()
@@ -626,7 +626,7 @@ mod tests {
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -686,7 +686,7 @@ mod tests {
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -746,7 +746,7 @@ mod tests {
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -842,7 +842,7 @@ mod tests {
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -901,7 +901,7 @@ mod tests {
                     low: m,
                     close: m,
                     volume: 1000,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })
@@ -960,7 +960,7 @@ mod tests {
                     low: 10.0,
                     close: 10.0,
                     volume: v,
-                    timestamp: i as i64,
+                    timestamp: i64::from(i),
                     high_low_order: HighLowOrder::HighFirst,
                 }
             })

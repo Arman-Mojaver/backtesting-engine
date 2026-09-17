@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
@@ -25,7 +26,7 @@ pub fn compute(
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(period, InvalidRocPeriod);
-    let p = period as usize;
+    let p = cast::i32_to_usize(period);
     let n = points.len();
 
     if n <= p {
@@ -85,7 +86,7 @@ mod tests {
         // ROC[k] = (10 - 10) / 10 * 100 = 0.0 for all k.
         // 5 points -> 2 ROC values = 0.0 at points[3].ts, points[4].ts.
         let points: Vec<ResampledPointD1> =
-            (0..5).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..5).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
@@ -102,7 +103,7 @@ mod tests {
         // ROC[1] = (5 - 2) / 5 * 100 = 60.0 at points[4].ts.
         // 5 points -> 2 ROC values = 75.0, 60.0.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, (i + 1) as f64))
+            .map(|i| rp(i + 1, i64::from(i + 1), f64::from(i + 1)))
             .collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
@@ -122,7 +123,7 @@ mod tests {
         // 5 points -> 3 ROC values = -66.666..., -100.0, -200.0.
         let closes = [10.0, 8.0, 6.0, 4.0, 2.0];
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
+            .map(|i| rp(i + 1, i64::from(i + 1), closes[usize::try_from(i).unwrap()]))
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -147,7 +148,7 @@ mod tests {
         // 5 points -> 3 ROC values = 100.0, 0.0, 50.0.
         let closes = [0.0, 1.0, 2.0, 0.0, 4.0];
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
+            .map(|i| rp(i + 1, i64::from(i + 1), closes[usize::try_from(i).unwrap()]))
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -172,7 +173,7 @@ mod tests {
     fn fewer_than_period_plus_one_points_yields_empty_buffer() {
         // period=12, 11 points -> 11 <= 12 -> no ROC values.
         let points: Vec<ResampledPointD1> =
-            (0..11).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..11).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 12).unwrap();
         assert!(result.items.is_empty());
     }
@@ -181,7 +182,7 @@ mod tests {
     fn exactly_period_points_yields_empty_buffer() {
         // period=12, 12 points -> 12 <= 12 -> no ROC values.
         let points: Vec<ResampledPointD1> =
-            (0..12).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..12).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 12).unwrap();
         assert!(result.items.is_empty());
     }
@@ -191,7 +192,7 @@ mod tests {
         // period=3, 4 points -> 1 ROC value.
         // close = [10, 10, 10, 10] -> ROC[0] = (10 - 10) / 10 * 100 = 0.0.
         let points: Vec<ResampledPointD1> =
-            (0..4).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..4).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
@@ -216,8 +217,9 @@ mod tests {
     fn timestamps_track_evaluated_bar() {
         // period=3, 5 points -> 2 ROC values at original indices 3 and 4 ->
         // timestamps points[3].ts, points[4].ts.
-        let points: Vec<ResampledPointD1> =
-            (0..5).map(|i| rp(i + 1, (i + 100) as i64, 10.0)).collect();
+        let points: Vec<ResampledPointD1> = (0..5)
+            .map(|i| rp(i + 1, i64::from(i + 100), 10.0))
+            .collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 2);
@@ -229,7 +231,7 @@ mod tests {
     fn output_length_is_points_minus_period() {
         // 10 points, period 3 -> 10 - 3 = 7 ROC values.
         let points: Vec<ResampledPointD1> =
-            (0..10).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..10).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 3).unwrap();
         assert_eq!(indicator_values!(result).len(), 7);
     }

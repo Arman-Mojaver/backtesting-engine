@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
+use crate::domain::cast;
+
 /// DB-side state: what exists in the database.
 ///
 /// The DB holds no (instrument, mms_id, indicator) relationship: indicators are
@@ -65,7 +67,7 @@ pub fn build_metadata_report(
             .processed_ids_per_cell
             .get(&(instrument.clone(), *mms_id));
 
-        let manifest_count = manifest_ids.map_or(0, std::collections::HashSet::len) as i32;
+        let manifest_count = manifest_ids.map_or(0, |s| cast::usize_to_i32(s.len()));
 
         let (db_effective, remaining_ids) = if db_cells.contains(&(instrument.clone(), *mms_id)) {
             // Which indicator IDs from the DB have NOT been processed yet?
@@ -75,7 +77,7 @@ pub fn build_metadata_report(
             );
             let mut r = remaining;
             r.sort_unstable();
-            (db_count as i32, r)
+            (cast::usize_to_i32(db_count), r)
         } else {
             // Manifest-only cell has no DB presence.
             (0, Vec::new())
@@ -101,7 +103,7 @@ pub fn build_metadata_report(
     let total_processed: i32 = cells.iter().map(|c| c.manifest_indicator_count).sum();
     let total_remaining: i32 = cells
         .iter()
-        .map(|c| c.remaining_indicator_ids.len() as i32)
+        .map(|c| cast::usize_to_i32(c.remaining_indicator_ids.len()))
         .sum();
 
     MetadataReport {
@@ -140,7 +142,7 @@ impl fmt::Display for MetadataReport {
                 cell.mms_id,
                 cell.db_indicator_count,
                 cell.manifest_indicator_count,
-                cell.remaining_indicator_ids.len() as i32,
+                cast::usize_to_i32(cell.remaining_indicator_ids.len()),
             )?;
         }
 

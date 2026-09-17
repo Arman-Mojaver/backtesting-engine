@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -20,7 +21,7 @@ fn compute_ad(points: &[ResampledPointD1]) -> Vec<f64> {
         let ad_value = if range == 0.0 {
             0.0
         } else {
-            ((pt.close - pt.low) - (pt.high - pt.close)) / range * (pt.volume as f64)
+            ((pt.close - pt.low) - (pt.high - pt.close)) / range * (f64::from(pt.volume))
         };
         let prev = ad.last().copied().unwrap_or(0.0);
         ad.push(prev + ad_value);
@@ -57,8 +58,8 @@ pub fn compute(
             slow: slow_ma,
         });
     }
-    let fast = fast_ma as usize;
-    let slow = slow_ma as usize;
+    let fast = cast::i32_to_usize(fast_ma);
+    let slow = cast::i32_to_usize(slow_ma);
 
     let ad = compute_ad(points);
     let fast_ema = ema(&ad, fast);
@@ -131,7 +132,7 @@ mod tests {
         // CHO starts at index slow_ma=4: CHO[4]=FastEMA[4]-SlowEMA[4]=225-175=50.0.
         // 5 points (slow_ma+1=5) -> 1 CHO value = 50.0 at points[4].ts.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, 3.0, 1.0, 2.5, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), 3.0, 1.0, 2.5, 100))
             .collect();
         let result = compute(&points, 2, 4).unwrap();
         let vals = indicator_values!(result);
@@ -149,7 +150,7 @@ mod tests {
         // CHO[4] = 0.0 - 0.0 = 0.0.
         // 5 points -> 1 CHO value = 0.0 at points[4].ts.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 10.0, 10.0, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 10.0, 10.0, 100))
             .collect();
         let result = compute(&points, 2, 4).unwrap();
         let vals = indicator_values!(result);
@@ -170,7 +171,7 @@ mod tests {
     fn fewer_than_slow_ma_plus_one_points_yields_empty_buffer() {
         // slow_ma=4, 4 points -> slow EMA has 1 entry -> no CHO values.
         let points: Vec<ResampledPointD1> = (0..4)
-            .map(|i| rp(i + 1, (i + 1) as i64, 3.0, 1.0, 2.5, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), 3.0, 1.0, 2.5, 100))
             .collect();
         let result = compute(&points, 2, 4).unwrap();
         assert!(result.items.is_empty());
@@ -180,7 +181,7 @@ mod tests {
     fn exactly_slow_ma_plus_one_points_yields_single_value() {
         // slow_ma=4, 5 points -> slow EMA has 2 entries -> 1 CHO value.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, 3.0, 1.0, 2.5, 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), 3.0, 1.0, 2.5, 100))
             .collect();
         let result = compute(&points, 2, 4).unwrap();
         let vals = indicator_values!(result);
@@ -221,7 +222,7 @@ mod tests {
         // values at original indices 3 and 4 -> timestamps points[3].ts,
         // points[4].ts.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 100) as i64, 3.0, 1.0, 2.5, 100))
+            .map(|i| rp(i + 1, i64::from(i + 100), 3.0, 1.0, 2.5, 100))
             .collect();
         let result = compute(&points, 2, 3).unwrap();
         let vals = indicator_values!(result);

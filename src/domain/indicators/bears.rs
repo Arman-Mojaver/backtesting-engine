@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -23,7 +24,7 @@ pub fn compute(
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(period, InvalidBearsPeriod);
-    let p = period as usize;
+    let p = cast::i32_to_usize(period);
     let close: Vec<f64> = points.iter().map(|pt| pt.close).collect();
     let ema_close = ema(&close, p);
 
@@ -81,7 +82,7 @@ mod tests {
         // low = 9.0 for all bars -> Bears = 9.0 - 10.0 = -1.0.
         // 4 points (period + 1) -> 1 Bears value at points[3].ts.
         let points: Vec<ResampledPointD1> = (0..4)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 9.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 9.0))
             .collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
@@ -98,7 +99,7 @@ mod tests {
         // Bears[3] = low[3] - EMA[3] = 2 - 2.0 = 0.0
         // 4 points -> 1 Bears value = 0.0 at points[3].ts.
         let points: Vec<ResampledPointD1> = (0..4)
-            .map(|i| rp(i + 1, (i + 1) as i64, i as f64, (i - 1) as f64))
+            .map(|i| rp(i + 1, i64::from(i + 1), f64::from(i), f64::from(i - 1)))
             .collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
@@ -119,7 +120,7 @@ mod tests {
     fn fewer_than_period_plus_one_points_yields_empty_buffer() {
         // period = 3, 3 points -> EMA has 1 entry -> no Bears values.
         let points: Vec<ResampledPointD1> = (0..3)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 9.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 9.0))
             .collect();
         let result = compute(&points, 3).unwrap();
         assert!(result.items.is_empty());
@@ -129,7 +130,7 @@ mod tests {
     fn exactly_period_plus_one_points_yields_single_value() {
         // period = 3, 4 points -> EMA has 2 entries -> 1 Bears value.
         let points: Vec<ResampledPointD1> = (0..4)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 9.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 9.0))
             .collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
@@ -156,7 +157,7 @@ mod tests {
         // period = 2, 4 points -> EMA has 3 entries -> 2 Bears values at
         // original indices 2 and 3 -> timestamps points[2].ts, points[3].ts.
         let points: Vec<ResampledPointD1> = (0..4)
-            .map(|i| rp(i + 1, (i + 100) as i64, 10.0, 9.0))
+            .map(|i| rp(i + 1, i64::from(i + 100), 10.0, 9.0))
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -169,7 +170,7 @@ mod tests {
     fn output_length_is_points_minus_period() {
         // 10 points, period 3 -> 10 - 3 = 7 Bears values.
         let points: Vec<ResampledPointD1> = (0..10)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 9.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 9.0))
             .collect();
         let result = compute(&points, 3).unwrap();
         assert_eq!(indicator_values!(result).len(), 7);

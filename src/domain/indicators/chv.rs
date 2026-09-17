@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -31,8 +32,8 @@ pub fn compute(
     chv_period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(smooth_period, InvalidChvSmoothPeriod; chv_period, InvalidChvPeriod);
-    let smooth = smooth_period as usize;
-    let chv = chv_period as usize;
+    let smooth = cast::i32_to_usize(smooth_period);
+    let chv = cast::i32_to_usize(chv_period);
 
     let hl: Vec<f64> = points.iter().map(|p| p.high - p.low).collect();
     let shl = ema(&hl, smooth);
@@ -98,7 +99,7 @@ mod tests {
         // CHV[0] = 100 * (SHL[3] - SHL[0]) / SHL[0] = 100 * 0 / 2 = 0.0.
         // 5 points -> 1 CHV value = 0.0 at points[4].ts.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, 11.0, 9.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), 11.0, 9.0))
             .collect();
         let result = compute(&points, 2, 3).unwrap();
         let vals = indicator_values!(result);
@@ -118,7 +119,7 @@ mod tests {
         // CHV[0] = 100 * (2.5 - 0.5) / 0.5 = 400.0 at points[3].ts.
         // CHV[1] = 100 * (3.5 - 1.5) / 1.5 = 133.333... at points[4].ts.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, (10 + i) as f64, 10.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), f64::from(10 + i), 10.0))
             .collect();
         let result = compute(&points, 2, 2).unwrap();
         let vals = indicator_values!(result);
@@ -136,7 +137,7 @@ mod tests {
         // CHV[k] = 0.0 (guard: SHL[k] == 0.0 -> 0.0).
         // 5 points -> 2 CHV values = 0.0 at points[3].ts and points[4].ts.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, 10.0, 10.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), 10.0, 10.0))
             .collect();
         let result = compute(&points, 2, 2).unwrap();
         let vals = indicator_values!(result);
@@ -160,7 +161,7 @@ mod tests {
         // smooth_period=2, chv_period=3, 3 points -> SHL has 2 entries ->
         // 2 < 4 (chv + 1) -> no CHV values.
         let points: Vec<ResampledPointD1> = (0..3)
-            .map(|i| rp(i + 1, (i + 1) as i64, 11.0, 9.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), 11.0, 9.0))
             .collect();
         let result = compute(&points, 2, 3).unwrap();
         assert!(result.items.is_empty());
@@ -171,7 +172,7 @@ mod tests {
         // smooth_period=2, chv_period=3, 4 points (= smooth + chv - 1) ->
         // SHL has 3 entries -> 3 < 4 (chv + 1) -> no CHV values.
         let points: Vec<ResampledPointD1> = (0..4)
-            .map(|i| rp(i + 1, (i + 1) as i64, 11.0, 9.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), 11.0, 9.0))
             .collect();
         let result = compute(&points, 2, 3).unwrap();
         assert!(result.items.is_empty());
@@ -182,7 +183,7 @@ mod tests {
         // smooth_period=2, chv_period=3, 5 points (= smooth + chv) ->
         // SHL has 4 entries -> 1 CHV value = 0.0 (constant spread).
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, 11.0, 9.0))
+            .map(|i| rp(i + 1, i64::from(i + 1), 11.0, 9.0))
             .collect();
         let result = compute(&points, 2, 3).unwrap();
         let vals = indicator_values!(result);
@@ -223,7 +224,7 @@ mod tests {
         // 2 CHV values at original indices 3 and 4 -> timestamps points[3].ts,
         // points[4].ts.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 100) as i64, (10 + i) as f64, 10.0))
+            .map(|i| rp(i + 1, i64::from(i + 100), f64::from(10 + i), 10.0))
             .collect();
         let result = compute(&points, 2, 2).unwrap();
         let vals = indicator_values!(result);

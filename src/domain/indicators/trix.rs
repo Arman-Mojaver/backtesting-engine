@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -29,7 +30,7 @@ pub fn compute(
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(period, InvalidTrixPeriod);
-    let p = period as usize;
+    let p = cast::i32_to_usize(period);
 
     let closes: Vec<f64> = points.iter().map(|pt| pt.close).collect();
     let ema1 = ema(&closes, p);
@@ -95,7 +96,7 @@ mod tests {
         // 8 points -> 4 TRIX values = 0.0 at points[4].ts, points[5].ts,
         // points[6].ts, points[7].ts.
         let points: Vec<ResampledPointD1> =
-            (0..8).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..8).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 4);
@@ -121,7 +122,7 @@ mod tests {
         // TRIX[3] = (6.5 - 5.5) / 5.5 = 0.181818... at points[7].ts.
         // 8 points -> 4 TRIX values.
         let points: Vec<ResampledPointD1> = (0..8)
-            .map(|i| rp(i + 1, (i + 1) as i64, (i + 1) as f64))
+            .map(|i| rp(i + 1, i64::from(i + 1), f64::from(i + 1)))
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -149,7 +150,7 @@ mod tests {
         // 8 points -> 4 TRIX values.
         let closes = [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0];
         let points: Vec<ResampledPointD1> = (0..8)
-            .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
+            .map(|i| rp(i + 1, i64::from(i + 1), closes[usize::try_from(i).unwrap()]))
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -171,7 +172,7 @@ mod tests {
         // TRIX[k]: EMA3[k] = 0.0 -> zero-division guard -> 0.0 for all k.
         // 8 points -> 4 TRIX values = 0.0.
         let points: Vec<ResampledPointD1> =
-            (0..8).map(|i| rp(i + 1, (i + 1) as i64, 0.0)).collect();
+            (0..8).map(|i| rp(i + 1, i64::from(i + 1), 0.0)).collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 4);
@@ -198,7 +199,7 @@ mod tests {
         // period=2, 3*2 - 1 = 5 points needed for a single value.
         // 3 points -> EMA3 has 0 entries -> no TRIX values.
         let points: Vec<ResampledPointD1> =
-            (0..3).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..3).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 2).unwrap();
         assert!(result.items.is_empty());
     }
@@ -207,7 +208,7 @@ mod tests {
     fn exactly_three_period_minus_two_points_yields_empty_buffer() {
         // period=2, 3*2 - 2 = 4 points -> EMA3 has 1 entry -> no TRIX values.
         let points: Vec<ResampledPointD1> =
-            (0..4).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..4).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 2).unwrap();
         assert!(result.items.is_empty());
     }
@@ -217,7 +218,7 @@ mod tests {
         // period=2, 3*2 - 1 = 5 points -> EMA3 has 2 entries -> 1 TRIX value.
         // Constant close=10 -> all EMAs = 10.0 -> TRIX = 0.0.
         let points: Vec<ResampledPointD1> =
-            (0..5).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..5).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
@@ -243,8 +244,9 @@ mod tests {
         // period=2, 8 points -> 4 TRIX values at original indices 4, 5, 6, 7
         // -> timestamps points[4].ts, points[5].ts, points[6].ts,
         // points[7].ts.
-        let points: Vec<ResampledPointD1> =
-            (0..8).map(|i| rp(i + 1, (i + 100) as i64, 10.0)).collect();
+        let points: Vec<ResampledPointD1> = (0..8)
+            .map(|i| rp(i + 1, i64::from(i + 100), 10.0))
+            .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 4);
@@ -258,7 +260,7 @@ mod tests {
     fn output_length_is_n_minus_three_period_plus_two() {
         // 10 points, period 2 -> 10 - 3*2 + 2 = 6 TRIX values.
         let points: Vec<ResampledPointD1> =
-            (0..10).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..10).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 2).unwrap();
         assert_eq!(indicator_values!(result).len(), 6);
     }

@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -34,7 +35,7 @@ pub fn compute(
     validate_period!(period, InvalidDpoPeriod);
     // ExtMAPeriod = period / 2 + 1; DPO entry j evaluates the bar at index
     // period / 2 + j (= ExtMAPeriod - 1 + j).
-    let skip_count = (period / 2) as usize;
+    let skip_count = cast::i32_to_usize(period / 2);
     let ext_ma_period = skip_count.saturating_add(1);
 
     let closes: Vec<f64> = points.iter().map(|p| p.close).collect();
@@ -90,7 +91,7 @@ mod tests {
         // 5 points -> 3 DPO values = 0.0 at points[2].ts, points[3].ts,
         // points[4].ts.
         let points: Vec<ResampledPointD1> =
-            (0..5).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..5).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 4).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
@@ -111,7 +112,7 @@ mod tests {
         // DPO[2] = close[4] - 4.0 = 5 - 4 = 1.0 at points[4].ts.
         // 5 points -> 3 DPO values = 1.0 each.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, (i + 1) as f64))
+            .map(|i| rp(i + 1, i64::from(i + 1), f64::from(i + 1)))
             .collect();
         let result = compute(&points, 4).unwrap();
         let vals = indicator_values!(result);
@@ -135,7 +136,7 @@ mod tests {
         // 5 points -> 4 DPO values alternating 1.0, -1.0.
         let closes = [1.0, 3.0, 1.0, 3.0, 1.0];
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
+            .map(|i| rp(i + 1, i64::from(i + 1), closes[usize::try_from(i).unwrap()]))
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -162,7 +163,7 @@ mod tests {
     fn fewer_than_ext_ma_period_points_yields_empty_buffer() {
         // period=12 -> ExtMAPeriod = 12/2 + 1 = 7. 6 points -> SMA empty.
         let points: Vec<ResampledPointD1> =
-            (0..6).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..6).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 12).unwrap();
         assert!(result.items.is_empty());
     }
@@ -171,7 +172,7 @@ mod tests {
     fn exactly_period_over_two_points_yields_empty_buffer() {
         // period=12 -> period/2 = 6. 6 points -> ExtMAPeriod = 7 -> SMA empty.
         let points: Vec<ResampledPointD1> =
-            (0..6).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..6).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 12).unwrap();
         assert!(result.items.is_empty());
     }
@@ -180,7 +181,7 @@ mod tests {
     fn exactly_period_over_two_plus_one_points_yields_single_value() {
         // period=12 -> ExtMAPeriod = 7. 7 points -> SMA has 1 entry -> 1 DPO.
         let points: Vec<ResampledPointD1> =
-            (0..7).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..7).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 12).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
@@ -206,8 +207,9 @@ mod tests {
         // period=4 -> ExtMAPeriod = 3. 5 points -> SMA has 3 entries -> 3 DPO
         // values at original indices 2, 3, 4 -> timestamps points[2].ts,
         // points[3].ts, points[4].ts.
-        let points: Vec<ResampledPointD1> =
-            (0..5).map(|i| rp(i + 1, (i + 100) as i64, 10.0)).collect();
+        let points: Vec<ResampledPointD1> = (0..5)
+            .map(|i| rp(i + 1, i64::from(i + 100), 10.0))
+            .collect();
         let result = compute(&points, 4).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
@@ -220,7 +222,7 @@ mod tests {
     fn output_length_is_points_minus_period_over_two() {
         // 10 points, period 4 -> 10 - 4/2 = 10 - 2 = 8 DPO values.
         let points: Vec<ResampledPointD1> =
-            (0..10).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..10).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 4).unwrap();
         assert_eq!(indicator_values!(result).len(), 8);
     }

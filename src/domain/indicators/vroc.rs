@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
@@ -9,7 +10,7 @@ use crate::validate_period;
 /// `VROC[i] = 100 * (volume[i] - volume[i - (period - 1)]) /
 /// volume[i - (period - 1)]` when the previous volume is non-zero, otherwise
 /// the previous VROC value is carried forward (MQL5 `VROC.mq5`,
-/// `VOLUME_TICK` baked in via `point.volume as f64`). No MA helpers are needed
+/// `VOLUME_TICK` baked in via `f64::from(point.volume)`). No MA helpers are needed
 /// — VROC is a pure volume-momentum formula with a single subtraction,
 /// division, and multiplication, plus a carry-forward zero-division guard.
 ///
@@ -27,7 +28,7 @@ pub fn compute(
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(period, InvalidVrocPeriod);
-    let lookback = period.saturating_sub(1) as usize;
+    let lookback = cast::i32_to_usize(period.saturating_sub(1));
     let n = points.len();
 
     if n <= lookback {
@@ -39,8 +40,8 @@ pub fn compute(
     // VROC entry k pairs the point at index lookback + k (current) with the
     // point at index k (lookback bars earlier).
     for (curr, prev) in points.iter().skip(lookback).zip(points.iter()) {
-        let curr_volume = curr.volume as f64;
-        let prev_volume = prev.volume as f64;
+        let curr_volume = f64::from(curr.volume);
+        let prev_volume = f64::from(prev.volume);
         let value = if prev_volume == 0.0 {
             carry
         } else {
@@ -87,7 +88,7 @@ mod tests {
         // VROC[k] = 100 * (100 - 100) / 100 = 0.0 for all k.
         // 5 points -> 4 VROC values = 0.0 at points[1].ts .. points[4].ts.
         let points: Vec<ResampledPointD1> =
-            (0..5).map(|i| rp(i + 1, (i + 1) as i64, 100)).collect();
+            (0..5).map(|i| rp(i + 1, i64::from(i + 1), 100)).collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 4);
@@ -110,7 +111,7 @@ mod tests {
         // VROC[3] = 100 * (500 - 400) / 400 = 25.0 at points[4].ts.
         // 5 points -> 4 VROC values = 100.0, 50.0, 33.333..., 25.0.
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, (i + 1) * 100))
+            .map(|i| rp(i + 1, i64::from(i + 1), (i + 1) * 100))
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -135,7 +136,13 @@ mod tests {
         // 5 points -> 4 VROC values = -20.0, -25.0, -33.333..., -50.0.
         let volumes = [500, 400, 300, 200, 100];
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, volumes[i as usize]))
+            .map(|i| {
+                rp(
+                    i + 1,
+                    i64::from(i + 1),
+                    volumes[usize::try_from(i).unwrap()],
+                )
+            })
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -160,7 +167,13 @@ mod tests {
         // 5 points -> 4 VROC values = 0.0, 100.0, -100.0, -100.0.
         let volumes = [0, 100, 200, 0, 400];
         let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i| rp(i + 1, (i + 1) as i64, volumes[i as usize]))
+            .map(|i| {
+                rp(
+                    i + 1,
+                    i64::from(i + 1),
+                    volumes[usize::try_from(i).unwrap()],
+                )
+            })
             .collect();
         let result = compute(&points, 2).unwrap();
         let vals = indicator_values!(result);
@@ -187,7 +200,7 @@ mod tests {
     fn fewer_than_period_points_yields_empty_buffer() {
         // period=25, 24 points -> 24 < 25 -> no VROC values.
         let points: Vec<ResampledPointD1> =
-            (0..24).map(|i| rp(i + 1, (i + 1) as i64, 100)).collect();
+            (0..24).map(|i| rp(i + 1, i64::from(i + 1), 100)).collect();
         let result = compute(&points, 25).unwrap();
         assert!(result.items.is_empty());
     }
@@ -196,7 +209,7 @@ mod tests {
     fn exactly_period_minus_one_points_yields_empty_buffer() {
         // period=25, 24 points (= period - 1) -> 24 <= 24 (lookback) -> empty.
         let points: Vec<ResampledPointD1> =
-            (0..24).map(|i| rp(i + 1, (i + 1) as i64, 100)).collect();
+            (0..24).map(|i| rp(i + 1, i64::from(i + 1), 100)).collect();
         let result = compute(&points, 25).unwrap();
         assert!(result.items.is_empty());
     }
@@ -232,7 +245,7 @@ mod tests {
         // indices 2, 3, 4 -> timestamps points[2].ts, points[3].ts,
         // points[4].ts.
         let points: Vec<ResampledPointD1> =
-            (0..5).map(|i| rp(i + 1, (i + 100) as i64, 100)).collect();
+            (0..5).map(|i| rp(i + 1, i64::from(i + 100), 100)).collect();
         let result = compute(&points, 3).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
@@ -245,7 +258,7 @@ mod tests {
     fn output_length_is_points_minus_period_plus_one() {
         // 10 points, period 3 -> lookback=2 -> 10 - 2 = 8 VROC values.
         let points: Vec<ResampledPointD1> =
-            (0..10).map(|i| rp(i + 1, (i + 1) as i64, 100)).collect();
+            (0..10).map(|i| rp(i + 1, i64::from(i + 1), 100)).collect();
         let result = compute(&points, 3).unwrap();
         assert_eq!(indicator_values!(result).len(), 8);
     }

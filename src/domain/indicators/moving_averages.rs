@@ -1,3 +1,4 @@
+use crate::domain::cast;
 /// Simple Moving Average over a slice of `f64` values.
 ///
 /// Returns a vector of windowed averages. The result length is
@@ -12,7 +13,7 @@ pub fn sma(values: &[f64], period: usize) -> Vec<f64> {
     }
     values
         .windows(period)
-        .map(|w| w.iter().sum::<f64>() / period as f64)
+        .map(|w| w.iter().sum::<f64>() / cast::usize_to_f64(period))
         .collect()
 }
 
@@ -33,10 +34,10 @@ pub fn ema(values: &[f64], period: usize) -> Vec<f64> {
     if period == 0 || values.len() < period {
         return Vec::new();
     }
-    let k = 2.0 / (period as f64 + 1.0);
+    let k = 2.0 / (cast::usize_to_f64(period) + 1.0);
     let mut out = Vec::with_capacity(values.len().saturating_sub(period.saturating_sub(1)));
     // Seed: SMA of the first `period` values (index period-1 in the series).
-    let seed = values.iter().take(period).sum::<f64>() / period as f64;
+    let seed = values.iter().take(period).sum::<f64>() / cast::usize_to_f64(period);
     out.push(seed);
     // Recurse: ema[j] from ema[j-1] and values[period-1+j] (j = 1..).
     let mut prev = seed;
@@ -96,7 +97,7 @@ mod tests {
 
     #[test]
     fn long_series_window_count_is_len_minus_period_plus_one() {
-        let values: Vec<f64> = (0..10).map(|i| i as f64).collect();
+        let values: Vec<f64> = (0..10).map(|i: i32| f64::from(i)).collect();
         let result = sma(&values, 5);
         // 10 - 5 + 1 = 6 windows
         assert_eq!(result.len(), 6);
@@ -150,7 +151,7 @@ mod tests {
 
     #[test]
     fn ema_output_length_is_len_minus_period_plus_one() {
-        let values: Vec<f64> = (0..10).map(|i| i as f64).collect();
+        let values: Vec<f64> = (0..10).map(|i: i32| f64::from(i)).collect();
         let result = ema(&values, 4);
         // 10 - 4 + 1 = 7
         assert_eq!(result.len(), 7);

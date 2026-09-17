@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::operation_point::OperationPoint;
 
 const SECONDS_PER_DAY: f64 = 86400.0;
@@ -29,7 +30,7 @@ pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceM
     let mut max_dd: f64 = 0.0;
 
     for point in sorted {
-        let contribution = cummax * point.result as f64 * (point.risk / point.sl as f64);
+        let contribution = cummax * f64::from(point.result) * (point.risk / f64::from(point.sl));
         cumsum += contribution;
         cummax = cummax.max(cumsum);
 
@@ -60,7 +61,7 @@ impl PerformanceMetrics {
 
 /// Span between two unix timestamps in years; `0.0` for a non-positive span.
 fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
-    let days = end_timestamp.saturating_sub(start_timestamp) as f64 / SECONDS_PER_DAY;
+    let days = cast::i64_to_f64(end_timestamp.saturating_sub(start_timestamp)) / SECONDS_PER_DAY;
     if days <= 0.0 {
         return 0.0;
     }

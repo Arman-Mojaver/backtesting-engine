@@ -16,6 +16,7 @@ use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
 use rustc_hash::FxHashSet;
 
+use crate::domain::cast;
 use crate::domain::strategy::Strategy;
 
 #[derive(Debug, Clone)]
@@ -232,9 +233,9 @@ fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
         out.push(StrategyRow {
             strategy_id: strategy_ids.value(i),
             indicator_id: indicator_ids.value(i),
-            annual_roi: rois.value(i) as f64 / 100.0,
-            max_draw_down: draw_downs.value(i) as f64 / 100.0,
-            annual_operation_count: op_counts.value(i) as f64 / 100.0,
+            annual_roi: cast::i128_to_f64(rois.value(i)) / 100.0,
+            max_draw_down: cast::i128_to_f64(draw_downs.value(i)) / 100.0,
+            annual_operation_count: cast::i128_to_f64(op_counts.value(i)) / 100.0,
             long_operation_point_ids: decode_list_value(long_ids, i),
             short_operation_point_ids: decode_list_value(short_ids, i),
             money_management_strategy_id: mms_ids.value(i),
@@ -272,17 +273,18 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
     let strategy_ids: Int64Array = rows.iter().map(|r| r.strategy_id).collect();
     let indicator_ids: Int32Array = rows.iter().map(|r| r.indicator_id).collect();
     let rois = Decimal128Array::from_iter_values(
-        rows.iter().map(|r| (r.annual_roi * 100.0).round() as i128),
+        rows.iter()
+            .map(|r| cast::round_f64_to_i128(r.annual_roi * 100.0)),
     )
     .with_precision_and_scale(10, 2)?;
     let draw_downs = Decimal128Array::from_iter_values(
         rows.iter()
-            .map(|r| (r.max_draw_down * 100.0).round() as i128),
+            .map(|r| cast::round_f64_to_i128(r.max_draw_down * 100.0)),
     )
     .with_precision_and_scale(10, 2)?;
     let op_counts = Decimal128Array::from_iter_values(
         rows.iter()
-            .map(|r| (r.annual_operation_count * 100.0).round() as i128),
+            .map(|r| cast::round_f64_to_i128(r.annual_operation_count * 100.0)),
     )
     .with_precision_and_scale(10, 2)?;
     let mms_ids: Int32Array = rows
@@ -318,7 +320,7 @@ fn build_list_column(rows: &[StrategyRow], extract: fn(&StrategyRow) -> &[i32]) 
         for id in ids {
             values_builder.append_value(*id);
         }
-        offset = offset.saturating_add(ids.len() as i32);
+        offset = offset.saturating_add(cast::usize_to_i32(ids.len()));
         offsets.push(offset);
     }
     let values = values_builder.finish();

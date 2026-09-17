@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -38,9 +39,9 @@ pub fn compute(
             slow: slow_ema,
         });
     }
-    let fast = fast_ema as usize;
-    let slow = slow_ema as usize;
-    let signal = signal_sma as usize;
+    let fast = cast::i32_to_usize(fast_ema);
+    let slow = cast::i32_to_usize(slow_ema);
+    let signal = cast::i32_to_usize(signal_sma);
 
     let closes: Vec<f64> = points.iter().map(|pt| pt.close).collect();
     let fast_ema_result = ema(&closes, fast);
@@ -115,7 +116,7 @@ mod tests {
         // 8 points -> 3 OsMA values = 0.0 at points[5].ts, points[6].ts,
         // points[7].ts.
         let points: Vec<ResampledPointD1> =
-            (0..8).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..8).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 3, 5, 2).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
@@ -147,7 +148,7 @@ mod tests {
         // points[5].ts.
         let closes = [3.0, 6.0, 12.0, 24.0, 48.0, 96.0];
         let points: Vec<ResampledPointD1> = (0..6)
-            .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
+            .map(|i| rp(i + 1, i64::from(i + 1), closes[usize::try_from(i).unwrap()]))
             .collect();
         let result = compute(&points, 1, 3, 2).unwrap();
         let vals = indicator_values!(result);
@@ -178,7 +179,7 @@ mod tests {
         // points[5].ts.
         let closes = [3.0, 6.0, 12.0, 24.0, 12.0, 6.0];
         let points: Vec<ResampledPointD1> = (0..6)
-            .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
+            .map(|i| rp(i + 1, i64::from(i + 1), closes[usize::try_from(i).unwrap()]))
             .collect();
         let result = compute(&points, 1, 3, 2).unwrap();
         let vals = indicator_values!(result);
@@ -206,7 +207,7 @@ mod tests {
         // points[5].ts, points[6].ts.
         let closes = [3.0, 6.0, 12.0, 24.0, 48.0, 96.0, 192.0];
         let points: Vec<ResampledPointD1> = (0..7)
-            .map(|i| rp(i + 1, (i + 1) as i64, closes[i as usize]))
+            .map(|i| rp(i + 1, i64::from(i + 1), closes[usize::try_from(i).unwrap()]))
             .collect();
         let result = compute(&points, 1, 3, 2).unwrap();
         let vals = indicator_values!(result);
@@ -234,7 +235,7 @@ mod tests {
         // slow=26, signal=9 -> need slow+signal-1 = 34 points.
         // 33 points -> signal is empty -> no OsMA values.
         let points: Vec<ResampledPointD1> =
-            (0..33).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..33).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 12, 26, 9).unwrap();
         assert!(result.items.is_empty());
     }
@@ -244,7 +245,7 @@ mod tests {
         // slow=5, signal=2 -> slow+signal-2 = 5 points -> empty.
         // slow+signal-1 = 6 points needed for a single value.
         let points: Vec<ResampledPointD1> =
-            (0..5).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..5).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 3, 5, 2).unwrap();
         assert!(result.items.is_empty());
     }
@@ -254,7 +255,7 @@ mod tests {
         // slow=5, signal=2 -> slow+signal-1 = 6 points -> 1 OsMA value.
         // Constant close=10 -> all EMAs = 10.0 -> MACD = 0.0 -> OsMA = 0.0.
         let points: Vec<ResampledPointD1> =
-            (0..6).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..6).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 3, 5, 2).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 1);
@@ -305,8 +306,9 @@ mod tests {
     fn timestamps_track_evaluated_bar() {
         // fast=3, slow=5, signal=2 -> start = 5+2-2 = 5.
         // 8 points -> 3 OsMA values at indices 5, 6, 7.
-        let points: Vec<ResampledPointD1> =
-            (0..8).map(|i| rp(i + 1, (i + 100) as i64, 10.0)).collect();
+        let points: Vec<ResampledPointD1> = (0..8)
+            .map(|i| rp(i + 1, i64::from(i + 100), 10.0))
+            .collect();
         let result = compute(&points, 3, 5, 2).unwrap();
         let vals = indicator_values!(result);
         assert_eq!(vals.len(), 3);
@@ -319,7 +321,7 @@ mod tests {
     fn output_length_is_n_minus_slow_minus_signal_plus_two() {
         // 10 points, slow=5, signal=2 -> 10 - 5 - 2 + 2 = 5 OsMA values.
         let points: Vec<ResampledPointD1> =
-            (0..10).map(|i| rp(i + 1, (i + 1) as i64, 10.0)).collect();
+            (0..10).map(|i| rp(i + 1, i64::from(i + 1), 10.0)).collect();
         let result = compute(&points, 3, 5, 2).unwrap();
         assert_eq!(indicator_values!(result).len(), 5);
     }

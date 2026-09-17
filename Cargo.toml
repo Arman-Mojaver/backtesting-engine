@@ -51,12 +51,6 @@ implicit_hasher = "allow"
 # match-with-wildcard and let-else; not worth the churn here.
 single_match_else = "allow"
 manual_let_else = "allow"
-
-# --- Strict-lint adoption plan ---------------------------------------------
-# Uncomment one phase at a time -> fix errors -> commit. Error counts are
-# from the 1.94.0 baseline run (398 errors total across all phases).
-#
-# Phase 0 -- ACTIVE, zero errors (verified):
 todo = "deny"
 unimplemented = "deny"
 unchecked_time_subtraction = "deny"
@@ -74,10 +68,5 @@ suboptimal_flops = "deny"
 option_if_let_else = "deny"
 indexing_slicing = "deny"
 arithmetic_side_effects = "deny"
-#
-# Phase 5 -- casts:
-# as_conversions = "deny"             # 171 (41 prod / 130 test fixtures; no test exemption)
-#
-# Capstone -- uncomment AFTER phases 2-4: enables the whole nursery group.
-# Should be clean by then; catches future nursery lints. (BETA LINTS)
-# nursery = { level = "deny", priority = -1 }
+as_conversions = "deny"
+nursery = { level = "deny", priority = -1 }

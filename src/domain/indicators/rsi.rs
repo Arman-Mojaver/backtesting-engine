@@ -1,3 +1,4 @@
+use crate::domain::cast;
 use crate::domain::indicators::{IndicatorError, PriceField};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, ThresholdSeries};
@@ -24,7 +25,7 @@ pub fn compute(
     low_threshold: f64,
 ) -> Result<ThresholdSeries, IndicatorError> {
     validate_period!(n, InvalidRsiPeriod);
-    let period = n as usize;
+    let period = cast::i32_to_usize(n);
 
     // Build per-step price diffs: diff[i] = price[i+1] - price[i].
     let diffs: Vec<PriceDiff> = points

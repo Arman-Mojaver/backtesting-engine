@@ -123,7 +123,7 @@ fn row_to_operation_point(row: &Row) -> OperationPoint {
         tp: row.get("tp"),
         sl: row.get("sl"),
         risk: row.get("risk"),
-        timestamp: row.get::<_, i32>("timestamp") as i64,
+        timestamp: i64::from(row.get::<_, i32>("timestamp")),
         money_management_strategy_id: row.get("money_management_strategy_id"),
     }
 }
@@ -137,7 +137,7 @@ fn row_to_resampled_point(row: &Row) -> ResampledPointD1 {
         low: row.get("low"),
         close: row.get("close"),
         volume: row.get("volume"),
-        timestamp: row.get::<_, i32>("timestamp") as i64,
+        timestamp: i64::from(row.get::<_, i32>("timestamp")),
         high_low_order: map_high_low_order(&row.get::<_, String>("high_low_order")),
     }
 }
