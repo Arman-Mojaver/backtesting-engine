@@ -122,7 +122,7 @@
 | Processed manifest + idempotency | Ledger of (instrument, mms_id, indicator_id) triples; atomic writes | Arman Mojaver | Complete |
 | create_loop batch pipeline | All cells: load once, parallel compute, batch persist | Arman Mojaver | Complete |
 | metadata command | DB vs manifest progress report | Arman Mojaver | Complete |
-| CI workflow | fmt + clippy -D warnings + tests + Docker build/push (pinned 1.94.0) | Arman Mojaver | Complete |
+| CI workflow | fmt + clippy -D warnings + tests + Docker build/push (pinned 1.98.1) | Arman Mojaver | Complete |
 | Exit-date-aware metrics | Compound on exit order, not entry order | Arman Mojaver | Pending — high priority |
 | MACD compute | Crossover-kind output for MACD parameters | Arman Mojaver | Pending |
 

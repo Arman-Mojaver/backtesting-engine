@@ -1,6 +1,7 @@
-//! Test-only fixture: 2400 real EURUSD `resampled_point_d1` rows, frozen as a
-//! hardcoded in-repo snapshot so the level-2 indicator regression tests are
-//! hermetic — no database, deterministic, and runnable in CI.
+//! Test-only fixture: 2400 real EURUSD `resampled_point_d1` rows.
+//!
+//! Frozen as a hardcoded in-repo snapshot so the level-2 indicator regression
+//! tests are hermetic — no database, deterministic, and runnable in CI.
 //!
 //! Provenance: captured from the development database
 //! (`postgresql://postgres:postgres@localhost:54320/db-development`) as the

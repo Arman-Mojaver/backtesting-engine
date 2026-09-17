@@ -72,8 +72,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
 
     let processed_at = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| i64::try_from(d.as_secs()).unwrap_or(0))
-        .unwrap_or(0);
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0));
 
     info!(
         "Appending {} unprocessed indicator IDs to manifest ...",

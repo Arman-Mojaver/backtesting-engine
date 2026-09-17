@@ -867,6 +867,47 @@ A senior-engineer review suggested `#![warn(clippy::all, clippy::pedantic)]` + `
 - Complements: "CI Workflow" (2026-09-03) — the `-D warnings` gate now enforces pedantic
 - Complements: "Pin Rust Toolchain Exactly" (2026-09-04)
 
+---
+
+## Decision: Toolchain 1.94.0 → 1.98.1 + Dependency Refresh
+
+**Date**: 2026-09-17
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+Rust 1.94.0 (pinned 2026-09-04) was four stable releases behind (1.98.1 released 2026-09-01). Dependencies had drifted: arrow/parquet locked at 58.3.0 (latest 60.0.0), `cached` at 2.0.2 (latest 4.0.0), and `time` carried an exact `=0.3.41` pin as a direct dependency despite no direct usage in code (only `std::time` is used; the crate existed solely as simplelog's transitive dependency).
+
+### Decision
+1. Bump the exact toolchain pin 1.94.0 → 1.98.1 in all three places (`rust-toolchain.toml`, Dockerfile ×3, ci.yml ×2), per the exact-pin policy.
+2. Upgrade major dependencies: arrow/parquet 58 → 60, `cached` 2 → 4.
+3. Remove the unused direct `time` dependency (simplelog continues to pull it transitively, now at 0.3.55).
+4. `cargo update` for semver-compatible refreshes (clap 4.6.7, anyhow 1.0.104, postgres 0.19.14, log 0.4.34, rustc-hash 2.1.3 + transitive).
+5. Fix the three new clippy lints surfaced by the four-version toolchain jump: 2× `map_unwrap_or` (`create.rs`, `strategy_persistence.rs` → `map_or`) and 1× `too_long_first_doc_paragraph` (`test_support.rs` doc restructured).
+
+### Rationale
+- Regular toolchain/dependency updates for security and currency (security-patterns dependency policy)
+- The exact-pin policy makes bumps a deliberate 3-place change — done atomically
+- `time = "=0.3.41"` was a workaround-era pin with no remaining direct consumer; removing it minimizes the dependency count and lets the transitive resolve freely
+- arrow 60 / cached 4 MSRVs (1.88 / 1.92) are satisfied by 1.98.1
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Stay on 1.94.0 | Zero effort | Security/currency drift grows | Regular updates are policy |
+| Bump toolchain only, keep deps | Smaller change | arrow/cached majors left behind | Deps were part of the goal |
+| Keep `time` as direct dep (unpinned "0.3") | Explicit version control | Unused direct dep = misleading manifest | Not directly used; transitive suffices |
+| Float pin (`1.98`) | Fewer future bumps | Rejected by the 2026-09-04 exact-pin decision | Drift is the problem the policy fixes |
+
+### Impact
+**Positive**: Current toolchain (four releases of improvements), current deps, one fewer direct dependency, zero-warning gate preserved, all 429 tests pass
+**Negative**: New toolchain versions can surface new lints (they did: 3, all fixed); future bumps remain 3-place changes
+**Risk**: arrow 58→60 spanned two majors — compiled clean here, but future major bumps deserve the same full validation gate
+
+### Related
+- Implementation: `rust-toolchain.toml`, `Dockerfile`, `.github/workflows/ci.yml`, `Cargo.toml`, `Cargo.lock`, 3 lint-fix files
+- Follows: "Pin Rust Toolchain Exactly" (2026-09-04), "Deliberate clippy Lint Policy" (2026-09-04)
+
 ## Deprecated Decisions
 
 | Decision | Date | Replaced By | Why |

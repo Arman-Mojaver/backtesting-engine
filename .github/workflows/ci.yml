@@ -46,7 +46,7 @@ jobs:
       - name: Install Rust toolchain (pinned to match Dockerfile)
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.94.0
+          toolchain: 1.98.1
           components: clippy,rustfmt
 
       - name: Cache cargo build artifacts
@@ -70,7 +70,7 @@ jobs:
       - name: Install Rust toolchain (pinned to match Dockerfile)
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.94.0
+          toolchain: 1.98.1
 
       - name: Cache cargo build artifacts
         uses: Swatinem/rust-cache@v2
