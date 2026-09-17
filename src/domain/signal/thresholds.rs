@@ -1,25 +1,27 @@
+use itertools::{Either, Itertools};
+
 use crate::domain::signal::ThresholdSeries;
 
 pub fn create(buffer: &ThresholdSeries) -> (Vec<i64>, Vec<i64>) {
     let values = &buffer.items;
-    let n = values.len();
     let high_threshold = buffer.high_threshold;
     let low_threshold = buffer.low_threshold;
 
-    let mut long_signals: Vec<i64> = Vec::with_capacity(n / 2);
-    let mut short_signals: Vec<i64> = Vec::with_capacity(n / 2);
-
-    if let Some((first, rest)) = values.split_first() {
-        let mut prev = first;
-        for curr in rest {
+    // Threshold-cross detection over consecutive pairs: crossing above the
+    // low threshold is a long signal, crossing below the high is short.
+    let (long_signals, short_signals) = values
+        .iter()
+        .tuple_windows()
+        .filter_map(|(prev, curr)| {
             if prev.value < low_threshold && curr.value > low_threshold {
-                long_signals.push(curr.timestamp);
+                Some(Either::Left(curr.timestamp))
             } else if prev.value > high_threshold && curr.value < high_threshold {
-                short_signals.push(curr.timestamp);
+                Some(Either::Right(curr.timestamp))
+            } else {
+                None
             }
-            prev = curr;
-        }
-    }
+        })
+        .partition_map(|either| either);
 
     (long_signals, short_signals)
 }

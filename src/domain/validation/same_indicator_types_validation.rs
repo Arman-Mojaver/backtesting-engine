@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use crate::domain::indicator::Indicator;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,15 +10,12 @@ pub enum ValidationError {
 pub fn validate_same_indicator_types(indicators: &[Indicator]) -> Result<(), ValidationError> {
     // Empty input is vacuously valid (and pre-validated upstream by
     // `empty_validation` via `validate_all`).
-    let reference = match indicators.first() {
-        Some(indicator) => &indicator.r#type,
-        None => return Ok(()),
-    };
-
-    if indicators
+    let all_same = indicators
         .iter()
-        .any(|indicator| &indicator.r#type != reference)
-    {
+        .map(|indicator| &indicator.r#type)
+        .all_equal();
+
+    if !all_same {
         return Err(ValidationError::IndicatorTypeMismatch);
     }
 

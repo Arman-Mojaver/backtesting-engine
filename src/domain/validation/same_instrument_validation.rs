@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
@@ -13,17 +15,12 @@ pub fn validate_same_instrument(
 ) -> Result<(), ValidationError> {
     // Empty input is vacuously valid (and pre-validated upstream by
     // `empty_validation` via `validate_all`).
-    let reference_instrument = match resampled_points.first() {
-        Some(point) => &point.instrument,
-        None => return Ok(()),
-    };
-
     let all_match = resampled_points
         .iter()
         .map(|resampled_point| &resampled_point.instrument)
         .chain(long_operation_points.iter().map(|op| &op.instrument))
         .chain(short_operation_points.iter().map(|op| &op.instrument))
-        .all(|instrument| instrument == reference_instrument);
+        .all_equal();
 
     if !all_match {
         return Err(ValidationError::InstrumentMismatch);

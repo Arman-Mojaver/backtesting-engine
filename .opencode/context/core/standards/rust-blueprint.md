@@ -1,4 +1,4 @@
-<!-- Context: standards/rust-blueprint | Priority: high | Version: 1.0 | Updated: 2026-05-23 -->
+<!-- Context: standards/rust-blueprint | Priority: high | Version: 1.1 | Updated: 2026-09-17 -->
 
 # Production Rust Blueprint
 
@@ -806,6 +806,7 @@ cargo build
 | Database | `sqlx` | Async, compile-time query checking |
 | Trait objects in async | `async-trait` | Until async fn in traits is stable |
 | Decimal arithmetic | `rust_decimal` | Never use `f64` for financial values |
+| Iterator composition | `itertools` | `all_equal`, `tuple_windows` + `partition_map`, `iproduct!` — extends the §4 iterator-chain house style (adopted 2026-09-17, see decisions-log) |
 
 > **Financial values:** use `rust_decimal::Decimal` for PnL, prices, and percentages. Floating-point arithmetic accumulates rounding errors that compound across thousands of operation points.
 

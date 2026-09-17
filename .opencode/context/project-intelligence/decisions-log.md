@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.9 | Updated: 2026-09-04 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.10 | Updated: 2026-09-17 -->
 
 # Decisions Log
 
@@ -907,6 +907,47 @@ Rust 1.94.0 (pinned 2026-09-04) was four stable releases behind (1.98.1 released
 ### Related
 - Implementation: `rust-toolchain.toml`, `Dockerfile`, `.github/workflows/ci.yml`, `Cargo.toml`, `Cargo.lock`, 3 lint-fix files
 - Follows: "Pin Rust Toolchain Exactly" (2026-09-04), "Deliberate clippy Lint Policy" (2026-09-04)
+
+---
+
+## Decision: Adopt `itertools` for Iterator Composition
+
+**Date**: 2026-09-17
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The house style mandates declarative iterator chains over imperative loops (code-quality.md, rust-blueprint §4), but five sites still needed imperative scaffolding: two validators extracted a "reference" element via `first()` + early return before comparing every element against it; the `oscillator` and `thresholds` signal-semantics modules carried manual `prev`/`curr` mutable state through a loop for pairwise crossing detection; and `metadata_report` built the (instrument x mms_id) Cartesian product with a nested for-loop. Each pattern is a solved problem in `itertools`.
+
+### Decision
+Add `itertools = "0.15"` (default features) and refactor the five sites — behavior-preserving, all existing tests kept verbatim:
+1. `same_instrument_validation` + `same_indicator_types_validation`: reference-compare → `.all_equal()` over the chained iterators (empty input stays vacuously valid).
+2. `oscillator` + `thresholds` signal semantics: manual prev/curr loop → `.tuple_windows()` + `filter_map` into `Either::Left`/`Either::Right` + `.partition_map()` — single pass, no mutable state.
+3. `metadata_report`: nested product loop → `iproduct!` macro.
+
+### Rationale
+- Directly extends the mandated iterator-chain style; removes loop-carried mutable state from domain signal semantics
+- Lazy zero-cost adaptors; `partition_map` keeps crossing detection single-pass
+- Minimal dependency footprint — the only transitive dependency is `either`
+- Deliberately NOT applied where a serial loop is intentional: `performance_metrics` (loop-carried cumsum/cummax), `ema` (loop-carried recursion), and rayon `par_iter` sites (itertools is sequential-only)
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Stay std-only | No new dependency | Reference-extraction boilerplate, manual prev/curr state, nested product loops remain | Those are exactly the anti-patterns the house style forbids |
+| Refactor with std only (`scan`, `flat_map`) | No new dependency | Pairwise detection and cartesian products are far less readable in std | Readability is the point of the refactor |
+| Apply everywhere (metrics, EMA) | Uniformity | Loop-carried state there is intentional and documented | Forced rewriting would hurt clarity, not help it |
+
+### Impact
+**Positive**: Five sites more declarative; signal semantics lose mutable state; validators lose reference-extraction boilerplate; all 429 tests pass unchanged
+**Negative**: One more dependency; contributors must know the itertools API surface
+**Risk**: Low — behavior-preserving refactors. Gotchas documented: `chunk_by` groups consecutive runs only (sort first for full grouping); `zip_eq` panics on length mismatch (plain `zip` is correct in `crossover`, where unequal lengths are allowed)
+
+### Related
+- Implementation: `Cargo.toml`, `src/domain/validation/same_instrument_validation.rs`, `src/domain/validation/same_indicator_types_validation.rs`, `src/domain/signal/oscillator.rs`, `src/domain/signal/thresholds.rs`, `src/application/metadata_report.rs`
+- Complements: rust-blueprint §4 (Functional Patterns) and §10 (crate table — itertools added)
+
+---
 
 ## Deprecated Decisions
 

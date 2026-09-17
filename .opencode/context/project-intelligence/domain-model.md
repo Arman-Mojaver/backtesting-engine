@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.7 | Updated: 2026-09-03 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.8 | Updated: 2026-09-17 -->
 
 # Domain Model — Backtesting Engine
 
@@ -271,11 +271,11 @@ Before a backtest can run, the input data must satisfy **five invariants**, chec
 
 1. **Non-Empty Data** (`empty_validation`) — all four datasets non-empty.
 2. **Same Indicator Types** (`same_indicator_types_validation`) — all indicators share the same `type`.
-3. **Same Instrument** (`same_instrument_validation`) — every resampled/long/short point references the same instrument (first resampled point is the reference).
+3. **Same Instrument** (`same_instrument_validation`) — every resampled/long/short point references the same instrument (itertools `all_equal()` over the chained iterators).
 4. **Same Money Management Strategy** (`same_mms_validation`) — every operation point's `money_management_strategy_id` matches the expected MMS ID parameter.
 5. **Timestamp Alignment** (`same_timestamp_validation`) — long and short timestamp sets are identical; both are subsets of resampled timestamps.
 
-`combined_validation::validate_all()` runs all five in order, returning early on the first failure as a `CombinedValidationError` (Empty / IndicatorTypeMismatch / InstrumentMismatch / MoneyManagementStrategyMismatch / TimestampMismatch). Order is load-bearing: emptiness first prevents index-out-of-bounds in later validators that access `[0]`.
+`combined_validation::validate_all()` runs all five in order, returning early on the first failure as a `CombinedValidationError` (Empty / IndicatorTypeMismatch / InstrumentMismatch / MoneyManagementStrategyMismatch / TimestampMismatch). Order is load-bearing: emptiness first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
 
 ---
 
@@ -350,7 +350,7 @@ src/
 
 1. **Long/Short separation**: Longs and shorts use the same `OperationPoint` struct but are stored in separate repositories. Direction is determined by *which repository* holds the point, not by a field on the struct.
 2. **Validation as pure functions**: All validators are free functions over slices, not methods on structs. Composable and testable without object construction.
-3. **Fail-fast combined validation**: `validate_all` short-circuits on the first error. Order matters: emptiness is checked first (prevents index-out-of-bounds in later validators that access `[0]`).
+3. **Fail-fast combined validation**: `validate_all` short-circuits on the first error. Order matters: emptiness is checked first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
 4. **Fixtures module**: Test data lives in `domain::fixtures`, reusable across all test modules. (In-memory repos were removed 2026-08 — fixtures + tempfile cover the same need with less code.)
 5. **Ports-and-adapters**: Repository traits live in the domain; implementations live in infrastructure. The domain has zero dependencies on infrastructure.
 6. **Dual binary layout**: `ct` (`src/main.rs`) is the operator frontend (forwards to Python CLI and engine via Docker exec); `bt-engine` (`src/bin/bt-engine.rs`) is the native Rust engine. Both follow `build -> parse -> execute` and return `anyhow::Result<()>`.

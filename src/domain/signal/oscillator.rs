@@ -1,23 +1,25 @@
+use itertools::{Either, Itertools};
+
 use crate::domain::signal::OscillatorSeries;
 
 pub fn create(buffer: &OscillatorSeries) -> (Vec<i64>, Vec<i64>) {
     let values = &buffer.items;
-    let n = values.len();
 
-    let mut long_signals: Vec<i64> = Vec::with_capacity(n / 2);
-    let mut short_signals: Vec<i64> = Vec::with_capacity(n / 2);
-
-    if let Some((first, rest)) = values.split_first() {
-        let mut prev = first;
-        for curr in rest {
+    // Zero-cross detection over consecutive pairs: a strict negative-to-
+    // positive transition is a long signal, positive-to-negative is short.
+    let (long_signals, short_signals) = values
+        .iter()
+        .tuple_windows()
+        .filter_map(|(prev, curr)| {
             if prev.value < 0.0 && curr.value > 0.0 {
-                long_signals.push(curr.timestamp);
+                Some(Either::Left(curr.timestamp))
             } else if prev.value > 0.0 && curr.value < 0.0 {
-                short_signals.push(curr.timestamp);
+                Some(Either::Right(curr.timestamp))
+            } else {
+                None
             }
-            prev = curr;
-        }
-    }
+        })
+        .partition_map(|either| either);
 
     (long_signals, short_signals)
 }
