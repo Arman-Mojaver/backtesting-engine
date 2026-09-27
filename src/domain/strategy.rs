@@ -25,7 +25,7 @@ pub struct GlobalStrategyFilter {
 impl Default for GlobalStrategyFilter {
     fn default() -> Self {
         Self {
-            max_draw_down_max: 30.0,
+            max_draw_down_max: 20.0,
             min_annual_roi: 5.0,
             min_operation_count: 10.0,
         }
