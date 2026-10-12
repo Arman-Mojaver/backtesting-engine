@@ -1,11 +1,13 @@
 use std::cell::RefCell;
-use std::slice::SliceIndex;
 use std::time::Instant;
 
 use anyhow::{bail, Context};
 use log::debug;
 use postgres::types::ToSql;
 use postgres::{Client, NoTls, Row};
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
+use serde_json::{Map, Value};
 
 use crate::domain::indicator::{Indicator, IndicatorParameters, IndicatorRepository};
 use crate::domain::operation_point::{
@@ -13,45 +15,84 @@ use crate::domain::operation_point::{
 };
 use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1, ResampledPointD1Repository};
 
-/// Safely slices `json` by byte range. The `None` case (a non-UTF-8 boundary)
-/// is unreachable for offsets returned by `str::find`, but panic-free slicing
-/// requires handling it.
-fn get_slice<'a, I>(json: &'a str, index: I, key: &str) -> anyhow::Result<&'a str>
+/// Wire format of `indicator.parameters` for `type = "macd"`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MacdParams {
+    slow_type: String,
+    slow_n: i32,
+    fast_type: String,
+    fast_n: i32,
+}
+
+/// Wire format of `indicator.parameters` for `type = "rsi"`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RsiParams {
+    n: i32,
+    high_threshold: i32,
+    low_threshold: i32,
+}
+
+/// Wire format of `indicator.parameters` for the period-only indicator types
+/// (`bears`, `bulls`, `dpo`, `force`, `roc`, `vroc`).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PeriodParams {
+    period: i32,
+}
+
+/// Wire format of `indicator.parameters` for `type = "cho"`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ChoParams {
+    fast_ma: i32,
+    slow_ma: i32,
+}
+
+/// Wire format of `indicator.parameters` for `type = "chaikin_volatility"`
+/// (type not yet present in the database).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ChvParams {
+    smooth_period: i32,
+    chv_period: i32,
+}
+
+/// Wire format of `indicator.parameters` for `type = "osma"`
+/// (type not yet present in the database).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OsMaParams {
+    fast_ema: i32,
+    slow_ema: i32,
+    signal_sma: i32,
+}
+
+/// Deserializes `indicator.parameters` (fetched as `parameters::text`) into
+/// `T`, attaching the indicator type and the raw JSON to any parse error.
+fn parse_params<T>(indicator_type: &str, json_text: &str) -> anyhow::Result<T>
 where
-    I: SliceIndex<str, Output = str>,
+    T: DeserializeOwned,
 {
-    json.get(index).with_context(|| {
-        format!("non-UTF-8 boundary while extracting key \"{key}\" from JSON: {json}")
+    serde_json::from_str(json_text).with_context(|| {
+        format!("invalid parameters for indicator type \"{indicator_type}\": {json_text}")
     })
 }
 
-fn json_extract_str(json: &str, key: &str) -> anyhow::Result<String> {
-    let search = format!("\"{key}\":\"");
-    let start = json
-        .find(&search)
-        .with_context(|| format!("key \"{key}\" not found in JSON: {json}"))?;
-    let value_start = start.saturating_add(search.len());
-    let rest = get_slice(json, value_start.., key)?;
-    let value_end = rest
-        .find('"')
-        .with_context(|| format!("unterminated string for key \"{key}\" in JSON: {json}"))?;
-    Ok(get_slice(rest, ..value_end, key)?.to_string())
-}
-
-fn json_extract_i32(json: &str, key: &str) -> anyhow::Result<i32> {
-    let search = format!("\"{key}\":");
-    let start = json
-        .find(&search)
-        .with_context(|| format!("key \"{key}\" not found in JSON: {json}"))?;
-    let value_start = start.saturating_add(search.len());
-    let value_slice = get_slice(json, value_start.., key)?;
-    let value_slice = value_slice.trim_start();
-    let end = value_slice
-        .find(|c: char| !c.is_ascii_digit() && c != '-')
-        .unwrap_or(value_slice.len());
-    let raw = get_slice(value_slice, ..end, key)?;
-    raw.parse()
-        .with_context(|| format!("failed to parse i32 for key \"{key}\" from: {raw}"))
+/// Parses `indicator.parameters` for the parameterless indicator types
+/// (`ao`, `ac`): the JSON must be an empty object.
+fn parse_empty_params(indicator_type: &str, json_text: &str) -> anyhow::Result<()> {
+    let map: Map<String, Value> = parse_params(indicator_type, json_text)?;
+    if !map.is_empty() {
+        let keys = map
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        bail!("indicator type \"{indicator_type}\" takes no parameters, found keys: {keys}");
+    }
+    Ok(())
 }
 
 fn map_high_low_order(value: &str) -> HighLowOrder {
@@ -62,55 +103,86 @@ fn map_high_low_order(value: &str) -> HighLowOrder {
     }
 }
 
+/// Maps a database `indicator.type` string plus its `parameters` JSON onto
+/// the domain enum. The matched strings and JSON shapes mirror the database
+/// exactly; an unknown type or malformed parameters is an error.
 fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<IndicatorParameters> {
     Ok(match indicator_type {
-        "macd" => IndicatorParameters::Macd {
-            slow_type: json_extract_str(json_text, "slow_type")?,
-            slow_n: json_extract_i32(json_text, "slow_n")?,
-            fast_type: json_extract_str(json_text, "fast_type")?,
-            fast_n: json_extract_i32(json_text, "fast_n")?,
-        },
-        "rsi" => IndicatorParameters::Rsi {
-            n: json_extract_i32(json_text, "n")?,
-            high_threshold: json_extract_i32(json_text, "high_threshold")?,
-            low_threshold: json_extract_i32(json_text, "low_threshold")?,
-        },
-        "awesome_oscillator" => IndicatorParameters::AwesomeOscillator,
-        "accelerator_decelerator" => IndicatorParameters::AcceleratorDecelerator,
-        "bears" => IndicatorParameters::BearsPower {
-            period: json_extract_i32(json_text, "period")?,
-        },
-        "bulls" => IndicatorParameters::BullsPower {
-            period: json_extract_i32(json_text, "period")?,
-        },
-        "chaikin_oscillator" => IndicatorParameters::ChaikinOscillator {
-            fast_ma: json_extract_i32(json_text, "fast_ma")?,
-            slow_ma: json_extract_i32(json_text, "slow_ma")?,
-        },
-        "chaikin_volatility" => IndicatorParameters::ChaikinVolatility {
-            smooth_period: json_extract_i32(json_text, "smooth_period")?,
-            chv_period: json_extract_i32(json_text, "chv_period")?,
-        },
-        "detrended_price_oscillator" => IndicatorParameters::DetrendedPriceOscillator {
-            period: json_extract_i32(json_text, "period")?,
-        },
-        "force_index" => IndicatorParameters::ForceIndex {
-            period: json_extract_i32(json_text, "period")?,
-        },
-        "osma" => IndicatorParameters::OsMa {
-            fast_ema: json_extract_i32(json_text, "fast_ema")?,
-            slow_ema: json_extract_i32(json_text, "slow_ema")?,
-            signal_sma: json_extract_i32(json_text, "signal_sma")?,
-        },
-        "roc" => IndicatorParameters::Roc {
-            period: json_extract_i32(json_text, "period")?,
-        },
-        "trix" => IndicatorParameters::Trix {
-            period: json_extract_i32(json_text, "period")?,
-        },
-        "vroc" => IndicatorParameters::Vroc {
-            period: json_extract_i32(json_text, "period")?,
-        },
+        "macd" => {
+            let p = parse_params::<MacdParams>(indicator_type, json_text)?;
+            IndicatorParameters::Macd {
+                slow_type: p.slow_type,
+                slow_n: p.slow_n,
+                fast_type: p.fast_type,
+                fast_n: p.fast_n,
+            }
+        }
+        "rsi" => {
+            let p = parse_params::<RsiParams>(indicator_type, json_text)?;
+            IndicatorParameters::Rsi {
+                n: p.n,
+                high_threshold: p.high_threshold,
+                low_threshold: p.low_threshold,
+            }
+        }
+        "ao" => {
+            parse_empty_params(indicator_type, json_text)?;
+            IndicatorParameters::AwesomeOscillator
+        }
+        "ac" => {
+            parse_empty_params(indicator_type, json_text)?;
+            IndicatorParameters::AcceleratorDecelerator
+        }
+        "bears" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::BearsPower { period: p.period }
+        }
+        "bulls" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::BullsPower { period: p.period }
+        }
+        "cho" => {
+            let p = parse_params::<ChoParams>(indicator_type, json_text)?;
+            IndicatorParameters::ChaikinOscillator {
+                fast_ma: p.fast_ma,
+                slow_ma: p.slow_ma,
+            }
+        }
+        "chaikin_volatility" => {
+            let p = parse_params::<ChvParams>(indicator_type, json_text)?;
+            IndicatorParameters::ChaikinVolatility {
+                smooth_period: p.smooth_period,
+                chv_period: p.chv_period,
+            }
+        }
+        "dpo" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::DetrendedPriceOscillator { period: p.period }
+        }
+        "force" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::ForceIndex { period: p.period }
+        }
+        "osma" => {
+            let p = parse_params::<OsMaParams>(indicator_type, json_text)?;
+            IndicatorParameters::OsMa {
+                fast_ema: p.fast_ema,
+                slow_ema: p.slow_ema,
+                signal_sma: p.signal_sma,
+            }
+        }
+        "roc" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::Roc { period: p.period }
+        }
+        "trix" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::Trix { period: p.period }
+        }
+        "vroc" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::Vroc { period: p.period }
+        }
         _ => bail!("unknown indicator type: {indicator_type}"),
     })
 }
@@ -143,12 +215,15 @@ fn row_to_resampled_point(row: &Row) -> ResampledPointD1 {
 }
 
 fn row_to_indicator(row: &Row) -> anyhow::Result<Indicator> {
+    let id: i32 = row.get("id");
     let raw_type: String = row.get("type");
     let raw_params: String = row.get("parameters");
+    let parameters = map_parameters(&raw_type, &raw_params)
+        .with_context(|| format!("failed to map parameters for indicator id {id}"))?;
     Ok(Indicator {
-        id: row.get("id"),
-        r#type: raw_type.clone(),
-        parameters: map_parameters(&raw_type, &raw_params)?,
+        id,
+        r#type: raw_type,
+        parameters,
         identifier: row.get("identifier"),
     })
 }
@@ -387,5 +462,173 @@ impl PgMoneyManagementStrategyAdapter {
             &[],
             |r| Ok(r.get("id")),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The dev database stores `parameters` as `json` text with one space after
+    // each colon; the literals below mirror rows captured from it.
+
+    #[test]
+    fn macd_params_parse_from_db_json_shape() {
+        let params = map_parameters(
+            "macd",
+            r#"{"slow_type": "sma", "slow_n": 20, "fast_type": "ema", "fast_n": 21}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            params,
+            IndicatorParameters::Macd {
+                slow_type: "sma".to_string(),
+                slow_n: 20,
+                fast_type: "ema".to_string(),
+                fast_n: 21,
+            }
+        );
+    }
+
+    #[test]
+    fn rsi_params_parse_from_db_json_shape() {
+        let params = map_parameters(
+            "rsi",
+            r#"{"n": 10, "high_threshold": 80, "low_threshold": 20}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            params,
+            IndicatorParameters::Rsi {
+                n: 10,
+                high_threshold: 80,
+                low_threshold: 20,
+            }
+        );
+    }
+
+    #[test]
+    fn cho_params_parse_from_db_json_shape() {
+        let params = map_parameters("cho", r#"{"fast_ma": 30, "slow_ma": 40}"#).unwrap();
+        assert_eq!(
+            params,
+            IndicatorParameters::ChaikinOscillator {
+                fast_ma: 30,
+                slow_ma: 40,
+            }
+        );
+    }
+
+    #[test]
+    fn types_not_yet_in_db_parse_from_expected_json_shapes() {
+        let chv = map_parameters(
+            "chaikin_volatility",
+            r#"{"smooth_period": 10, "chv_period": 10}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            chv,
+            IndicatorParameters::ChaikinVolatility {
+                smooth_period: 10,
+                chv_period: 10,
+            }
+        );
+
+        let osma = map_parameters(
+            "osma",
+            r#"{"fast_ema": 12, "slow_ema": 26, "signal_sma": 9}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            osma,
+            IndicatorParameters::OsMa {
+                fast_ema: 12,
+                slow_ema: 26,
+                signal_sma: 9,
+            }
+        );
+
+        let trix = map_parameters("trix", r#"{"period": 14}"#).unwrap();
+        assert_eq!(trix, IndicatorParameters::Trix { period: 14 });
+    }
+
+    #[test]
+    fn period_only_types_parse_from_db_json_shape() {
+        let cases = [
+            ("bears", IndicatorParameters::BearsPower { period: 105 }),
+            ("bulls", IndicatorParameters::BullsPower { period: 105 }),
+            (
+                "dpo",
+                IndicatorParameters::DetrendedPriceOscillator { period: 105 },
+            ),
+            ("force", IndicatorParameters::ForceIndex { period: 105 }),
+            ("roc", IndicatorParameters::Roc { period: 105 }),
+            ("vroc", IndicatorParameters::Vroc { period: 105 }),
+        ];
+        for (indicator_type, expected) in cases {
+            assert_eq!(
+                map_parameters(indicator_type, r#"{"period": 105}"#).unwrap(),
+                expected,
+                "type {indicator_type}"
+            );
+        }
+    }
+
+    #[test]
+    fn compact_json_also_parses() {
+        let params = map_parameters("roc", r#"{"period":105}"#).unwrap();
+        assert_eq!(params, IndicatorParameters::Roc { period: 105 });
+    }
+
+    #[test]
+    fn parameterless_types_parse_from_empty_object() {
+        for indicator_type in ["ao", "ac"] {
+            assert!(
+                map_parameters(indicator_type, "{}").is_ok(),
+                "type {indicator_type}"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_type_is_rejected() {
+        let err = map_parameters("stochastic", r#"{"n": 1}"#).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("unknown indicator type: stochastic"));
+    }
+
+    #[test]
+    fn missing_parameter_key_is_rejected() {
+        let err = map_parameters("rsi", r#"{"n": 10, "high_threshold": 80}"#).unwrap_err();
+        assert!(format!("{err:#}").contains("missing field"));
+    }
+
+    #[test]
+    fn string_value_for_integer_parameter_is_rejected() {
+        let err = map_parameters("roc", r#"{"period": "105"}"#).unwrap_err();
+        assert!(format!("{err:#}").contains("invalid type"));
+    }
+
+    #[test]
+    fn float_value_for_integer_parameter_is_rejected() {
+        assert!(map_parameters("roc", r#"{"period": 10.5}"#).is_err());
+    }
+
+    #[test]
+    fn unknown_parameter_key_is_rejected() {
+        let err = map_parameters("bears", r#"{"period": 5, "signal": 9}"#).unwrap_err();
+        assert!(format!("{err:#}").contains("unknown field"));
+    }
+
+    #[test]
+    fn parameterless_type_with_stray_key_is_rejected() {
+        let err = map_parameters("ao", r#"{"n": 14}"#).unwrap_err();
+        assert!(err.to_string().contains("takes no parameters"));
+    }
+
+    #[test]
+    fn non_object_parameters_are_rejected() {
+        assert!(map_parameters("vroc", "12").is_err());
     }
 }
