@@ -3,7 +3,6 @@ use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
 use super::empty_validation;
-use super::same_indicator_types_validation;
 use super::same_instrument_validation;
 use super::same_mms_validation;
 use super::same_timestamp_validation;
@@ -11,7 +10,6 @@ use super::same_timestamp_validation;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CombinedValidationError {
     Empty(empty_validation::EmptyRepoValidationError),
-    IndicatorTypeMismatch,
     InstrumentMismatch,
     MoneyManagementStrategyMismatch,
     TimestampMismatch,
@@ -27,9 +25,6 @@ pub fn validate_all(
 ) -> Result<(), CombinedValidationError> {
     empty_validation::validate_empty_entities(long_ops, short_ops, indicators, resampled_points)
         .map_err(CombinedValidationError::Empty)?;
-
-    same_indicator_types_validation::validate_same_indicator_types(indicators)
-        .map_err(|_| CombinedValidationError::IndicatorTypeMismatch)?;
 
     same_instrument_validation::validate_same_instrument(resampled_points, long_ops, short_ops)
         .map_err(|_| CombinedValidationError::InstrumentMismatch)?;
@@ -92,19 +87,6 @@ mod tests {
             Err(CombinedValidationError::Empty(
                 empty_validation::EmptyRepoValidationError::ShortOperationPointsEmpty
             ))
-        );
-    }
-
-    #[test]
-    fn test_indicator_type_mismatch() {
-        let long = op_points_default();
-        let short = op_points_default();
-        let indicators = indicators_different_type();
-        let resampled = resampled_points_default();
-
-        assert_eq!(
-            validate_all(&long, &short, &indicators, &resampled, 1),
-            Err(CombinedValidationError::IndicatorTypeMismatch)
         );
     }
 

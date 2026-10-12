@@ -140,8 +140,8 @@ mod tests {
             .enumerate()
             .map(|(i, close)| {
                 rp(
-                    i32::try_from(i).unwrap() + 1,
-                    i64::try_from(i).unwrap() + 1,
+                    i32::try_from(i).unwrap().saturating_add(1),
+                    i64::try_from(i).unwrap().saturating_add(1),
                     *close,
                 )
             })
@@ -188,7 +188,7 @@ mod tests {
             assert_eq!(val.value, 1.0, "value mismatch at index {i}");
             assert_eq!(
                 val.timestamp,
-                i64::try_from(i).unwrap() + 4,
+                i64::try_from(i).unwrap().saturating_add(4),
                 "ts mismatch at {i}"
             );
         }
@@ -234,7 +234,7 @@ mod tests {
             assert_eq!(val.value, -1.0, "value mismatch at index {i}");
             assert_eq!(
                 val.timestamp,
-                i64::try_from(i).unwrap() + 4,
+                i64::try_from(i).unwrap().saturating_add(4),
                 "ts mismatch at {i}"
             );
         }
@@ -312,7 +312,7 @@ mod tests {
         // fast=3, slow=5 -> values start at index 4.
         // 8 points with ts 100..107 -> values at ts 104..107.
         let points: Vec<ResampledPointD1> = (0..8)
-            .map(|i| rp(i + 1, i64::from(i + 100), 10.0))
+            .map(|i: i32| rp(i.saturating_add(1), i64::from(i.saturating_add(100)), 10.0))
             .collect();
         let result = compute(&points, "ema", 3, "sma", 5).unwrap();
         let vals = indicator_values!(result);

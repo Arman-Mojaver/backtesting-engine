@@ -358,32 +358,6 @@ pub fn indicators_default() -> Vec<Indicator> {
     ]
 }
 
-pub fn indicators_different_type() -> Vec<Indicator> {
-    vec![
-        Indicator {
-            id: 1,
-            r#type: "macd".to_string(),
-            parameters: IndicatorParameters::Macd {
-                slow_type: "ema".to_string(),
-                slow_n: 26,
-                fast_type: "ema".to_string(),
-                fast_n: 12,
-            },
-            identifier: "macd_1".to_string(),
-        },
-        Indicator {
-            id: 2,
-            r#type: "rsi".to_string(),
-            parameters: IndicatorParameters::Rsi {
-                n: 14,
-                high_threshold: 70,
-                low_threshold: 30,
-            },
-            identifier: "rsi_1".to_string(),
-        },
-    ]
-}
-
 // Signal-generation fixtures: resampled-point series long enough to drive RSI
 // windows, plus indicator builders with RSI parameters.
 
