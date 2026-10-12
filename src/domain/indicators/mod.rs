@@ -6,6 +6,7 @@ pub mod cho;
 pub mod chv;
 pub mod dpo;
 pub mod force;
+pub mod macd;
 pub mod macros;
 pub mod moving_averages;
 pub mod osma;
@@ -43,6 +44,9 @@ impl PriceField {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndicatorError {
+    InvalidMacdFastPeriod { n: i32 },
+    InvalidMacdSlowPeriod { n: i32 },
+    InvalidMacdMaType { ma_type: String },
     InvalidRsiPeriod { n: i32 },
     InvalidBearsPeriod { n: i32 },
     InvalidBullsPeriod { n: i32 },
@@ -61,7 +65,6 @@ pub enum IndicatorError {
     InvalidTrixPeriod { n: i32 },
     InvalidVrocPeriod { n: i32 },
     NotEnoughData { points: usize, required: usize },
-    UnsupportedIndicator { indicator: String },
 }
 
 pub fn create_indicator_output(
@@ -91,9 +94,15 @@ pub fn create_indicator_output(
             )?;
             Ok(IndicatorOutput::Threshold { instrument, buffer })
         }
-        IndicatorParameters::Macd { .. } => Err(IndicatorError::UnsupportedIndicator {
-            indicator: "macd".to_string(),
-        }),
+        IndicatorParameters::Macd {
+            slow_type,
+            slow_n,
+            fast_type,
+            fast_n,
+        } => {
+            let buffer = macd::compute(points, fast_type, *fast_n, slow_type, *slow_n)?;
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
         IndicatorParameters::AwesomeOscillator => {
             let buffer = ao::compute(points)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
@@ -214,22 +223,109 @@ mod tests {
         }
     }
 
+    /// 6 points with constant close -> exactly 2 MACD values
+    /// (fast=3, slow=5 -> values start at index 4).
+    fn rp_macd_6() -> Vec<ResampledPointD1> {
+        (1..=6)
+            .map(|i| {
+                let m = 10.0;
+                ResampledPointD1 {
+                    id: i,
+                    instrument: "EURUSD".to_string(),
+                    open: m,
+                    high: m,
+                    low: m,
+                    close: m,
+                    volume: 1000,
+                    timestamp: i64::from(i),
+                    high_low_order: HighLowOrder::HighFirst,
+                }
+            })
+            .collect()
+    }
+
     #[test]
-    fn macd_dispatch_returns_unsupported_error() {
+    fn macd_dispatch_returns_one_variant() {
+        let params = IndicatorParameters::Macd {
+            slow_type: "ema".to_string(),
+            slow_n: 5,
+            fast_type: "ema".to_string(),
+            fast_n: 3,
+        };
+        let points = rp_macd_6();
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => {
+                // 6 points, fast=3, slow=5 -> 2 MACD values (constant close -> 0.0).
+                assert_eq!(buf.items.len(), 2);
+                assert_eq!(buf.items[0].value, 0.0);
+            }
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn macd_dispatch_with_insufficient_data_yields_empty_one() {
         let params = IndicatorParameters::Macd {
             slow_type: "ema".to_string(),
             slow_n: 26,
             fast_type: "ema".to_string(),
             fast_n: 12,
         };
-        let points = vec![rp(1, 1, 1.0)];
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Oscillator {
+                buffer: ref buf, ..
+            } => assert!(buf.items.is_empty()),
+            other => panic!("expected One, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn macd_dispatch_invalid_ma_type_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Macd {
+            slow_type: "ema".to_string(),
+            slow_n: 26,
+            fast_type: "wma".to_string(),
+            fast_n: 12,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(
             err,
-            IndicatorError::UnsupportedIndicator {
-                indicator: "macd".to_string()
+            IndicatorError::InvalidMacdMaType {
+                ma_type: "wma".to_string()
             }
         );
+    }
+
+    #[test]
+    fn macd_invalid_fast_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Macd {
+            slow_type: "ema".to_string(),
+            slow_n: 26,
+            fast_type: "ema".to_string(),
+            fast_n: 0,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidMacdFastPeriod { n: 0 });
+    }
+
+    #[test]
+    fn macd_invalid_slow_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Macd {
+            slow_type: "ema".to_string(),
+            slow_n: 0,
+            fast_type: "ema".to_string(),
+            fast_n: 12,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidMacdSlowPeriod { n: 0 });
     }
 
     #[test]

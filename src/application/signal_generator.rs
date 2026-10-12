@@ -60,8 +60,9 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_indicator_is_skipped_not_aborted() {
-        // MACD is unsupported -> produces no group, but RSI still produces one.
+    fn invalid_indicator_is_skipped_not_aborted() {
+        // A MACD with an unknown moving-average type errors -> produces no
+        // group, but the RSI indicator still produces one.
         let indicators = vec![
             Indicator {
                 id: 100,
@@ -69,10 +70,10 @@ mod tests {
                 parameters: IndicatorParameters::Macd {
                     slow_type: "ema".to_string(),
                     slow_n: 26,
-                    fast_type: "ema".to_string(),
+                    fast_type: "wma".to_string(),
                     fast_n: 12,
                 },
-                identifier: "macd_1".to_string(),
+                identifier: "macd_bad_type".to_string(),
             },
             Indicator {
                 id: 2,
@@ -93,6 +94,46 @@ mod tests {
     }
 
     #[test]
+    fn macd_zero_cross_produces_long_signal() {
+        // closes [10, 10, 10, 5, 10] with fast EMA(1) (identity) and slow
+        // EMA(2): MACD = [0, 0, -1.66.., 1.11..] at ts 2000..5000. The
+        // strict negative-to-positive zero cross at ts 5000 is a long signal.
+        let closes = [10.0, 10.0, 10.0, 5.0, 10.0];
+        let points: Vec<ResampledPointD1> = (0..5)
+            .map(|i: i32| {
+                let close = closes[usize::try_from(i).unwrap()];
+                ResampledPointD1 {
+                    id: i + 1,
+                    instrument: "EURUSD".into(),
+                    open: close,
+                    high: close,
+                    low: close,
+                    close,
+                    volume: 1000,
+                    timestamp: i64::from(i + 1) * 1000,
+                    high_low_order: HighLowOrder::HighFirst,
+                }
+            })
+            .collect();
+        let indicators = vec![Indicator {
+            id: 9,
+            r#type: "macd".to_string(),
+            parameters: IndicatorParameters::Macd {
+                slow_type: "ema".to_string(),
+                slow_n: 2,
+                fast_type: "ema".to_string(),
+                fast_n: 1,
+            },
+            identifier: "macd_ema-1-2".to_string(),
+        }];
+        let result = create_signal_groups(&indicators, &points);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].indicator_id, 9);
+        assert_eq!(result[0].long_signals, vec![5000]);
+        assert!(result[0].short_signals.is_empty());
+    }
+
+    #[test]
     fn no_indicators_yields_no_signal_groups() {
         let points = resampled_points_for_rsi();
         let result = create_signal_groups(&[], &points);
@@ -100,17 +141,18 @@ mod tests {
     }
 
     #[test]
-    fn all_unsupported_yields_no_signal_groups() {
+    fn all_invalid_yields_no_signal_groups() {
+        // Every indicator has an unknown moving-average type -> no groups.
         let indicators = vec![Indicator {
             id: 100,
             r#type: "macd".to_string(),
             parameters: IndicatorParameters::Macd {
                 slow_type: "ema".to_string(),
                 slow_n: 26,
-                fast_type: "ema".to_string(),
+                fast_type: "wma".to_string(),
                 fast_n: 12,
             },
-            identifier: "macd_1".to_string(),
+            identifier: "macd_bad_type".to_string(),
         }];
         let points = resampled_points_for_rsi();
         let result = create_signal_groups(&indicators, &points);
