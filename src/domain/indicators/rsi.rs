@@ -25,6 +25,20 @@ pub fn compute(
     low_threshold: f64,
 ) -> Result<ThresholdSeries, IndicatorError> {
     validate_period!(n, InvalidRsiPeriod);
+
+    // Range validation (0-100) checked before ordering
+    if high_threshold < 0.0 || high_threshold > 100.0 {
+        return Err(IndicatorError::InvalidRsiThresholdRange { value: high_threshold as i32 });
+    }
+
+    if low_threshold < 0.0 || low_threshold > 100.0 {
+        return Err(IndicatorError::InvalidRsiThresholdRange { value: low_threshold as i32 });
+    }
+
+    if low_threshold >= high_threshold {
+        return Err(IndicatorError::InvalidRsiThresholdOrder { high: high_threshold as i32, low: low_threshold as i32 });
+    }
+
     let period = cast::i32_to_usize(n);
 
     // Build per-step price diffs: diff[i] = price[i+1] - price[i].
@@ -221,6 +235,72 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = compute(&points, PriceField::Close, -1, 70.0, 30.0).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidRsiPeriod { n: -1 });
+    }
+
+    #[test]
+    fn invalid_rsi_threshold_order_returns_error() {
+        // low_threshold (40) >= high_threshold (30) must be rejected
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = compute(&points, PriceField::Close, 3, 30.0, 40.0).unwrap_err();
+        assert_eq!(
+            err,
+            IndicatorError::InvalidRsiThresholdOrder { high: 30, low: 40 },
+        );
+    }
+
+    #[test]
+    fn invalid_rsi_threshold_order_equal_returns_error() {
+        // low_threshold == high_threshold must be rejected
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = compute(&points, PriceField::Close, 3, 50.0, 50.0).unwrap_err();
+        assert_eq!(
+            err,
+            IndicatorError::InvalidRsiThresholdOrder { high: 50, low: 50 },
+        );
+    }
+
+    #[test]
+    fn invalid_rsi_threshold_range_high_above_100_returns_error() {
+        // high_threshold > 100 must be rejected
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = compute(&points, PriceField::Close, 3, 101.0, 30.0).unwrap_err();
+        assert_eq!(
+            err,
+            IndicatorError::InvalidRsiThresholdRange { value: 101 },
+        );
+    }
+
+    #[test]
+    fn invalid_rsi_threshold_range_high_below_0_returns_error() {
+        // high_threshold < 0 must be rejected
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = compute(&points, PriceField::Close, 3, -1.0, 30.0).unwrap_err();
+        assert_eq!(
+            err,
+            IndicatorError::InvalidRsiThresholdRange { value: -1 },
+        );
+    }
+
+    #[test]
+    fn invalid_rsi_threshold_range_low_above_100_returns_error() {
+        // low_threshold > 100 must be rejected
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = compute(&points, PriceField::Close, 3, 70.0, 101.0).unwrap_err();
+        assert_eq!(
+            err,
+            IndicatorError::InvalidRsiThresholdRange { value: 101 },
+        );
+    }
+
+    #[test]
+    fn invalid_rsi_threshold_range_low_below_0_returns_error() {
+        // low_threshold < 0 must be rejected
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = compute(&points, PriceField::Close, 3, 70.0, -1.0).unwrap_err();
+        assert_eq!(
+            err,
+            IndicatorError::InvalidRsiThresholdRange { value: -1 },
+        );
     }
 
     #[test]

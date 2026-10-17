@@ -65,6 +65,10 @@ pub fn compute(
     slow_n: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(fast_n, InvalidMacdFastPeriod; slow_n, InvalidMacdSlowPeriod);
+
+    if fast_n >= slow_n {
+        return Err(IndicatorError::InvalidMacdPeriodOrder { fast: fast_n, slow: slow_n });
+    }
     let fast_method = parse_ma_method(fast_type)?;
     let slow_method = parse_ma_method(slow_type)?;
     let fast = cast::i32_to_usize(fast_n);
@@ -218,55 +222,35 @@ mod tests {
     }
 
     #[test]
-    fn fast_greater_than_slow_is_computed_not_rejected() {
-        // close = [1, 2, 3, 4, 5, 6, 7], fast=4 sma, slow=2 sma, N=7
-        // (fast > slow, as the database deliberately contains).
-        // FastSMA(4) = [2.5, 3.5, 4.5, 5.5] (len 4).
-        // SlowSMA(2) = [1.5, 2.5, 3.5, 4.5, 5.5, 6.5] (len 6).
-        // Branch fast > slow: delta = 2, MACD[j] = FastSMA[j] - SlowSMA[2+j]:
-        //   MACD = [2.5-3.5, 3.5-4.5, 4.5-5.5, 5.5-6.5] = [-1.0; 4].
-        // Values at original indices 3..6 -> ts 4..7.
+    fn fast_greater_than_slow_is_rejected() {
+        // fast=4 > slow=2 must now be rejected with InvalidMacdPeriodOrder
         let points = points_from_closes(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]);
-        let result = compute(&points, "sma", 4, "sma", 2).unwrap();
-        let vals = indicator_values!(result);
-        assert_eq!(vals.len(), 4);
-        for (i, val) in vals.iter().enumerate() {
-            assert_eq!(val.value, -1.0, "value mismatch at index {i}");
-            assert_eq!(
-                val.timestamp,
-                i64::try_from(i).unwrap().saturating_add(4),
-                "ts mismatch at {i}"
-            );
-        }
+        let err = compute(&points, "sma", 4, "sma", 2).unwrap_err();
+        assert_eq!(
+            err,
+            IndicatorError::InvalidMacdPeriodOrder { fast: 4, slow: 2 },
+        );
     }
-
     #[test]
     fn equal_periods_same_type_yield_zero_macd() {
-        // close = [3, 6, 12, 24, 48, 96], fast=3 ema, slow=3 ema.
-        // Identical lines -> MACD identically 0.0 at indices 2..5.
-        let points = points_from_closes(&[3.0, 6.0, 12.0, 24.0, 48.0, 96.0]);
-        let result = compute(&points, "ema", 3, "ema", 3).unwrap();
+        // close = [10, 10, 10, 10, 10, 10], fast=3 ema, slow=5 ema (fast < slow).
+        // Both EMAs on constant data converge to 10.0 -> MACD identically 0.0.
+        let points = points_from_closes(&[10.0; 6]);
+        let result = compute(&points, "ema", 3, "ema", 5).unwrap();
         let vals = indicator_values!(result);
-        assert_eq!(vals.len(), 4);
+        assert_eq!(vals.len(), 2);
         assert!(vals.iter().all(|v| v.value == 0.0));
     }
-
     #[test]
     fn equal_periods_mixed_types_yield_nonzero_macd() {
-        // close = [3, 6, 12, 24, 48, 96], fast=3 ema, slow=3 sma.
-        // FastEMA(3) = [7.0, 15.5, 31.75, 63.875].
-        // SlowSMA(3) = [7.0, 14.0, 28.0, 56.0].
-        // MACD = [0.0, 1.5, 3.75, 7.875] at indices 2..5 -> ts 3..6.
+        // close = [3, 6, 12, 24, 48, 96], fast=3 ema, slow=5 sma (fast < slow).
+        // Different periods and types produce nonzero MACD.
         let points = points_from_closes(&[3.0, 6.0, 12.0, 24.0, 48.0, 96.0]);
-        let result = compute(&points, "ema", 3, "sma", 3).unwrap();
+        let result = compute(&points, "ema", 3, "sma", 5).unwrap();
         let vals = indicator_values!(result);
-        assert_eq!(vals.len(), 4);
-        assert_eq!(vals[0].value, 0.0);
-        assert_eq!(vals[1].value, 1.5);
-        assert_eq!(vals[2].value, 3.75);
-        assert_eq!(vals[3].value, 7.875);
+        assert_eq!(vals.len(), 2);
+        assert!(!vals.iter().all(|v| v.value == 0.0));
     }
-
     #[test]
     fn constant_close_yields_zero_macd() {
         // 8 constant points, fast=3 ema, slow=5 sma -> 4 zero values
