@@ -67,7 +67,10 @@ pub fn compute(
     validate_period!(fast_n, InvalidMacdFastPeriod; slow_n, InvalidMacdSlowPeriod);
 
     if fast_n >= slow_n {
-        return Err(IndicatorError::InvalidMacdPeriodOrder { fast: fast_n, slow: slow_n });
+        return Err(IndicatorError::InvalidMacdPeriodOrder {
+            fast: fast_n,
+            slow: slow_n,
+        });
     }
     let fast_method = parse_ma_method(fast_type)?;
     let slow_method = parse_ma_method(slow_type)?;

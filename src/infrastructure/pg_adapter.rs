@@ -521,11 +521,7 @@ mod tests {
 
     #[test]
     fn types_not_yet_in_db_parse_from_expected_json_shapes() {
-        let chv = map_parameters(
-            "chaikin_volatility",
-            r#"{"smooth_period": 10, "chv_period": 10}"#,
-        )
-        .unwrap();
+        let chv = map_parameters("chv", r#"{"smooth_period": 10, "chv_period": 10}"#).unwrap();
         assert_eq!(
             chv,
             IndicatorParameters::ChaikinVolatility {
