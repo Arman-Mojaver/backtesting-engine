@@ -148,7 +148,7 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
                 slow_ma: p.slow_ma,
             }
         }
-        "chaikin_volatility" => {
+        "chv" => {
             let p = parse_params::<ChvParams>(indicator_type, json_text)?;
             IndicatorParameters::ChaikinVolatility {
                 smooth_period: p.smooth_period,
