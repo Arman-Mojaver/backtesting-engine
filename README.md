@@ -65,9 +65,7 @@ domain layer has no I/O and no framework types, so the business rules can be und
 and unit-tested in complete isolation.
 
 ```
-CLI              ct        operator frontend — routes commands to the engine
-                           or to the companion Python service
-                 bt-engine the native Rust engine
+CLI              bt-engine the native Rust engine — runs directly, no operator frontend
 
 Application      use-case orchestration: fetching inputs, generating signals,
                  building and filtering candidate strategies
@@ -207,22 +205,6 @@ bt-engine strategy create_loop                           # all cells, idempotent
 bt-engine strategy metadata                             # DB vs manifest progress report
 ```
 
-### `ct` — frontend
-
-`ct` is the operator entry point on the host. Engine commands are forwarded to the
-engine container; data-management and display commands are forwarded to the companion
-Python CLI (see [Ecosystem](#ecosystem)).
-
-```
-ct strategy create -m <MMS_ID> [-i <INSTRUMENT>]   # → engine
-ct strategy create_loop                           # → engine
-ct strategy metadata                              # → engine
-ct strategy display <STRATEGY_ID> [-v]            # → Python CLI (iteration table)
-
-ct dev | indicator (i) | money-management-strategy (mms) |
-   operation-point (o) | raw-point (r) | resampled-point (rr) …   # → Python CLI
-```
-
 ## Output format
 
 Strategies are written as Parquet (ZSTD-compressed) under an environment-scoped
@@ -293,7 +275,6 @@ cargo build                                # debug
 cargo build --release
 
 # Install the binaries to ~/.cargo/bin
-cargo install --path . --bin ct --force
 cargo install --path . --bin bt-engine --force
 ```
 
@@ -340,9 +321,9 @@ Honest list — read before trusting the numbers:
    required change before any production use of ROI/draw-down figures.
 2. **MACD is not implemented.** MACD configurations are read from the database but
    produce no strategies; runs continue without them.
-3. **`ct` depends on Docker and the companion Python service.** Data-management
-   commands and `strategy display` forward to the Python CLI. `bt-engine` itself has
-   no Python dependency.
+3. **Data management and strategy display live in the companion Python service.** The
+   Rust engine is `bt-engine`-only — all data CRUD and the iteration table are owned
+   by [Backtesting-4.0](../Backtesting-4.0) and accessed there directly.
 4. **DB configuration is hardcoded per environment** (host, ports, credentials). Fine
    for the Docker workflow; limiting if you want to point the engine at arbitrary
    PostgreSQL instances.
@@ -360,8 +341,9 @@ Honest list — read before trusting the numbers:
 
 This engine is the Rust computation core of a two-repo system. The companion
 **[Backtesting-4.0](../Backtesting-4.0)** repository (Python/Django) owns persistence,
-user-facing APIs, and strategy CRUD/display. `ct` is the operator frontend that routes
-between the two: engine commands to `bt-engine`, everything else to the Python CLI.
+user-facing APIs, data CRUD, and the iteration table (strategy display). The Rust
+engine is the standalone `bt-engine` binary and has no dependency on the Python
+service.
 
 ## License
 

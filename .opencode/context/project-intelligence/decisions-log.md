@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.10 | Updated: 2026-09-17 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.11 | Updated: 2026-10-21 -->
 
 # Decisions Log
 
@@ -949,6 +949,57 @@ Add `itertools = "0.15"` (default features) and refactor the five sites — beha
 
 ---
 
+---
+
+## Decision: Remove the `ct` Python-Wrapping CLI
+
+**Date**: 2026-10-21
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+After the removal of the actix-web server scaffold and the in-memory repos (the two previous "remove dead code" sweeps), the `ct` binary was the last surface that existed solely to forward commands out of the engine. It held two forwarding paths:
+1. **Engine commands** (`strategy create`, `create_loop`, `metadata`) — forwarded to `bt-engine` via `docker exec engine bt-engine …`.
+2. **Data-management commands** (`dev`, `indicator`, `mms`, `operation-point`, `raw-point`, `resampled-point`, `strategy display`) — forwarded to the companion Python CLI inside the `api` container.
+
+The `ct` binary also dragged the only Python Docker dependency into the engine, blocked compile-time improvements inside the engine container (extra source files cross-compiled for no functional gain), and added an indirection layer that confused operators about which backend handled which command. Engine commands already had a direct path (`bt-engine …`); data-management commands already had their own canonical home (the Python CLI). `ct` provided neither new capability nor a meaningful shortcut.
+
+### Decision
+Remove the `ct` binary entirely:
+- `src/cli/` directory deleted (8 files: 7 command files + `cli/mod.rs`)
+- `src/main.rs` deleted
+- `lib.rs` no longer re-exports the `cli` module
+- `Cargo.toml` `[[bin]]` entry for `ct` removed; `bte` (build) aliased for the single remaining binary
+
+Data management and the iteration table are reached exclusively through the companion [Backtesting-4.0](../Backtesting-4.0) Python service from now on; engine commands run directly as `bt-engine …`.
+
+### Rationale
+- Deletes a forwarding layer with no unique capability — every `ct` command has a direct equivalent
+- Removes the last Python/Docker dependency from the engine container, shortening compile time and shrinking the build surface
+- Eliminates operator confusion about which backend handles which command
+- Closes the gap between the engine and the Python service: each is one binary and one documented entry point
+- Follows the same precedent as the previous "dead code" sweeps: server scaffold (2026-06-04), `strategy generate` command (2026-06-28), in-memory repos (2026-08). All were correctly diagnosed as low-value surface area
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep `ct` as a thin convenience shim | Backward compat for any operators with muscle memory | Still drags Python forward path + extra compile cost; the convenience fades | Project is single-binary; muscle memory adapts fast |
+| Promote some data commands to `bt-engine` | One binary to do everything | Data CRUD belongs with persistence + APIs (Python/Django); engine stays compute-only | Wrong layer for data management |
+| Replace `ct` with a new dispatcher binary | Same UX, cleaner impl | Re-introduces the indirection problem the removal solves | YAGNI; direct commands work |
+
+### Impact
+**Positive**: Single Rust binary; no Python or Docker dependency in the engine; cleaner compile surface; clearer operator mental model; one less thing to install
+**Negative**: Operators must invoke `bt-engine …` directly and reach the Python service directly for data/display; the historical `ct` alias is gone
+**Risk**: Documentation drift — README, context files, and the Delta Lake PRD's planned `ct strategy read`/`vacuum` commands needed (and received) follow-up cleanup to land those new commands on `bt-engine` directly
+
+### Related
+- Commit `68391e9` (chore: remove "ct" cli and improve compile time inside container)
+- Implementation: deletion of `src/cli/*.rs` (8 files) + `src/main.rs` (9 deleted, 742 −11 in the commit)
+- Similar removals: server scaffold (2026-06-04), `strategy generate` (2026-06-28), in-memory repos (2026-08)
+- Documentation updates: `README.md`, `.opencode/context/project-intelligence/{domain-model,business-tech-bridge,business-domain,living-notes}.md`, `.opencode/.tmp/prd/2026-10-18-delta-lake-migration.md`
+
+---
+
 ## Deprecated Decisions
 
 | Decision | Date | Replaced By | Why |
@@ -959,6 +1010,7 @@ Add `itertools = "0.15"` (default features) and refactor the five sites — beha
 | In-memory repositories for tests | 2026-06 | Remove In-Memory Repositories (2026-08-29) | Fixtures + tempfile-based adapter tests cover the same needs |
 | `eprintln!` progress output | pre-2026-08 | Structured Logging via `log` + `simplelog` (2026-08-29) | Batch tooling needs levels, timestamps, and file routing |
 | Manual Docker build/push (Makefile only) | pre-2026-09 | CI Workflow (2026-09-03) | Publishing must be gated on fmt + clippy + tests |
+| `ct` Python-wrapping CLI binary | 2026-10-21 | Remove the `ct` Python-Wrapping CLI (2026-10-21) | Operator frontend had no unique capability; dragged Python forward path and Docker indirection into the engine |
 
 ## Onboarding Checklist
 

@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.8 | Updated: 2026-09-17 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.9 | Updated: 2026-10-21 -->
 
 # Domain Model — Backtesting Engine
 
@@ -292,15 +292,6 @@ src/
 │   ├── strategy_generator.rs   # create_strategies() / create_strategy() — real metrics
 │   ├── strategy_runner.rs      # run_strategies() — validate → signals → filter → strategies → filter
 │   └── strategy_runner_utils.rs # get_unprocessed() — manifest diffing
-├── cli/                        # ct command tree (clap, one file per group)
-│   ├── mod.rs                  # Coordinator: AppCommand enum, build_cli(), parse(), execute(), exec_python_cli(), exec_engine_cli()
-│   ├── dev.rs                  # dev commands (forwarded to Python CLI)
-│   ├── indicator.rs            # i/indicator (forwarded to Python CLI)
-│   ├── money_management_strategy.rs  # mms (forwarded to Python CLI)
-│   ├── operation_point.rs      # o/operation-point (forwarded to Python CLI)
-│   ├── raw_point.rs            # r/raw-point (forwarded to Python CLI)
-│   ├── resampled_point.rs      # rr/resampled-point (forwarded to Python CLI)
-│   └── strategy.rs             # s/strategy create, create_loop, metadata (→ engine), display (→ Python)
 ├── domain/                     # Pure domain logic — no I/O, no frameworks
 │   ├── indicator.rs            # Indicator + IndicatorParameters (14 variants) + IndicatorRepository
 │   ├── indicators/             # Indicator computation: 14 indicators + dispatch + macros + moving averages
@@ -340,8 +331,7 @@ src/
 │   └── environment.rs          # Environment, DbConfig, parquet_base_dir(), parquet_root_dir()
 ├── bin/
 │   └── bt-engine.rs            # bt-engine binary entry: engine::build_cli() → parse() → execute()
-├── main.rs                     # ct binary entry: cli::build_cli() → parse() → execute()
-└── lib.rs                      # Crate root — re-exports application, cli, config, domain, engine, infrastructure
+└── lib.rs                      # Crate root — re-exports application, config, domain, engine, infrastructure
 ```
 
 ---
@@ -353,7 +343,7 @@ src/
 3. **Fail-fast combined validation**: `validate_all` short-circuits on the first error. Order matters: emptiness is checked first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
 4. **Fixtures module**: Test data lives in `domain::fixtures`, reusable across all test modules. (In-memory repos were removed 2026-08 — fixtures + tempfile cover the same need with less code.)
 5. **Ports-and-adapters**: Repository traits live in the domain; implementations live in infrastructure. The domain has zero dependencies on infrastructure.
-6. **Dual binary layout**: `ct` (`src/main.rs`) is the operator frontend (forwards to Python CLI and engine via Docker exec); `bt-engine` (`src/bin/bt-engine.rs`) is the native Rust engine. Both follow `build -> parse -> execute` and return `anyhow::Result<()>`.
+6. **Single-binary engine layout**: `bt-engine` (`src/bin/bt-engine.rs`) is the sole Rust CLI; it follows the `build -> parse -> execute` pattern and returns `anyhow::Result<()>`. The previous `ct` operator frontend (which forwarded engine commands via Docker exec and Python CLI commands via the `api` container) was removed in the commit that dropped `src/cli/` and `src/main.rs` — data CRUD and the iteration table are now reached exclusively in the companion Python service.
 7. **Application layer**: `src/application/` orchestrates domain + infrastructure. Keeps `engine/` CLI handlers thin. One file per use case.
 8. **Metrics as pure domain functions**: `performance_metrics()` takes `&[&OperationPoint]` and returns `PerformanceMetrics` (`global_roi` + `max_draw_down`) computed in a single pass over the shared compounding curve, sorting its input chronologically itself (stable; ties keep input order). `annual_roi` is a method on `PerformanceMetrics`. No I/O — composable and unit-tested in isolation.
 9. **Two-stage filtering**: `filter_signal_groups_by_annual_ops()` prunes signal groups by annual operation count first (cheap), then `filter_strategies(strategies, &GlobalStrategyFilter)` prunes by max draw down + annual ROI (expensive, runs on fewer candidates). `GlobalStrategyFilter::default()` encodes the baseline quality bar (DD ≤ 30%, ROI ≥ 5%, ops ≥ 10/yr).

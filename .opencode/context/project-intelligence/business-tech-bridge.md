@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.7 | Updated: 2026-09-03 -->
+<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.8 | Updated: 2026-10-21 -->
 
 # Business ↔ Tech Bridge
 
@@ -46,19 +46,11 @@
 | Record processed indicators | `ParquetProcessedManifest` | `src/infrastructure/processed_manifest.rs` | `processed.parquet` ledger; atomic writes; dedup per triple |
 | Batch commit (create_loop) | `StrategyPersistence::persist_cells()` | `src/infrastructure/strategy_persistence.rs` | Assign IDs once, write partitions in parallel, commit manifest once |
 | Logging | `logging::init()` | `src/infrastructure/logging.rs` | simplelog, RUST_LOG-driven |
-| CLI binary (`ct`) | Operator frontend | `src/main.rs` | `cli::build_cli()` → `parse()` → `execute()`. Forwards via Docker exec. Installed at `~/.cargo/bin/ct` |
-| CLI dev tools | `ct dev …` | `src/cli/dev.rs` | Forwarded to Python CLI |
-| CLI indicator / mms / op-point / raw-point / resampled-point | `ct i\|mms\|o\|r\|rr …` | `src/cli/*.rs` | Forwarded to Python CLI |
-| CLI strategy create | `ct strategy/s create -m <mms_id> [-i <instrument>]` | `src/cli/strategy.rs` | Forwards to `bt-engine strategy create` via Docker exec |
-| CLI strategy create_loop | `ct s create_loop` | `src/cli/strategy.rs` | Forwards to `bt-engine strategy create_loop` |
-| CLI strategy metadata | `ct s metadata` | `src/cli/strategy.rs` | Forwards to `bt-engine strategy metadata` |
-| CLI strategy display | `ct s display <strategy_id> [-v/--verbose]` | `src/cli/strategy.rs` | Forwards to Python `bt strategy display` via Docker exec |
-| Engine CLI module | Command tree for `bt-engine` | `src/engine/mod.rs` | `EngineCommand` enum + `build_cli()`, `parse()`, `execute()` |
+| Engine CLI module | Command tree for `bt-engine` (the sole CLI) | `src/engine/mod.rs` | `EngineCommand` enum + `build_cli()`, `parse()`, `execute()` |
 | Engine strategy create | `bt-engine strategy create -m <mms_id> [-i <instrument>]` | `src/engine/strategy/create.rs` | fetch → manifest diff → run_strategies → parquet → manifest append |
 | Engine strategy create_loop | `bt-engine strategy create_loop` | `src/engine/strategy/create_loop.rs` | All cells: load once (rayon::join) → parallel compute → batch persist |
 | Engine strategy metadata | `bt-engine strategy metadata` | `src/engine/strategy/metadata.rs` | DB vs manifest state + remaining triples |
-| Refresh CLI after changes | `cargo install --path . --bin ct --force` | — | Installs updated `ct` to `~/.cargo/bin/ct` |
-| Refresh engine binary after changes | `cargo install --path . --bin bt-engine --force` | `Cargo.toml` defines both `[[bin]]` entries | Installs updated `bt-engine` to `~/.cargo/bin/bt-engine` |
+| Refresh engine binary after changes | `cargo install --path . --bin bt-engine --force` | `Cargo.toml` defines the single `[[bin]]` entry | Installs updated `bt-engine` to `~/.cargo/bin/bt-engine` |
 | Parquet files volume | `${PARQUET_FILES_PATH}:/app/parquet_files` | `docker-compose.yaml`, `.env.example` | Host path configurable via `PARQUET_FILES_PATH` env var |
 
 ## Architecture Pattern
@@ -80,7 +72,7 @@ Business Question                              Code Path
 "Generate signal groups?"                 →   create_signal_groups(&indicators, &resampled_points)  (real indicator math)
 "Which signal groups have enough ops?"    →   filter_signal_groups_by_annual_ops(groups, min_ops, start_ts, end_ts)
 "Which strategies pass the quality bar?"  →   filter_strategies(strategies, &GlobalStrategyFilter::default())
-"Create strategies for one cell?"         →   fetch_source_data() → manifest diff → run_strategies() → parquet write → manifest append
+"Create strategies for one cell?"         →   bt-engine strategy create -m <mms_id> [-i <instrument>]
 "Create strategies for everything?"       →   bt-engine strategy create_loop (load once → parallel cells → batch persist)
 "Which indicators are already processed?" →   ParquetProcessedManifest::read() / read_processed_ids_per_cell()
 "How much work remains?"                  →   bt-engine strategy metadata
@@ -97,8 +89,8 @@ Business Question                              Code Path
 | New signal semantics | `src/domain/signal/{name}.rs` + `IndicatorOutput` variant | See `oscillator.rs` (zero-cross) |
 | New data source adapter | `src/infrastructure/{adapter}.rs` | See `pg_adapter.rs` or `strategy_adapter.rs` |
 | New application orchestration | `src/application/{name}.rs` | See `strategy_runner.rs` / `source_data.rs` |
-| New CLI command group (ct binary) | `src/cli/{name}.rs` | See `src/cli/dev.rs` — 4 sections: builder, types, parse, execute |
-| New CLI subcommand under existing group | Inside the relevant `src/cli/{group}.rs` or `src/engine/{group}/` | Add to the enum + builder + parser + execute match |
+| New CLI command group | `src/engine/{name}/` module dir | Follow `src/engine/strategy/` pattern: `mod.rs` (enum + `build_cli`/`parse`/`execute`) + one file per subcommand |
+| New CLI subcommand under existing group | Inside the relevant `src/engine/{group}/` | Add the variant to the enum + builder + parser + execute match |
 | New engine command group (bt-engine binary) | `src/engine/{name}/` module dir | Follow `src/engine/strategy/` pattern: mod.rs + one file per subcommand |
 | New test fixtures | `src/domain/fixtures.rs` | Add `pub fn {name}() -> Vec<T>` |
 | New infrastructure adapter | `src/infrastructure/{name}.rs` | See `processed_manifest.rs` — expose types and functions, add `pub mod` in `mod.rs` |

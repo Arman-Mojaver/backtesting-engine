@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/notes | Priority: high | Version: 1.7 | Updated: 2026-09-03 -->
+<!-- Context: project-intelligence/notes | Priority: high | Version: 1.8 | Updated: 2026-10-21 -->
 
 # Living Notes
 
@@ -16,7 +16,6 @@
 |------|--------|----------|------------|
 | Metrics assume operations close in entry order | ROI/max_draw_down walk operation points sorted by entry timestamp; real trades have exit dates and do not necessarily close in entry order — figures are approximate until fixed | **High** | Account for `exit_date` in the compounding curve before any production use (see `notes.md`) |
 | MACD indicator unsupported | MACD rows parse from DB but `create_indicator_output` returns `UnsupportedIndicator`; MACD strategies are silently skipped | Medium | Implement MACD compute (fast/slow MA diff + signal line → Crossover output kind) |
-| `ct strategy display` forwards to Python CLI | Display logic lives in Backtesting-4.0, not the Rust engine | Medium | Port display logic to Rust engine if/when Python dependency is dropped |
 | PG adapter hand-parses indicator JSON | `json_extract_str`/`json_extract_i32` are panic-on-miss string scanners, not a real JSON parser | Medium | Replace with `serde_json` parsing once `serde` is on the hot path, or keep for performance |
 | DbConfig is hardcoded per environment | Host (`host.docker.internal`), ports, and credentials cannot be overridden by env vars | Medium | Fine for the Docker workflow; add env overrides if the engine must target arbitrary PG instances |
 | Engine CLI handlers have no direct unit tests | `create.rs` / `create_loop.rs` / `metadata.rs` handlers are thin but untested; the functions they call ARE tested | Low-Medium | Logic is pushed into tested application/infrastructure functions; add handler tests if handlers grow |
@@ -55,7 +54,6 @@
 | Question | Stakeholders | Status | Next Action |
 |----------|--------------|--------|-------------|
 | Should engine commands be extended with strategy delete/update? | Arman Mojaver | Open | Add commands as needed |
-| Should `ct strategy display` be ported to the Rust engine? | Arman Mojaver | Open | Currently forwards to Python `bt strategy display` |
 | When should exit-date-aware metrics land? | Arman Mojaver | Open | Required before production use of ROI/DD figures |
 | Should MACD land as Crossover output kind? | Arman Mojaver | Open | Natural fit; needs two-series compute |
 
@@ -74,7 +72,7 @@
 - **Pure metric functions** — `performance_metrics()` (single pass: global ROI + max draw down, owns the defensive chronological sort) and `annual_operation_count()`. Independently unit-tested, no I/O.
 - **Typed indicator parameters + dispatch** — Adding an indicator is mechanical: variant + compute fn + dispatch arm + tests. The `validate_period!` / `empty_oscillator!` / `indicator_values!` macros keep the 14 implementations uniform.
 - **Signal semantics as a separate concept** — `IndicatorOutput` (what the indicator computed) is deliberately separate from `SignalGroup` (when to trade). Oscillator/threshold/crossover semantics cover all 14 indicators with three small modules.
-- **Separate engine binary** — Clear line between Python-wrapping CLI (`ct`) and native Rust engine (`bt-engine`).
+- **Single-binary engine** — The engine is the entire CLI surface (`bt-engine`); data management and the iteration table belong to the companion Python service, accessed there directly.
 - **Application layer** — `run_strategies()` keeps `engine/` CLI handlers thin and reusable across binaries.
 - **Parquet partitioning by (instrument, mms_id)** — Mirrors the single-instrument/single-MMS backtest constraint; enables partition pruning.
 - **Processed manifest** — Idempotency ledger makes `create`/`create_loop` safely re-runnable; `metadata` gives operators a progress report for free.
@@ -106,8 +104,8 @@
 - **README stability policy** — The README contains only stable information: abstract domain concepts, CLI surface, data contracts (parquet schema), formulas, tools, and external dependencies. NO function/struct/file names, no folder trees, no test counts — anything that moves with the code lives in these context files, not the README. Rule of thumb: if a code change would force a README edit, that content belongs in `.opencode/context/` instead.
 
 ### Gotchas for Maintainers
-- **Two binaries to install** — After changes to `engine/`, run `cargo install --path . --bin bt-engine --force`. After changes to `cli/`, run `cargo install --path . --bin ct --force`.
-- **Python CLI dependency** — `ct` data-management commands and `strategy display` forward to a Python Docker container (`api`). Engine commands forward to the `engine` container. `bt-engine` itself has no Python dependency.
+- **One binary to install** — After changes under `src/engine/`, run `cargo install --path . --bin bt-engine --force`.
+- **Python companion is a separate repo** — Data CRUD and the iteration table live in [Backtesting-4.0](../Backtesting-4.0) (Python/Django). The Rust engine talks only to PostgreSQL and the Parquet directory; it has no Python or Docker dependency.
 - **Parquet dirs are environment-scoped** — `/app/parquet_files/{env}/strategy` (partitions) and `/app/parquet_files/{env}/processed.parquet` (manifest). Host-mounted via `PARQUET_FILES_PATH`.
 - **DB config is hardcoded per environment** — `host.docker.internal` with ports 5432/54320/54321 for production/development/testing. No env override.
 - **MACD is skipped, not an error** — Runs containing MACD indicators silently produce no MACD strategies.

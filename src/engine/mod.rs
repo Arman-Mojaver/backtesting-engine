@@ -7,7 +7,7 @@ pub enum EngineCommand {
 }
 
 pub fn build_cli() -> Command {
-    Command::new("bt-engine")
+    Command::new("bte")
         .about("Backtesting Engine (Rust CLI)")
         .subcommand_required(true)
         .arg_required_else_help(true)

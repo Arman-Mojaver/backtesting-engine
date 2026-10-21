@@ -2,17 +2,18 @@
 name = "backtesting-engine"
 version = "0.1.0"
 edition = "2021"
+autobins = false
 
 [lib]
 doctest = false
 
 [[bin]]
-name = "ct"
-path = "src/main.rs"
-
-[[bin]]
-name = "bt-engine"
+name = "bte"
 path = "src/bin/bt-engine.rs"
+
+[profile.dev]
+# Use `debug = "line-tables-only"` if you need backtraces.
+debug = false
 
 [dependencies]
 clap = { version = "4.5", features = ["string", "derive"] }
