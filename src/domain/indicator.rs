@@ -59,5 +59,4 @@ pub struct Indicator {
 
 pub trait IndicatorRepository {
     fn get_all(&self) -> anyhow::Result<Vec<Indicator>>;
-    fn get_by_type(&self, indicator_type: &str) -> anyhow::Result<Vec<Indicator>>;
 }

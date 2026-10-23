@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.9 | Updated: 2026-10-21 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.10 | Updated: 2026-10-23 -->
 
 # Domain Model — Backtesting Engine
 
@@ -215,7 +215,7 @@ The domain defines repository traits — ports in a ports-and-adapters architect
 | `LongOperationPointRepository` | `get_all()`, `get_by_mms_id_and_instrument(mms_id, instrument)`, `index_by_cell()` (default) | Long (buy) trades; `index_by_cell` groups by `(instrument, mms_id)` |
 | `ShortOperationPointRepository` | `get_all()`, `get_by_mms_id_and_instrument(mms_id, instrument)`, `index_by_cell()` (default) | Short (sell) trades |
 | `ResampledPointD1Repository` | `get_all()`, `get_by_instrument(instrument)`, `index_by_instrument()` (default) | Daily candles |
-| `IndicatorRepository` | `get_all()`, `get_by_type(indicator_type)` | Indicators |
+| `IndicatorRepository` | `get_all()` | Indicators |
 
 Infrastructure provides the `Pg*Adapter` (PostgreSQL) implementations. The in-memory test repos were removed (2026-08); tests use `domain::fixtures` builders + `tempfile`-based adapter tests instead. There is no dedicated money-management-strategy adapter: `strategy metadata` currently derives distinct money-management ids from the long operation-point table (`PgLongOperationPointAdapter::get_distinct_mms_ids()`); this will change in Ticket 6, which unions the long and short sources.
 

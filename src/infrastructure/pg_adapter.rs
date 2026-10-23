@@ -432,16 +432,6 @@ impl IndicatorRepository for PgIndicatorAdapter {
             row_to_indicator,
         )
     }
-
-    fn get_by_type(&self, indicator_type: &str) -> anyhow::Result<Vec<Indicator>> {
-        fetch_rows(
-            &self.conn,
-            "indicator by type",
-            "SELECT id, type, parameters::text, identifier FROM indicator WHERE type = $1",
-            &[&indicator_type],
-            row_to_indicator,
-        )
-    }
 }
 
 #[cfg(test)]
