@@ -5,8 +5,7 @@ use crate::domain::cast;
 /// `values.len() - period + 1` when `values` is at least `period` long,
 /// otherwise an empty vector. Pure: no side effects.
 ///
-/// Future indicators (Bears, Bulls, TRIX, MACD, …) will add EMA, SMMA and
-/// LWMA helpers to this same module.
+/// Only SMA and EMA are needed by the current indicator set.
 pub fn sma(values: &[f64], period: usize) -> Vec<f64> {
     if period == 0 || values.len() < period {
         return Vec::new();
