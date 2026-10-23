@@ -18,7 +18,12 @@ pub struct GlobalStrategyFilter {
     pub max_draw_down_max: f64,
     /// Strategies with annual_roi below this value are excluded.
     pub min_annual_roi: f64,
-    /// Strategies with fewer annual operations are excluded.
+    /// Minimum annualized operation count.
+    ///
+    /// Enforced upstream by [`crate::domain::signal_group::filter_signal_groups_by_annual_ops`],
+    /// not by [`filter_strategies`]: the count is known at the signal-group stage and
+    /// needs none of the expensive metrics that draw-down and ROI require. Kept here so
+    /// all three thresholds live in one place instead of being scattered.
     pub min_operation_count: f64,
 }
 
@@ -32,6 +37,17 @@ impl Default for GlobalStrategyFilter {
     }
 }
 
+/// Filters strategies by draw-down and annual ROI only.
+///
+/// `min_operation_count` is enforced upstream, at the signal-group stage, by
+/// [`crate::domain::signal_group::filter_signal_groups_by_annual_ops`]: the count is
+/// known before strategies exist, while draw-down and ROI require the expensive
+/// computation that happens when a strategy is built. Direct callers get no
+/// operation-count filtering here.
+///
+/// # Arguments
+/// * `strategies` - Strategies to filter; consumed.
+/// * `filter` - Draw-down and annual-ROI thresholds.
 pub fn filter_strategies(
     strategies: Vec<Strategy>,
     filter: &GlobalStrategyFilter,
