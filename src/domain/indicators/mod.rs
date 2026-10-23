@@ -168,7 +168,7 @@ pub fn create_indicator_output(
 mod tests {
     use super::*;
     use crate::domain::indicator::IndicatorParameters;
-    use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::domain::resampled_point::ResampledPointD1;
     use crate::domain::signal::IndicatorOutput;
 
     fn rp(id: i32, ts: i64, close: f64) -> ResampledPointD1 {
@@ -181,7 +181,6 @@ mod tests {
             close,
             volume: 1000,
             timestamp: ts,
-            high_low_order: HighLowOrder::HighFirst,
         }
     }
 
@@ -199,7 +198,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -241,7 +239,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -372,7 +369,6 @@ mod tests {
             close: 1.5,
             volume: 100,
             timestamp: 1,
-            high_low_order: HighLowOrder::HighFirst,
         };
         assert_eq!(PriceField::Open.select(&point), 1.0);
         assert_eq!(PriceField::High.select(&point), 2.0);
@@ -406,7 +402,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -457,7 +452,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -515,7 +509,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -572,7 +565,6 @@ mod tests {
                 close: 2.5,
                 volume: 100,
                 timestamp: i64::from(i),
-                high_low_order: HighLowOrder::HighFirst,
             })
             .collect()
     }
@@ -648,7 +640,6 @@ mod tests {
                 close: 11.0,
                 volume: 1000,
                 timestamp: i64::from(i),
-                high_low_order: HighLowOrder::HighFirst,
             })
             .collect()
     }
@@ -726,7 +717,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -786,7 +776,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -846,7 +835,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -942,7 +930,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -1001,7 +988,6 @@ mod tests {
                     close: m,
                     volume: 1000,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()
@@ -1060,7 +1046,6 @@ mod tests {
                     close: 10.0,
                     volume: v,
                     timestamp: i64::from(i),
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect()

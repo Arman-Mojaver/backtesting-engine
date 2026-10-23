@@ -1,12 +1,5 @@
 use rustc_hash::FxHashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HighLowOrder {
-    HighFirst,
-    LowFirst,
-    Undefined,
-}
-
 #[derive(Debug, Clone)]
 pub struct ResampledPointD1 {
     pub id: i32,
@@ -17,7 +10,6 @@ pub struct ResampledPointD1 {
     pub close: f64,
     pub volume: i32,
     pub timestamp: i64,
-    pub high_low_order: HighLowOrder,
 }
 
 fn group_by_instrument(points: Vec<ResampledPointD1>) -> FxHashMap<String, Vec<ResampledPointD1>> {
@@ -53,7 +45,6 @@ mod tests {
             close: 1.05,
             volume: 1000,
             timestamp: 1000,
-            high_low_order: HighLowOrder::HighFirst,
         }
     }
 

@@ -41,7 +41,7 @@ mod tests {
     use super::*;
     use crate::domain::fixtures::{indicators_rsi_single, resampled_points_for_rsi};
     use crate::domain::indicator::{Indicator, IndicatorParameters};
-    use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::domain::resampled_point::ResampledPointD1;
 
     #[test]
     fn rsi_indicator_produces_a_signal_group_stamped_with_its_id() {
@@ -107,7 +107,6 @@ mod tests {
                     close,
                     volume: 1000,
                     timestamp: i64::from(i + 1) * 1000,
-                    high_low_order: HighLowOrder::HighFirst,
                 }
             })
             .collect();
@@ -167,7 +166,6 @@ mod tests {
                 close: 5.0,
                 volume: 1000,
                 timestamp: 1000,
-                high_low_order: HighLowOrder::HighFirst,
             },
             ResampledPointD1 {
                 id: 2,
@@ -178,7 +176,6 @@ mod tests {
                 close: 4.0,
                 volume: 1000,
                 timestamp: 2000,
-                high_low_order: HighLowOrder::HighFirst,
             },
             ResampledPointD1 {
                 id: 3,
@@ -189,7 +186,6 @@ mod tests {
                 close: 3.0,
                 volume: 1000,
                 timestamp: 3000,
-                high_low_order: HighLowOrder::HighFirst,
             },
             ResampledPointD1 {
                 id: 4,
@@ -200,7 +196,6 @@ mod tests {
                 close: 4.0,
                 volume: 1000,
                 timestamp: 4000,
-                high_low_order: HighLowOrder::HighFirst,
             },
         ];
         let indicators = vec![Indicator {

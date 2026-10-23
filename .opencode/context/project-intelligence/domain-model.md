@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.11 | Updated: 2026-10-23 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.12 | Updated: 2026-10-24 -->
 
 # Domain Model — Backtesting Engine
 
@@ -14,8 +14,7 @@
 | **Operation Points (bundle)** | A paired collection of long and short operation points. Provides timestamp-keyed lookup maps for aligning trades with market data. | `OperationPoints` | `domain::operation_point` |
 | **Long Operation Point** | An operation point representing a **buy** (long) position. Stored in a separate repository from shorts. | `OperationPoint` via `LongOperationPointRepository` | `domain::operation_point` |
 | **Short Operation Point** | An operation point representing a **sell** (short) position. Stored in a separate repository from longs. | `OperationPoint` via `ShortOperationPointRepository` | `domain::operation_point` |
-| **Resampled Point (D1)** | An OHLCV candlestick bar resampled to the **daily (D1)** timeframe. Carries a `high_low_order` describing intraday price ordering. | `ResampledPointD1` | `domain::resampled_point` |
-| **High-Low Order** | The intraday price ordering of a candle: `HighFirst`, `LowFirst`, or `Undefined`. | `HighLowOrder` | `domain::resampled_point` |
+| **Resampled Point (D1)** | An OHLCV candlestick bar resampled to the **daily (D1)** timeframe. | `ResampledPointD1` | `domain::resampled_point` |
 | **Indicator** | A technical indicator applied to market data. Has an `id` and typed `parameters`. | `Indicator` | `domain::indicator` |
 | **Indicator Parameters** | Typed parameters for an indicator — a 14-variant enum: `Macd`, `Rsi`, `AwesomeOscillator`, `AcceleratorDecelerator`, `BearsPower`, `BullsPower`, `ChaikinOscillator`, `ChaikinVolatility`, `DetrendedPriceOscillator`, `ForceIndex`, `OsMa`, `Roc`, `Trix`, `Vroc`. | `IndicatorParameters` | `domain::indicator` |
 | **Indicator Type** | The category/kind of a technical indicator (e.g. `macd`, `rsi`). Not a domain-struct field: lives in the database `type` column, which the PG adapter reads to select the `IndicatorParameters` variant. | `type` DB column | `infrastructure::pg_adapter` |
@@ -87,7 +86,6 @@ ResampledPointD1 {
     close:           f64       — closing price
     volume:          i32       — trade volume
     timestamp:       i64       — day identifier (epoch seconds)
-    high_low_order:  HighLowOrder — HighFirst | LowFirst | Undefined
 }
 ```
 
@@ -300,7 +298,7 @@ src/
 │   │   ├── dpo.rs, force.rs, osma.rs, roc.rs, trix.rs, vroc.rs
 │   │   └── test_support.rs     # #[cfg(test)] shared test helpers
 │   ├── operation_point.rs      # OperationPoint + OperationPoints + long/short repo traits (+ index_by_cell)
-│   ├── resampled_point.rs      # ResampledPointD1 + HighLowOrder + repo trait (+ index_by_instrument)
+│   ├── resampled_point.rs      # ResampledPointD1 + repo trait (+ index_by_instrument)
 │   ├── signal/                 # Signal semantics: IndicatorOutput → SignalGroup
 │   │   ├── mod.rs              # IndicatorOutput enum + create_signal_group()
 │   │   ├── oscillator.rs       # zero-cross signals

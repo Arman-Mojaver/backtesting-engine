@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.9 | Updated: 2026-10-23 -->
+<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.10 | Updated: 2026-10-24 -->
 
 # Business ↔ Tech Bridge
 
@@ -12,8 +12,7 @@
 | Long/short trade bundle | `OperationPoints` struct | `src/domain/operation_point.rs` | Pairs long+short; `*_points_by_timestamp()` lookup maps |
 | Long trades collection | `LongOperationPointRepository` trait | `src/domain/operation_point.rs` | Port — impl in infrastructure; `index_by_cell()` default method |
 | Short trades collection | `ShortOperationPointRepository` trait | `src/domain/operation_point.rs` | Port — impl in infrastructure; `index_by_cell()` default method |
-| Daily market candle | `ResampledPointD1` struct | `src/domain/resampled_point.rs` | OHLCV + instrument + timestamp + high_low_order |
-| Intraday price ordering | `HighLowOrder` enum | `src/domain/resampled_point.rs` | HighFirst / LowFirst / Undefined |
+| Daily market candle | `ResampledPointD1` struct | `src/domain/resampled_point.rs` | OHLCV + instrument + timestamp |
 | Market data collection | `ResampledPointD1Repository` trait | `src/domain/resampled_point.rs` | Port — `get_all()`, `get_by_instrument()`, `index_by_instrument()` |
 | Technical indicator | `Indicator` struct | `src/domain/indicator.rs` | Has `id` and typed `parameters` |
 | Indicator parameters | `IndicatorParameters` enum | `src/domain/indicator.rs` | 14 variants: Macd, Rsi, AO, AC, Bears, Bulls, CHO, CHV, DPO, Force, OsMa, Roc, Trix, Vroc |

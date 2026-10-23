@@ -13,7 +13,7 @@ use crate::domain::indicator::{Indicator, IndicatorParameters, IndicatorReposito
 use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
 };
-use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1, ResampledPointD1Repository};
+use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repository};
 
 /// Wire format of `indicator.parameters` for `type = "macd"`.
 #[derive(Deserialize)]
@@ -93,14 +93,6 @@ fn parse_empty_params(indicator_type: &str, json_text: &str) -> anyhow::Result<(
         bail!("indicator type \"{indicator_type}\" takes no parameters, found keys: {keys}");
     }
     Ok(())
-}
-
-fn map_high_low_order(value: &str) -> HighLowOrder {
-    match value {
-        "high_first" => HighLowOrder::HighFirst,
-        "low_first" => HighLowOrder::LowFirst,
-        _ => HighLowOrder::Undefined,
-    }
 }
 
 /// Maps a database `indicator.type` string plus its `parameters` JSON onto
@@ -210,7 +202,6 @@ fn row_to_resampled_point(row: &Row) -> ResampledPointD1 {
         close: row.get("close"),
         volume: row.get("volume"),
         timestamp: i64::from(row.get::<_, i32>("timestamp")),
-        high_low_order: map_high_low_order(&row.get::<_, String>("high_low_order")),
     }
 }
 
@@ -375,7 +366,8 @@ impl ResampledPointD1Repository for PgResampledPointAdapter {
             &self.conn,
             "resampled_point_d1 get_all",
             // ORDER BY timestamp is load-bearing: moving-average indicator math depends on chronological order.
-            "SELECT id, instrument, open, high, low, close, volume, timestamp, high_low_order \
+            // The table's `high_low_order` column is deliberately not fetched
+            "SELECT id, instrument, open, high, low, close, volume, timestamp \
              FROM resampled_point_d1 ORDER BY timestamp",
             &[],
             |row| Ok(row_to_resampled_point(row)),
@@ -386,7 +378,7 @@ impl ResampledPointD1Repository for PgResampledPointAdapter {
         fetch_rows(
             &self.conn,
             "resampled_point_d1 by instrument",
-            "SELECT id, instrument, open, high, low, close, volume, timestamp, high_low_order \
+            "SELECT id, instrument, open, high, low, close, volume, timestamp \
              FROM resampled_point_d1 WHERE instrument = $1 ORDER BY timestamp",
             &[&instrument],
             |row| Ok(row_to_resampled_point(row)),

@@ -42,11 +42,11 @@ a ResampledPointD1 is a price observation.
 ### ResampledPointD1
 
 A daily resampled OHLCV candle for a single instrument. Captures the open,
-high, low, close prices, volume, and the order in which high/low occurred.
+high, low, close prices, and volume.
 
 **Distinguishes from**: OperationPoint — ResampledPointD1 represents market data,
 not trade decisions.
-**Example**: EURUSD O=1.05 H=1.10 L=0.95 C=1.08 V=1000, ts=1000, HighLowOrder::HighFirst.
+**Example**: EURUSD O=1.05 H=1.10 L=0.95 C=1.08 V=1000, ts=1000.
 
 ### Instrument
 

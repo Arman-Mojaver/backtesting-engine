@@ -62,7 +62,7 @@ pub fn compute(
 mod tests {
     use super::*;
     use crate::domain::indicators::test_support;
-    use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::domain::resampled_point::ResampledPointD1;
     use crate::indicator_values;
 
     /// Build a resampled point with an explicit close (the only price
@@ -77,7 +77,6 @@ mod tests {
             close,
             volume: 1000,
             timestamp: ts,
-            high_low_order: HighLowOrder::HighFirst,
         }
     }
 

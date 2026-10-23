@@ -116,7 +116,7 @@ fn compute_rsi_point(window: &[PriceDiff]) -> IndicatorValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+    use crate::domain::resampled_point::ResampledPointD1;
     use crate::indicator_values;
 
     fn rp(id: i32, ts: i64, close: f64) -> ResampledPointD1 {
@@ -129,7 +129,6 @@ mod tests {
             close,
             volume: 1000,
             timestamp: ts,
-            high_low_order: HighLowOrder::HighFirst,
         }
     }
 

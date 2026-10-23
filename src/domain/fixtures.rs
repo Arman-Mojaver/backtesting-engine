@@ -1,6 +1,6 @@
 use crate::domain::indicator::{Indicator, IndicatorParameters};
 use crate::domain::operation_point::OperationPoint;
-use crate::domain::resampled_point::{HighLowOrder, ResampledPointD1};
+use crate::domain::resampled_point::ResampledPointD1;
 
 // Operation Point fixtures
 
@@ -218,7 +218,6 @@ pub fn resampled_points_default() -> Vec<ResampledPointD1> {
             close: 1.05,
             volume: 1000,
             timestamp: 1000,
-            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 2,
@@ -229,7 +228,6 @@ pub fn resampled_points_default() -> Vec<ResampledPointD1> {
             close: 1.22,
             volume: 800,
             timestamp: 1001,
-            high_low_order: HighLowOrder::HighFirst,
         },
     ]
 }
@@ -245,7 +243,6 @@ pub fn resampled_points_ts_123() -> Vec<ResampledPointD1> {
             close: 1.05,
             volume: 1000,
             timestamp: 1,
-            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 2,
@@ -256,7 +253,6 @@ pub fn resampled_points_ts_123() -> Vec<ResampledPointD1> {
             close: 1.22,
             volume: 800,
             timestamp: 2,
-            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 3,
@@ -267,7 +263,6 @@ pub fn resampled_points_ts_123() -> Vec<ResampledPointD1> {
             close: 1.22,
             volume: 800,
             timestamp: 3,
-            high_low_order: HighLowOrder::HighFirst,
         },
     ]
 }
@@ -283,7 +278,6 @@ pub fn resampled_points_usdcad() -> Vec<ResampledPointD1> {
             close: 1.05,
             volume: 1000,
             timestamp: 1000,
-            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 2,
@@ -294,7 +288,6 @@ pub fn resampled_points_usdcad() -> Vec<ResampledPointD1> {
             close: 1.10,
             volume: 900,
             timestamp: 1001,
-            high_low_order: HighLowOrder::HighFirst,
         },
     ]
 }
@@ -309,7 +302,6 @@ pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
             close: 1.05,
             volume: 1000,
             timestamp: 1000,
-            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 2,
@@ -320,7 +312,6 @@ pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
             close: 1.22,
             volume: 800,
             timestamp: 1001,
-            high_low_order: HighLowOrder::HighFirst,
         },
     ]
 }
@@ -371,7 +362,6 @@ pub fn resampled_points_for_rsi() -> Vec<ResampledPointD1> {
             close: 1.0,
             volume: 1000,
             timestamp: 1000,
-            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 2,
@@ -382,7 +372,6 @@ pub fn resampled_points_for_rsi() -> Vec<ResampledPointD1> {
             close: 2.0,
             volume: 1000,
             timestamp: 2000,
-            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 3,
@@ -393,7 +382,6 @@ pub fn resampled_points_for_rsi() -> Vec<ResampledPointD1> {
             close: 1.0,
             volume: 1000,
             timestamp: 3000,
-            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 4,
@@ -404,7 +392,6 @@ pub fn resampled_points_for_rsi() -> Vec<ResampledPointD1> {
             close: 2.0,
             volume: 1000,
             timestamp: 4000,
-            high_low_order: HighLowOrder::HighFirst,
         },
         ResampledPointD1 {
             id: 5,
@@ -415,7 +402,6 @@ pub fn resampled_points_for_rsi() -> Vec<ResampledPointD1> {
             close: 1.0,
             volume: 1000,
             timestamp: 5000,
-            high_low_order: HighLowOrder::HighFirst,
         },
     ]
 }

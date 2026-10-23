@@ -113,7 +113,7 @@ Stage notes:
 |---|---|
 | **Instrument** | A tradeable pair, e.g. `EURUSD`. |
 | **Operation point** | One trade entry: outcome (win/loss), take-profit, stop-loss, risk fraction, governing MMS, timestamp. Long and short operation points are kept in **separate collections** — direction is where a record lives, not a field on it. |
-| **Resampled point** | A daily OHLCV candle, plus the instrument and the intraday high/low ordering. |
+| **Resampled point** | A daily OHLCV candle plus the instrument it belongs to. |
 | **Indicator** | A typed indicator configuration: kind plus parameters (periods, thresholds). |
 | **Signal** | A timestamp at which an indicator calls for a long or short entry. |
 | **Signal group** | All long and short signals for one indicator. |
