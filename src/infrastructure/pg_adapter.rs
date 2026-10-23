@@ -379,8 +379,9 @@ impl ResampledPointD1Repository for PgResampledPointAdapter {
         fetch_rows(
             &self.conn,
             "resampled_point_d1 get_all",
+            // ORDER BY timestamp is load-bearing: moving-average indicator math depends on chronological order.
             "SELECT id, instrument, open, high, low, close, volume, timestamp, high_low_order \
-             FROM resampled_point_d1",
+             FROM resampled_point_d1 ORDER BY timestamp",
             &[],
             |row| Ok(row_to_resampled_point(row)),
         )
@@ -391,7 +392,7 @@ impl ResampledPointD1Repository for PgResampledPointAdapter {
             &self.conn,
             "resampled_point_d1 by instrument",
             "SELECT id, instrument, open, high, low, close, volume, timestamp, high_low_order \
-             FROM resampled_point_d1 WHERE instrument = $1",
+             FROM resampled_point_d1 WHERE instrument = $1 ORDER BY timestamp",
             &[&instrument],
             |row| Ok(row_to_resampled_point(row)),
         )
