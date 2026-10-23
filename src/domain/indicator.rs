@@ -52,9 +52,7 @@ pub enum IndicatorParameters {
 #[derive(Debug, Clone)]
 pub struct Indicator {
     pub id: i32,
-    pub r#type: String,
     pub parameters: IndicatorParameters,
-    pub identifier: String,
 }
 
 pub trait IndicatorRepository {

@@ -220,12 +220,7 @@ fn row_to_indicator(row: &Row) -> anyhow::Result<Indicator> {
     let raw_params: String = row.get("parameters");
     let parameters = map_parameters(&raw_type, &raw_params)
         .with_context(|| format!("failed to map parameters for indicator id {id}"))?;
-    Ok(Indicator {
-        id,
-        r#type: raw_type,
-        parameters,
-        identifier: row.get("identifier"),
-    })
+    Ok(Indicator { id, parameters })
 }
 
 fn connect(connection_string: &str) -> anyhow::Result<Client> {
@@ -427,7 +422,7 @@ impl IndicatorRepository for PgIndicatorAdapter {
         fetch_rows(
             &self.conn,
             "indicator get_all",
-            "SELECT id, type, parameters::text, identifier FROM indicator",
+            "SELECT id, type, parameters::text FROM indicator",
             &[],
             row_to_indicator,
         )

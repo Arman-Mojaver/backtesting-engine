@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.10 | Updated: 2026-10-23 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.11 | Updated: 2026-10-23 -->
 
 # Domain Model — Backtesting Engine
 
@@ -16,9 +16,9 @@
 | **Short Operation Point** | An operation point representing a **sell** (short) position. Stored in a separate repository from longs. | `OperationPoint` via `ShortOperationPointRepository` | `domain::operation_point` |
 | **Resampled Point (D1)** | An OHLCV candlestick bar resampled to the **daily (D1)** timeframe. Carries a `high_low_order` describing intraday price ordering. | `ResampledPointD1` | `domain::resampled_point` |
 | **High-Low Order** | The intraday price ordering of a candle: `HighFirst`, `LowFirst`, or `Undefined`. | `HighLowOrder` | `domain::resampled_point` |
-| **Indicator** | A technical indicator applied to market data. Has a `type`, typed `parameters`, and a string `identifier`. All indicators in a backtest run must share the same `type`. | `Indicator` | `domain::indicator` |
+| **Indicator** | A technical indicator applied to market data. Has an `id` and typed `parameters`. | `Indicator` | `domain::indicator` |
 | **Indicator Parameters** | Typed parameters for an indicator — a 14-variant enum: `Macd`, `Rsi`, `AwesomeOscillator`, `AcceleratorDecelerator`, `BearsPower`, `BullsPower`, `ChaikinOscillator`, `ChaikinVolatility`, `DetrendedPriceOscillator`, `ForceIndex`, `OsMa`, `Roc`, `Trix`, `Vroc`. | `IndicatorParameters` | `domain::indicator` |
-| **Indicator Type** | The category/kind of a technical indicator (e.g. `macd`, `rsi`). | `String` field (`type`) | `domain::indicator` |
+| **Indicator Type** | The category/kind of a technical indicator (e.g. `macd`, `rsi`). Not a domain-struct field: lives in the database `type` column, which the PG adapter reads to select the `IndicatorParameters` variant. | `type` DB column | `infrastructure::pg_adapter` |
 | **Indicator Output** | The computed result of an indicator over a candle series — `Oscillator`, `Threshold`, or `Crossover` — carrying timestamped values. Converted to a `SignalGroup` by signal semantics. | `IndicatorOutput` | `domain::signal` |
 | **Money Management Strategy (MMS)** | A strategy that governs position sizing and risk. Identified by `money_management_strategy_id`. All operation points in a run must use the same MMS. | `i32` field | `domain::operation_point`, `domain::strategy` |
 | **Take Profit (TP)** | The target price level (in pips/points) at which a trade is closed for profit. | `i32` field (`tp`) | `domain::operation_point` |
@@ -96,9 +96,7 @@ A technical indicator used in the strategy being backtested.
 ```
 Indicator {
     id:          i32                 — unique identifier
-    r#type:      String              — indicator category ("macd" | "rsi" | ...)
     parameters:  IndicatorParameters — 14-variant typed enum (see below)
-    identifier:  String              — human-readable identifier
 }
 IndicatorParameters ::= Macd { slow_type, slow_n, fast_type, fast_n }
                       | Rsi { n, high_threshold, low_threshold }

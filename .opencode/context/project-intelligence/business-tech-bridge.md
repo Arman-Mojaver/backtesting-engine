@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.8 | Updated: 2026-10-21 -->
+<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.9 | Updated: 2026-10-23 -->
 
 # Business ↔ Tech Bridge
 
@@ -15,7 +15,7 @@
 | Daily market candle | `ResampledPointD1` struct | `src/domain/resampled_point.rs` | OHLCV + instrument + timestamp + high_low_order |
 | Intraday price ordering | `HighLowOrder` enum | `src/domain/resampled_point.rs` | HighFirst / LowFirst / Undefined |
 | Market data collection | `ResampledPointD1Repository` trait | `src/domain/resampled_point.rs` | Port — `get_all()`, `get_by_instrument()`, `index_by_instrument()` |
-| Technical indicator | `Indicator` struct | `src/domain/indicator.rs` | Has `id`, `type`, typed `parameters`, `identifier` |
+| Technical indicator | `Indicator` struct | `src/domain/indicator.rs` | Has `id` and typed `parameters` |
 | Indicator parameters | `IndicatorParameters` enum | `src/domain/indicator.rs` | 14 variants: Macd, Rsi, AO, AC, Bears, Bulls, CHO, CHV, DPO, Force, OsMa, Roc, Trix, Vroc |
 | Indicator computation | `create_indicator_output()` | `src/domain/indicators/mod.rs` | Dispatches params → `IndicatorOutput`; MACD unsupported (skipped) |
 | Indicator math (one per indicator) | `rsi.rs`, `ao.rs`, … | `src/domain/indicators/` | Shared MAs in `moving_averages.rs`; macros in `macros.rs` |

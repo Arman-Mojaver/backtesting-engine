@@ -66,24 +66,20 @@ mod tests {
         let indicators = vec![
             Indicator {
                 id: 100,
-                r#type: "macd".to_string(),
                 parameters: IndicatorParameters::Macd {
                     slow_type: "ema".to_string(),
                     slow_n: 26,
                     fast_type: "wma".to_string(),
                     fast_n: 12,
                 },
-                identifier: "macd_bad_type".to_string(),
             },
             Indicator {
                 id: 2,
-                r#type: "rsi".to_string(),
                 parameters: IndicatorParameters::Rsi {
                     n: 3,
                     high_threshold: 70,
                     low_threshold: 30,
                 },
-                identifier: "rsi_2".to_string(),
             },
         ];
         let points = resampled_points_for_rsi();
@@ -117,14 +113,12 @@ mod tests {
             .collect();
         let indicators = vec![Indicator {
             id: 9,
-            r#type: "macd".to_string(),
             parameters: IndicatorParameters::Macd {
                 slow_type: "ema".to_string(),
                 slow_n: 2,
                 fast_type: "ema".to_string(),
                 fast_n: 1,
             },
-            identifier: "macd_ema-1-2".to_string(),
         }];
         let result = create_signal_groups(&indicators, &points);
         assert_eq!(result.len(), 1);
@@ -145,14 +139,12 @@ mod tests {
         // Every indicator has an unknown moving-average type -> no groups.
         let indicators = vec![Indicator {
             id: 100,
-            r#type: "macd".to_string(),
             parameters: IndicatorParameters::Macd {
                 slow_type: "ema".to_string(),
                 slow_n: 26,
                 fast_type: "wma".to_string(),
                 fast_n: 12,
             },
-            identifier: "macd_bad_type".to_string(),
         }];
         let points = resampled_points_for_rsi();
         let result = create_signal_groups(&indicators, &points);
@@ -213,13 +205,11 @@ mod tests {
         ];
         let indicators = vec![Indicator {
             id: 7,
-            r#type: "rsi".to_string(),
             parameters: IndicatorParameters::Rsi {
                 n: 2,
                 high_threshold: 70,
                 low_threshold: 30,
             },
-            identifier: "rsi_2-70-30".to_string(),
         }];
         let result = create_signal_groups(&indicators, &points);
         assert_eq!(result.len(), 1);
