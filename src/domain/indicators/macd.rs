@@ -47,16 +47,18 @@ fn moving_average(values: &[f64], method: MaMethod, period: usize) -> Vec<f64> {
 ///
 /// Both moving-average helpers share the index convention (entry `j`
 /// corresponds to original index `period - 1 + j`), so the first MACD value
-/// sits at index `max(fast, slow) - 1`. Unlike the CHO/OsMA modules, no
-/// fast/slow order is enforced: the database deliberately contains
-/// `fast >= slow` rows, and `MA(fast) - MA(slow)` is well-defined for any
-/// order. Each value is tagged with the timestamp of the resampled point at
+/// sits at index `slow - 1`: the slow MA is always the limiting buffer.
+/// Like the CHO/OsMA modules, the fast/slow order is enforced, and a row
+/// with `fast_n >= slow_n` is rejected as invalid configuration
+/// (`InvalidMacdPeriodOrder`). Such rows are currently silent no-ops in the
+/// signal generator; once Ticket 4 lands they will surface as logged skips.
+/// Each value is tagged with the timestamp of the resampled point at
 /// the evaluated index.
 ///
-/// Insufficient data (fewer than `max(fast, slow)` points) yields an empty
+/// Insufficient data (fewer than `slow` points) yields an empty
 /// `items` vector (not an error), per umbrella PRD Decision 10. A non-positive
-/// `fast_n` or `slow_n`, or a method other than `"ema"` / `"sma"`, is an
-/// error.
+/// `fast_n` or `slow_n`, a `fast_n >= slow_n` order, or a method other than
+/// `"ema"` / `"sma"`, is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     fast_type: &str,
@@ -87,33 +89,20 @@ pub fn compute(
 
     // Entry `j` of an MA with period `p` corresponds to original index
     // `p - 1 + j`, so MACD is emitted at every original index from
-    // `max(fast, slow) - 1`: the shorter-period MA is skipped ahead by the
-    // period difference to stay aligned with the longer-period one.
-    let items = if fast <= slow {
-        // Limiting buffer: slow MA (entries map to indices `slow - 1 + j`).
-        let delta = slow.saturating_sub(fast);
-        slow_ma
-            .iter()
-            .zip(fast_ma.iter().skip(delta))
-            .zip(points.iter().skip(slow.saturating_sub(1)))
-            .map(|((slow_val, fast_val), point)| IndicatorValue {
-                timestamp: point.timestamp,
-                value: fast_val - slow_val,
-            })
-            .collect()
-    } else {
-        // Limiting buffer: fast MA (entries map to indices `fast - 1 + j`).
-        let delta = fast.saturating_sub(slow);
-        fast_ma
-            .iter()
-            .zip(slow_ma.iter().skip(delta))
-            .zip(points.iter().skip(fast.saturating_sub(1)))
-            .map(|((fast_val, slow_val), point)| IndicatorValue {
-                timestamp: point.timestamp,
-                value: fast_val - slow_val,
-            })
-            .collect()
-    };
+    // `slow - 1` (fast < slow is validated above): the shorter-period MA
+    // is skipped ahead by the period difference to stay aligned with the
+    // longer-period one.
+    // Limiting buffer: slow MA (entries map to indices `slow - 1 + j`).
+    let delta = slow.saturating_sub(fast);
+    let items = slow_ma
+        .iter()
+        .zip(fast_ma.iter().skip(delta))
+        .zip(points.iter().skip(slow.saturating_sub(1)))
+        .map(|((slow_val, fast_val), point)| IndicatorValue {
+            timestamp: point.timestamp,
+            value: fast_val - slow_val,
+        })
+        .collect();
 
     Ok(OscillatorSeries { items })
 }
