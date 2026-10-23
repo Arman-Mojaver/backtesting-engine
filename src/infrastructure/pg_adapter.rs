@@ -443,28 +443,6 @@ impl IndicatorRepository for PgIndicatorAdapter {
         )
     }
 }
-pub struct PgMoneyManagementStrategyAdapter {
-    conn: RefCell<Client>,
-}
-
-impl PgMoneyManagementStrategyAdapter {
-    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
-        let conn = connect(connection_string)?;
-        Ok(Self {
-            conn: RefCell::new(conn),
-        })
-    }
-
-    pub fn get_distinct_ids(&self) -> anyhow::Result<Vec<i32>> {
-        fetch_rows(
-            &self.conn,
-            "money_management_strategy distinct ids",
-            "SELECT DISTINCT id FROM money_management_strategy ORDER BY 1",
-            &[],
-            |r| Ok(r.get("id")),
-        )
-    }
-}
 
 #[cfg(test)]
 mod tests {
