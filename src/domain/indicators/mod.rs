@@ -18,6 +18,9 @@ pub mod test_support;
 pub mod trix;
 pub mod vroc;
 
+use std::error::Error;
+use std::fmt;
+
 use crate::domain::indicator::IndicatorParameters;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::IndicatorOutput;
@@ -42,6 +45,12 @@ impl PriceField {
     }
 }
 
+/// Typed error taxonomy for indicator computation.
+///
+/// Each variant names one invalid indicator configuration (which
+/// indicator, which parameter, the offending value) or a data shortfall,
+/// so callers can report or skip the offending row precisely instead of
+/// aborting the whole run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndicatorError {
     InvalidMacdFastPeriod { n: i32 },
@@ -69,6 +78,121 @@ pub enum IndicatorError {
     InvalidVrocPeriod { n: i32 },
     NotEnoughData { points: usize, required: usize },
 }
+
+impl fmt::Display for IndicatorError {
+    // A flat, exhaustive per-variant match is the canonical shape for a
+    // hand-rolled Display (it mirrors what thiserror generates); routing
+    // it through helpers would hide the exact per-variant sentences.
+    #[allow(clippy::too_many_lines)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidMacdFastPeriod { n } => {
+                write!(f, "macd fast period must be positive, got {n}")
+            }
+            Self::InvalidMacdSlowPeriod { n } => {
+                write!(f, "macd slow period must be positive, got {n}")
+            }
+            Self::InvalidMacdMaType { ma_type } => {
+                write!(
+                    f,
+                    "macd moving-average type must be \"ema\" or \"sma\", got \"{ma_type}\""
+                )
+            }
+            Self::InvalidMacdPeriodOrder { fast, slow } => {
+                write!(
+                    f,
+                    "macd fast period must be less than slow period, got fast {fast}, slow {slow}"
+                )
+            }
+            Self::InvalidRsiPeriod { n } => {
+                write!(f, "rsi period must be positive, got {n}")
+            }
+            Self::InvalidRsiThresholdOrder { high, low } => {
+                write!(
+                    f,
+                    "rsi low threshold must be less than high threshold, got high {high}, low {low}"
+                )
+            }
+            Self::InvalidRsiThresholdRange { value } => {
+                write!(f, "rsi threshold must be between 0 and 100, got {value}")
+            }
+            Self::InvalidBearsPeriod { n } => {
+                write!(f, "bears power period must be positive, got {n}")
+            }
+            Self::InvalidBullsPeriod { n } => {
+                write!(f, "bulls power period must be positive, got {n}")
+            }
+            Self::InvalidChoFastPeriod { n } => {
+                write!(
+                    f,
+                    "chaikin oscillator fast period must be positive, got {n}"
+                )
+            }
+            Self::InvalidChoSlowPeriod { n } => {
+                write!(
+                    f,
+                    "chaikin oscillator slow period must be positive, got {n}"
+                )
+            }
+            Self::InvalidChoPeriodOrder { fast, slow } => {
+                write!(
+                    f,
+                    "chaikin oscillator fast period must not exceed slow period, got fast {fast}, slow {slow}"
+                )
+            }
+            Self::InvalidChvSmoothPeriod { n } => {
+                write!(
+                    f,
+                    "chaikin volatility smoothing period must be positive, got {n}"
+                )
+            }
+            Self::InvalidChvPeriod { n } => {
+                write!(f, "chaikin volatility period must be positive, got {n}")
+            }
+            Self::InvalidDpoPeriod { n } => {
+                write!(
+                    f,
+                    "detrended price oscillator period must be positive, got {n}"
+                )
+            }
+            Self::InvalidForcePeriod { n } => {
+                write!(f, "force index period must be positive, got {n}")
+            }
+            Self::InvalidOsMaFastPeriod { n } => {
+                write!(f, "osma fast period must be positive, got {n}")
+            }
+            Self::InvalidOsMaSlowPeriod { n } => {
+                write!(f, "osma slow period must be positive, got {n}")
+            }
+            Self::InvalidOsMaSignalPeriod { n } => {
+                write!(f, "osma signal period must be positive, got {n}")
+            }
+            Self::InvalidOsMaPeriodOrder { fast, slow } => {
+                write!(
+                    f,
+                    "osma fast period must not exceed slow period, got fast {fast}, slow {slow}"
+                )
+            }
+            Self::InvalidRocPeriod { n } => {
+                write!(f, "rate of change period must be positive, got {n}")
+            }
+            Self::InvalidTrixPeriod { n } => {
+                write!(f, "trix period must be positive, got {n}")
+            }
+            Self::InvalidVrocPeriod { n } => {
+                write!(f, "volume rate of change period must be positive, got {n}")
+            }
+            Self::NotEnoughData { points, required } => {
+                write!(
+                    f,
+                    "not enough data points to compute indicator: saw {points}, required {required}"
+                )
+            }
+        }
+    }
+}
+
+impl Error for IndicatorError {}
 
 pub fn create_indicator_output(
     parameters: &IndicatorParameters,
@@ -1087,5 +1211,131 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidVrocPeriod { n: 0 });
+    }
+
+    // One table asserting every variant's Display output; splitting it
+    // to satisfy the line-count lint would scatter one concern across fns.
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn display_messages_are_operator_ready_sentences() {
+        let cases = [
+            (
+                IndicatorError::InvalidMacdFastPeriod { n: 0 },
+                "macd fast period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidMacdSlowPeriod { n: 0 },
+                "macd slow period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidMacdMaType {
+                    ma_type: "wma".to_string(),
+                },
+                "macd moving-average type must be \"ema\" or \"sma\", got \"wma\"",
+            ),
+            (
+                IndicatorError::InvalidMacdPeriodOrder { fast: 4, slow: 2 },
+                "macd fast period must be less than slow period, got fast 4, slow 2",
+            ),
+            (
+                IndicatorError::InvalidRsiPeriod { n: 0 },
+                "rsi period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidRsiThresholdOrder { high: 30, low: 40 },
+                "rsi low threshold must be less than high threshold, got high 30, low 40",
+            ),
+            (
+                IndicatorError::InvalidRsiThresholdRange { value: 101 },
+                "rsi threshold must be between 0 and 100, got 101",
+            ),
+            (
+                IndicatorError::InvalidBearsPeriod { n: 0 },
+                "bears power period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidBullsPeriod { n: 0 },
+                "bulls power period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidChoFastPeriod { n: 0 },
+                "chaikin oscillator fast period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidChoSlowPeriod { n: 0 },
+                "chaikin oscillator slow period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidChoPeriodOrder { fast: 10, slow: 4 },
+                "chaikin oscillator fast period must not exceed slow period, got fast 10, slow 4",
+            ),
+            (
+                IndicatorError::InvalidChvSmoothPeriod { n: 0 },
+                "chaikin volatility smoothing period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidChvPeriod { n: 0 },
+                "chaikin volatility period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidDpoPeriod { n: 0 },
+                "detrended price oscillator period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidForcePeriod { n: 0 },
+                "force index period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidOsMaFastPeriod { n: 0 },
+                "osma fast period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidOsMaSlowPeriod { n: 0 },
+                "osma slow period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidOsMaSignalPeriod { n: 0 },
+                "osma signal period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidOsMaPeriodOrder { fast: 26, slow: 12 },
+                "osma fast period must not exceed slow period, got fast 26, slow 12",
+            ),
+            (
+                IndicatorError::InvalidRocPeriod { n: 0 },
+                "rate of change period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidTrixPeriod { n: 0 },
+                "trix period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidVrocPeriod { n: 0 },
+                "volume rate of change period must be positive, got 0",
+            ),
+            (
+                IndicatorError::NotEnoughData {
+                    points: 2,
+                    required: 26,
+                },
+                "not enough data points to compute indicator: saw 2, required 26",
+            ),
+        ];
+
+        for (error, expected) in cases {
+            assert_eq!(
+                error.to_string(),
+                expected,
+                "Display mismatch for {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn indicator_error_is_a_std_error_object() {
+        let boxed: Box<dyn std::error::Error> =
+            Box::new(IndicatorError::InvalidTrixPeriod { n: 0 });
+        assert_eq!(boxed.to_string(), "trix period must be positive, got 0");
+        assert!(boxed.source().is_none());
     }
 }
