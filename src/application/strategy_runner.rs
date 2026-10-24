@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use anyhow::Context;
 use log::debug;
 
 use crate::application::signal_generator::create_signal_groups;
@@ -9,7 +10,7 @@ use crate::domain::operation_point::{OperationPoint, OperationPoints};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal_group::filter_signal_groups_by_annual_ops;
 use crate::domain::strategy::{filter_strategies, GlobalStrategyFilter, Strategy};
-use crate::domain::validation::combined_validation::{validate_all, CombinedValidationError};
+use crate::domain::validation::combined_validation::validate_all;
 
 pub fn run_strategies(
     indicators: &[Indicator],
@@ -26,7 +27,7 @@ pub fn run_strategies(
         resampled_points,
         money_management_strategy_id,
     )
-    .map_err(|e: CombinedValidationError| anyhow::anyhow!("Validation failed: {e:?}"))?;
+    .context("Validation failed")?;
 
     let operation_points = OperationPoints {
         long_operation_points,
