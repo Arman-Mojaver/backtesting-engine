@@ -1,4 +1,9 @@
+use std::env::{self, VarError};
+use std::error::Error;
+use std::fmt;
 use std::str::FromStr;
+
+use log::debug;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Environment {
@@ -7,16 +12,80 @@ pub enum Environment {
     Testing,
 }
 
+/// Error returned when a value does not name a valid [`Environment`].
+///
+/// The [`fmt::Display`] implementation names the rejected value and lists the
+/// accepted ones, so a fail-fast abort is self-explanatory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvalidEnvironmentError {
+    /// The rejected value, exactly as it was read.
+    value: String,
+}
+
+impl fmt::Display for InvalidEnvironmentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "invalid ENVIRONMENT value '{}': expected 'production', 'development', or 'testing' \
+             (case-insensitive)",
+            self.value
+        )
+    }
+}
+
+impl Error for InvalidEnvironmentError {}
+
 impl FromStr for Environment {
-    type Err = ();
+    type Err = InvalidEnvironmentError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match &*s.to_lowercase() {
             "production" => Ok(Self::Production),
             "development" => Ok(Self::Development),
             "testing" => Ok(Self::Testing),
-            _ => Err(()),
+            _ => Err(InvalidEnvironmentError {
+                value: s.to_owned(),
+            }),
         }
+    }
+}
+
+/// The environment variable that selects the target environment.
+const ENVIRONMENT_VARIABLE: &str = "ENVIRONMENT";
+
+/// Resolves the target environment from the `ENVIRONMENT` variable.
+///
+/// This is the crate's single resolution path — call sites must not read
+/// `ENVIRONMENT` on their own.
+///
+/// Behaviour:
+///
+/// - Variable **absent** → defaults to [`Environment::Development`] (the
+///   default is also documented in the README) and emits a debug-level log so
+///   the fallback is discoverable under `RUST_LOG=debug`.
+/// - Variable **present but invalid** — including non-UTF-8 values — → fails
+///   fast with [`InvalidEnvironmentError`], which names the accepted values.
+///   A typo like `produciton` can therefore never silently target the
+///   development database and parquet tree.
+pub fn resolve_environment() -> Result<Environment, InvalidEnvironmentError> {
+    resolve_from_raw(env::var(ENVIRONMENT_VARIABLE))
+}
+
+/// Pure decision core of [`resolve_environment`].
+///
+/// Takes the raw result of an env-var read instead of reading the process
+/// environment itself, so the resolution logic is unit-testable without
+/// mutating process-global state (which would race with parallel tests).
+fn resolve_from_raw(raw: Result<String, VarError>) -> Result<Environment, InvalidEnvironmentError> {
+    match raw {
+        Ok(value) => value.parse(),
+        Err(VarError::NotPresent) => {
+            debug!("{ENVIRONMENT_VARIABLE} is not set; defaulting to 'development'");
+            Ok(Environment::Development)
+        }
+        Err(VarError::NotUnicode(value)) => Err(InvalidEnvironmentError {
+            value: value.to_string_lossy().into_owned(),
+        }),
     }
 }
 
@@ -104,15 +173,7 @@ pub fn parquet_root_dir(env: Environment) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
-
-    fn set_env(value: &str) {
-        env::set_var("ENVIRONMENT", value);
-    }
-
-    fn clear_env() {
-        env::remove_var("ENVIRONMENT");
-    }
+    use std::ffi::OsString;
 
     #[test]
     fn environment_from_str_parses_valid_values() {
@@ -138,6 +199,16 @@ mod tests {
     fn environment_from_str_fails_on_invalid_values() {
         assert!("invalid".parse::<Environment>().is_err());
         assert!("".parse::<Environment>().is_err());
+    }
+
+    #[test]
+    fn environment_from_str_error_names_accepted_values() {
+        let err = "produciton".parse::<Environment>().unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid ENVIRONMENT value 'produciton': expected 'production', 'development', or \
+             'testing' (case-insensitive)"
+        );
     }
 
     #[test]
@@ -177,17 +248,55 @@ mod tests {
         assert_eq!(config.connection_string(), expected);
     }
 
+    // The former `application_layer_creates_env_explicitly` test was removed:
+    // it mutated process-global env vars (`set_var`/`remove_var`), which races
+    // with parallel test threads, and its coverage is fully subsumed by the
+    // parse tests above plus the `resolve_from_raw_*` tests below.
+
     #[test]
-    fn application_layer_creates_env_explicitly() {
-        set_env("development");
-        let env_var = env::var("ENVIRONMENT").unwrap();
-        let env = Environment::from_str(&env_var).unwrap();
-        let config = DbConfig::from_env(env);
+    fn resolve_from_raw_accepts_each_environment() {
+        assert_eq!(
+            resolve_from_raw(Ok("production".to_owned())).unwrap(),
+            Environment::Production
+        );
+        assert_eq!(
+            resolve_from_raw(Ok("Development".to_owned())).unwrap(),
+            Environment::Development
+        );
+        assert_eq!(
+            resolve_from_raw(Ok("testing".to_owned())).unwrap(),
+            Environment::Testing
+        );
+    }
 
-        assert_eq!(env, Environment::Development);
-        assert_eq!(config.database, "db-development");
+    #[test]
+    fn resolve_from_raw_absent_defaults_to_development() {
+        assert_eq!(
+            resolve_from_raw(Err(VarError::NotPresent)).unwrap(),
+            Environment::Development
+        );
+    }
 
-        clear_env();
+    #[test]
+    fn resolve_from_raw_invalid_value_fails_fast() {
+        let err = resolve_from_raw(Ok("produciton".to_owned())).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid ENVIRONMENT value 'produciton': expected 'production', 'development', or \
+             'testing' (case-insensitive)"
+        );
+    }
+
+    #[test]
+    fn resolve_from_raw_non_unicode_value_fails_fast() {
+        let err =
+            resolve_from_raw(Err(VarError::NotUnicode(OsString::from("production")))).unwrap_err();
+        assert_eq!(
+            err,
+            InvalidEnvironmentError {
+                value: "production".to_owned()
+            }
+        );
     }
 
     #[test]

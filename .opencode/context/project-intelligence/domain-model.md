@@ -324,7 +324,7 @@ src/
 │   ├── strategy_persistence.rs # StrategyPersistence (batch commit)
 │   └── logging.rs              # simplelog init
 ├── config/                     # Environment + DB configuration
-│   └── environment.rs          # Environment, DbConfig, parquet_base_dir(), parquet_root_dir()
+│   └── environment.rs          # Environment, DbConfig, resolve_environment(), parquet_base_dir(), parquet_root_dir()
 ├── bin/
 │   └── bt-engine.rs            # bt-engine binary entry: engine::build_cli() → parse() → execute()
 └── lib.rs                      # Crate root — re-exports application, config, domain, engine, infrastructure

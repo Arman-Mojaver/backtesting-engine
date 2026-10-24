@@ -6,11 +6,9 @@ use log::info;
 use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
-use crate::config::environment::{parquet_base_dir, parquet_root_dir};
+use crate::config::environment::{parquet_base_dir, parquet_root_dir, resolve_environment};
 use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
 use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
-
-use super::resolve_environment;
 
 pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
     let command_start = Instant::now();
@@ -19,7 +17,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
     let data = fetch_source_data(instrument, money_management_strategy_id)?;
     info!("Source data fetched in {:?}", fetch_start.elapsed());
 
-    let manifest = ParquetProcessedManifest::new(parquet_root_dir(resolve_environment()));
+    let manifest = ParquetProcessedManifest::new(parquet_root_dir(resolve_environment()?));
     let processed_rows = manifest.read(instrument, money_management_strategy_id)?;
     let processed_ids: HashSet<i32> = processed_rows.iter().map(|r| r.indicator_id).collect();
 
@@ -64,7 +62,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
         strategies.len()
     );
 
-    let repo = ParquetStrategyRepository::new(parquet_base_dir(resolve_environment()));
+    let repo = ParquetStrategyRepository::new(parquet_base_dir(resolve_environment()?));
     info!("Writing {} strategies to parquet ...", strategies.len());
     let write_start = Instant::now();
     repo.write(instrument, money_management_strategy_id, &strategies)?;

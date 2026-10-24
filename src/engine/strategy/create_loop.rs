@@ -9,7 +9,9 @@ use rustc_hash::FxHashMap;
 use crate::application::cell_output::CellOutput;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
-use crate::config::environment::{parquet_base_dir, parquet_root_dir, DbConfig};
+use crate::config::environment::{
+    parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig,
+};
 use crate::domain::indicator::{Indicator, IndicatorRepository};
 use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
@@ -20,8 +22,6 @@ use crate::infrastructure::pg_adapter::{
     PgShortOperationPointAdapter,
 };
 use crate::infrastructure::strategy_persistence::StrategyPersistence;
-
-use super::resolve_environment;
 
 /// The source data, loaded from the database and indexed for the parallel compute phase.
 struct SourceIndex {
@@ -36,7 +36,7 @@ impl SourceIndex {
     /// Loads every table once and indexes the rows in memory.
     fn load() -> anyhow::Result<Self> {
         info!("Querying db...");
-        let db_config = DbConfig::from_env(resolve_environment());
+        let db_config = DbConfig::from_env(resolve_environment()?);
         let conn_string = db_config.connection_string();
 
         let indicator_adapter =
@@ -149,8 +149,8 @@ pub fn execute() -> anyhow::Result<()> {
     let source = SourceIndex::load()?;
     let cells = source.cells();
     let persistence = StrategyPersistence::new(
-        parquet_base_dir(resolve_environment()),
-        parquet_root_dir(resolve_environment()),
+        parquet_base_dir(resolve_environment()?),
+        parquet_root_dir(resolve_environment()?),
     );
     let processed_ids_per_cell = persistence.read_processed_ids_per_cell()?;
 

@@ -1,7 +1,7 @@
 use anyhow::Context;
 use log::info;
 
-use crate::config::environment::{DbConfig, Environment};
+use crate::config::environment::{resolve_environment, DbConfig};
 use crate::domain::indicator::{Indicator, IndicatorRepository};
 use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
@@ -24,10 +24,7 @@ pub fn fetch_source_data(
     instrument: &str,
     money_management_strategy_id: i32,
 ) -> anyhow::Result<SourceData> {
-    let env: Environment = std::env::var("ENVIRONMENT")
-        .unwrap_or_else(|_| "development".to_string())
-        .parse()
-        .unwrap_or(Environment::Development);
+    let env = resolve_environment()?;
     let config = DbConfig::from_env(env);
     let conn_string = config.connection_string();
 

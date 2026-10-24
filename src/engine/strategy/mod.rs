@@ -4,8 +4,6 @@ mod metadata;
 
 use clap::{value_parser, Arg, ArgMatches, Command};
 
-use crate::config::environment::Environment;
-
 pub enum StrategyCommand {
     Create {
         money_management_strategy_id: i32,
@@ -67,13 +65,6 @@ pub fn parse_strategy(m: &ArgMatches) -> anyhow::Result<StrategyCommand> {
         Some(("metadata", _sub_m)) => Ok(StrategyCommand::Metadata),
         _ => anyhow::bail!("invalid strategy command"),
     }
-}
-
-pub fn resolve_environment() -> Environment {
-    std::env::var("ENVIRONMENT")
-        .unwrap_or_else(|_| "development".to_string())
-        .parse()
-        .unwrap_or(Environment::Development)
 }
 
 impl StrategyCommand {

@@ -6,17 +6,14 @@ use log::info;
 use crate::application::metadata_report::{
     build_metadata_report, DbMetadataState, ManifestMetadataState,
 };
-use crate::config::environment::{parquet_root_dir, DbConfig, Environment};
+use crate::config::environment::{parquet_root_dir, resolve_environment, DbConfig};
 use crate::infrastructure::pg_adapter::{
     PgIndicatorAdapter, PgLongOperationPointAdapter, PgResampledPointAdapter,
 };
 use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
 
 pub fn execute() -> anyhow::Result<()> {
-    let env: Environment = std::env::var("ENVIRONMENT")
-        .unwrap_or_else(|_| "development".to_string())
-        .parse()
-        .unwrap_or(Environment::Development);
+    let env = resolve_environment()?;
 
     let db_config = DbConfig::from_env(env);
     let conn_string = db_config.connection_string();
