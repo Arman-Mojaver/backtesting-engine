@@ -1,6 +1,7 @@
 use rayon::prelude::*;
 
 use cached::cached;
+use log::warn;
 
 use crate::domain::indicator::Indicator;
 use crate::domain::indicators::create_indicator_output;
@@ -25,14 +26,29 @@ pub fn create_signal_groups(
 /// rather than a hash of the (large, mixed-type) inputs.
 #[cached(
     key = "(i32, String)",
-    convert = r#"{ (indicator.id, resampled_points.first().map(|p| p.instrument.clone()).unwrap_or_default()) }"#
+    convert = r#"{ (indicator.id, resampled_points.first().map(|p| p.instrument.clone()).unwrap_or_default()) }"#,
+    cache_none = true
 )]
 fn create_signal_group(
     indicator: &Indicator,
     resampled_points: &[ResampledPointD1],
 ) -> Option<SignalGroup> {
     let indicator_output: IndicatorOutput =
-        create_indicator_output(&indicator.parameters, resampled_points).ok()?;
+        match create_indicator_output(&indicator.parameters, resampled_points) {
+            Ok(output) => output,
+            Err(error) => {
+                let instrument = resampled_points
+                    .first()
+                    .map_or("", |point| point.instrument.as_str());
+                // Skip, don't abort (pinned by tests): one misconfigured row must
+                // not prevent the others from producing groups. The miss itself is
+                // memoized (`cache_none` above), so this warn fires once per bad
+                // indicator, not once per cell: cells re-dispatch the same indicator,
+                // but only the first call computes, the rest are cache hits.
+                warn!("indicator {} ({instrument}) skipped: {error}", indicator.id);
+                return None;
+            }
+        };
     Some(indicator_output.create_signal_group(indicator.id))
 }
 
