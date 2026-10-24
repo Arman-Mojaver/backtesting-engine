@@ -19,7 +19,7 @@ pub fn execute() -> anyhow::Result<()> {
     let conn_string = db_config.connection_string();
 
     // Fetch DB state
-    info!("Fetching DB metadata ...");
+    info!("Querying DB metadata ...");
 
     let indicator_adapter =
         PgIndicatorAdapter::new(&conn_string).context("Failed to connect for indicators")?;

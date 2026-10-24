@@ -35,7 +35,7 @@ struct SourceIndex {
 impl SourceIndex {
     /// Loads every table once and indexes the rows in memory.
     fn load() -> anyhow::Result<Self> {
-        info!("Querying db...");
+        info!("Querying DB ...");
         let db_config = DbConfig::from_env(resolve_environment()?);
         let conn_string = db_config.connection_string();
 
@@ -130,7 +130,7 @@ fn compute_cell(
     ) {
         Ok(strategies) => strategies,
         Err(e) => {
-            error!("Error {instrument} (mms_id={mms_id}): {e:?}");
+            error!("{instrument} (mms_id={mms_id}): {e:#}");
             return None;
         }
     };
