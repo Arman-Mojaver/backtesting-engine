@@ -1,3 +1,8 @@
+//! TRIX: the one-period rate of change of a triple-smoothed EMA.
+//!
+//! `EMA3 = EMA(EMA(EMA(close, period)))` and
+//! `TRIX[k] = (EMA3[k + 1] - EMA3[k]) / EMA3[k]`. Ported from `TRIX.mq5`
+//! (`PRICE_CLOSE`).
 use crate::domain::cast;
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
@@ -6,25 +11,6 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Compute the TRIX (Triple Exponential Average) from resampled daily points.
-///
-/// `EMA3 = EMA(EMA(EMA(close, period)))` and
-/// `TRIX[k] = (EMA3[k + 1] - EMA3[k]) / EMA3[k]` when `EMA3[k] != 0.0`,
-/// otherwise `0.0` (MQL5 `TRIX.mq5`, `PRICE_CLOSE` baked in via
-/// `#property indicator_applied_price PRICE_CLOSE`). The `ema` helper from
-/// `moving_averages.rs` is reused three times — once for each EMA layer.
-///
-/// EMA3 entry `j` corresponds to original index `3 * (period - 1) + j`. TRIX
-/// requires both `EMA3[k]` (previous) and `EMA3[k + 1]` (current) to be valid,
-/// so the first TRIX value is at original index `3 * period - 2`. The MQL5
-/// source sets `PLOT_DRAW_BEGIN = 3 * InpPeriodEMA - 3` (= `3 * period - 3`);
-/// warm-up bars produce no `IndicatorValue` entries (per umbrella PRD Decision
-/// 10). Each value is tagged with the timestamp of the resampled point at the
-/// evaluated index.
-///
-/// Insufficient data (fewer than `3 * period - 1` points, i.e. `EMA3` has
-/// fewer than 2 entries) yields an empty `items` vector (not an error), per
-/// umbrella PRD Decision 10. A non-positive `period` is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
@@ -41,7 +27,6 @@ pub fn compute(
         empty_oscillator!();
     }
 
-    // TRIX entry k corresponds to original index 3*p - 2 + k.
     let start = p.saturating_mul(3).saturating_sub(2);
     let items = ema3
         .iter()
@@ -268,7 +253,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `trix::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `period = 14` (the MQL5 default) and capturing the output. They serve
     /// as a regression baseline. The user will later compare them against an

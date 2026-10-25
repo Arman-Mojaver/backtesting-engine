@@ -1,11 +1,4 @@
 use crate::domain::cast;
-/// Simple Moving Average over a slice of `f64` values.
-///
-/// Returns a vector of windowed averages. The result length is
-/// `values.len() - period + 1` when `values` is at least `period` long,
-/// otherwise an empty vector. Pure: no side effects.
-///
-/// Only SMA and EMA are needed by the current indicator set.
 pub fn sma(values: &[f64], period: usize) -> Vec<f64> {
     if period == 0 || values.len() < period {
         return Vec::new();
@@ -16,29 +9,17 @@ pub fn sma(values: &[f64], period: usize) -> Vec<f64> {
         .collect()
 }
 
-/// Exponential Moving Average over a slice of `f64` values.
-///
-/// Seeds with the SMA of the first `period` values (the standard MQL5 EMA
-/// definition), then recurses with smoothing factor `k = 2 / (period + 1)`:
-///
-/// ```text
-/// ema[0]      = SMA(values[0..period])            // index period-1
-/// ema[j]      = (values[period-1+j] - ema[j-1]) * k + ema[j-1]
-/// ```
-///
-/// The result length is `values.len() - period + 1` when `values` is at least
-/// `period` long, otherwise an empty vector. Entry `j` corresponds to the
-/// original series index `period - 1 + j`. Pure: no side effects.
+/// EMA per the MQL5 definition the indicators were ported from: seeded
+/// with the SMA of the first `period` values, smoothing factor
+/// 2 / (period + 1).
 pub fn ema(values: &[f64], period: usize) -> Vec<f64> {
     if period == 0 || values.len() < period {
         return Vec::new();
     }
     let k = 2.0 / (cast::usize_to_f64(period) + 1.0);
     let mut out = Vec::with_capacity(values.len().saturating_sub(period.saturating_sub(1)));
-    // Seed: SMA of the first `period` values (index period-1 in the series).
     let seed = values.iter().take(period).sum::<f64>() / cast::usize_to_f64(period);
     out.push(seed);
-    // Recurse: ema[j] from ema[j-1] and values[period-1+j] (j = 1..).
     let mut prev = seed;
     for &current in values.iter().skip(period) {
         let next = (current - prev).mul_add(k, prev);
@@ -120,7 +101,7 @@ mod tests {
 
     #[test]
     fn ema_input_equal_to_period_yields_single_sma_seed() {
-        // (1 + 2 + 3) / 3 = 2.0 — only the seed, no recursion.
+        // (1 + 2 + 3) / 3 = 2.0: only the seed, no recursion.
         let result = ema(&[1.0, 2.0, 3.0], 3);
         assert_eq!(result, vec![2.0]);
     }

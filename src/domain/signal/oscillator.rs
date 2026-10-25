@@ -5,8 +5,6 @@ use crate::domain::signal::OscillatorSeries;
 pub fn create(buffer: &OscillatorSeries) -> (Vec<i64>, Vec<i64>) {
     let values = &buffer.items;
 
-    // Zero-cross detection over consecutive pairs: a strict negative-to-
-    // positive transition is a long signal, positive-to-negative is short.
     let (long_signals, short_signals) = values
         .iter()
         .tuple_windows()

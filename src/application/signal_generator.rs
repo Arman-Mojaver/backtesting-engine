@@ -19,11 +19,9 @@ pub fn create_signal_groups(
         .collect()
 }
 
-/// Memoizes a single indicator's signal group on `(indicator_id, instrument)`.
-///
-/// An indicator's parameters are immutable and uniquely identified by its `id`, and an
-/// instrument's resampled points never change, so the cache key is the stable identity
-/// rather than a hash of the (large, mixed-type) inputs.
+/// Memoized on `(indicator_id, instrument)`: parameters are immutable per
+/// id and an instrument's resampled points never change, so the identity is
+/// a stable key without hashing the large inputs.
 #[cached(
     key = "(i32, String)",
     convert = r#"{ (indicator.id, resampled_points.first().map(|p| p.instrument.clone()).unwrap_or_default()) }"#,
@@ -40,11 +38,9 @@ fn create_signal_group(
                 let instrument = resampled_points
                     .first()
                     .map_or("", |point| point.instrument.as_str());
-                // Skip, don't abort (pinned by tests): one misconfigured row must
-                // not prevent the others from producing groups. The miss itself is
-                // memoized (`cache_none` above), so this warn fires once per bad
-                // indicator, not once per cell: cells re-dispatch the same indicator,
-                // but only the first call computes, the rest are cache hits.
+                // Skip, don't abort: one misconfigured row must not sink the
+                // others. The miss is memoized, so this warn fires once per
+                // bad indicator, not once per cell.
                 warn!("indicator {} ({instrument}) skipped: {error}", indicator.id);
                 return None;
             }

@@ -1,3 +1,7 @@
+//! Bulls Power: how far the high sits above the EMA of closes.
+//!
+//! `Bulls[i] = high[i] - EMA(close, period)[i]`. Ported from `Bulls.mq5`
+//! (`MODE_EMA` on `PRICE_CLOSE`).
 use crate::domain::cast;
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
@@ -6,19 +10,6 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Compute Bulls Power from resampled daily points.
-///
-/// `Bulls[i] = high[i] - EMA(close, period)[i]` where the EMA is seeded with
-/// the SMA of the first `period` close values and recurses with
-/// `k = 2 / (period + 1)` (MQL5 `Bulls.mq5`, `MODE_EMA` on `PRICE_CLOSE`).
-///
-/// The EMA is valid from index `period - 1`; Bulls starts one bar later at
-/// index `period` (the MQL5 source sets `start = InpBullsPeriod`). Each value
-/// is tagged with the timestamp of the resampled point at the evaluated index.
-///
-/// Insufficient data (fewer than `period + 1` points) yields an empty buffer,
-/// not an error — consistent with the AO/AC/Bears reference and umbrella PRD
-/// Decision 10. A non-positive period is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
@@ -28,16 +19,10 @@ pub fn compute(
     let close: Vec<f64> = points.iter().map(|pt| pt.close).collect();
     let ema_close = ema(&close, p);
 
-    // EMA entry `j` corresponds to original index `period - 1 + j`. Bulls
-    // starts at original index `period` (= EMA entry 1), so it consumes EMA
-    // entries `1..ema_close.len()` — requiring at least two EMA entries
-    // (i.e. `points.len() >= period + 1`).
     if ema_close.len() < 2 {
         empty_oscillator!();
     }
 
-    // EMA entry j -> original index period - 1 + j; Bulls evaluates the
-    // bar at that same original index (j starts at 1 -> bar index p).
     let items = ema_close
         .iter()
         .skip(1)
@@ -179,7 +164,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `bulls::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `period = 13` (the MQL5 default) and capturing the output. They serve
     /// as a regression baseline. The user will later compare them against an

@@ -1,3 +1,8 @@
+//! Force Index: the strength of price movement weighted by volume.
+//!
+//! `F[i] = volume[i] * (MA[i] - MA[i - 1])` with `MA = SMA(close, period)`.
+//! Ported from `Force_Index.mq5` (`MODE_SMA` on `PRICE_CLOSE`,
+//! `VOLUME_TICK`).
 use crate::domain::cast;
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
@@ -6,27 +11,6 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Compute the Force Index from resampled daily points.
-///
-/// `F[i] = volume[i] * (MA[i] - MA[i - 1])` where `MA = SMA(close, period)`
-/// computed via the shared `sma` helper from `moving_averages.rs` (MQL5
-/// `Force_Index.mq5`, `MODE_SMA` on `PRICE_CLOSE`, `VOLUME_TICK`).
-///
-/// SMA entry `j` corresponds to original index `period - 1 + j`. Force Index
-/// requires both `MA[j]` (current) and `MA[j - 1]` (previous SMA entry), so
-/// `F[j] = volume[period - 1 + j] * (MA[j] - MA[j - 1])` for
-/// `j = 1..(MA.len())`. The MQL5 source sets `start = InpForcePeriod` (= the
-/// index of the first Force Index value, 0-indexed), which is `period` (since
-/// SMA entry `j = 1` is at original index `period - 1 + 1 = period`).
-///
-/// The MQL5 source sets `PLOT_DRAW_BEGIN = InpForcePeriod` (= `period`); warm-up
-/// bars produce no `IndicatorValue` entries (per umbrella PRD Decision 10).
-/// Each value is tagged with the timestamp of the resampled point at the
-/// evaluated index.
-///
-/// Insufficient data (fewer than `period + 1` points, i.e. `ma` has fewer than
-/// 2 entries) yields an empty `items` vector (not an error), per umbrella PRD
-/// Decision 10. A non-positive `period` is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
@@ -41,8 +25,6 @@ pub fn compute(
         empty_oscillator!();
     }
 
-    // F[j] = volume[p - 1 + j] * (ma[j] - ma[j - 1]) for j = 1..ma.len();
-    // pair ma[j-1] with ma[j] and the bar at index p - 1 + j.
     let items = ma
         .iter()
         .zip(ma.iter().skip(1))
@@ -260,7 +242,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `force::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `period = 13` (the MQL5 default) and capturing the output. They serve
     /// as a regression baseline. The user will later compare them against an

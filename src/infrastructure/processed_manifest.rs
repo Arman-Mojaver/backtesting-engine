@@ -13,8 +13,6 @@ use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
 
-/// A row in the processed manifest recording a completed (instrument, mms_id, indicator_id)
-/// run at a given Unix timestamp.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessedRow {
     pub instrument: String,
@@ -23,8 +21,9 @@ pub struct ProcessedRow {
     pub processed_at: i64,
 }
 
-/// Persists which (instrument, mms_id, indicator_id) triples have already been processed
-/// into a single `processed.parquet` file under `root_dir`.
+/// Ledger of the (instrument, mms_id, indicator_id) triples already
+/// computed, persisted as a single `processed.parquet` under `root_dir` so
+/// reruns only compute what is missing.
 pub struct ParquetProcessedManifest {
     root_dir: String,
 }
@@ -54,8 +53,6 @@ impl ParquetProcessedManifest {
             .collect())
     }
 
-    /// Appends rows for each `indicator_id`, deduplicating any existing rows for the
-    /// same (instrument, mms_id, indicator_id) triple. Writes atomically via a temp file.
     pub fn append(
         &self,
         instrument: &str,
@@ -66,7 +63,6 @@ impl ParquetProcessedManifest {
         let path = self.path();
         let mut rows = self.read_all()?;
 
-        // Identify rows about to be replaced (for the info log below)
         let replaced_ids: Vec<i32> = rows
             .iter()
             .filter(|r| {
@@ -77,7 +73,6 @@ impl ParquetProcessedManifest {
             .map(|r| r.indicator_id)
             .collect();
 
-        // Dedup: drop any existing row that matches (instrument, mms_id) + an incoming indicator_id
         rows.retain(|r| {
             !(r.instrument == instrument
                 && r.mms_id == mms_id
@@ -94,7 +89,6 @@ impl ParquetProcessedManifest {
             );
         }
 
-        // Append new rows for each indicator_id
         for &indicator_id in indicator_ids {
             rows.push(ProcessedRow {
                 instrument: instrument.to_string(),
@@ -104,15 +98,12 @@ impl ParquetProcessedManifest {
             });
         }
 
-        // Atomic write: temp file first, then rename
         let temp_path = path.with_extension("parquet.tmp");
         write_parquet(&temp_path, &rows)?;
         fs::rename(&temp_path, &path)?;
 
         Ok(())
     }
-    /// Appends multiple (instrument, mms_id, indicator_ids) entries at once.
-    /// Reads the manifest once, applies all deduplications, writes once atomically.
     pub fn append_all(
         &self,
         entries: &[(String, i32, Vec<i32>)],
@@ -165,10 +156,6 @@ impl ParquetProcessedManifest {
     }
 }
 
-// ---------------------------------------------------------------------------
-//  Private helpers
-// ---------------------------------------------------------------------------
-
 fn read_parquet(path: &Path) -> anyhow::Result<Vec<ProcessedRow>> {
     let file = File::open(path)?;
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
@@ -218,7 +205,6 @@ fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
         Field::new("processed_at", DataType::Int64, false),
     ]));
 
-    // String column requires a builder; integer columns use collect()
     let mut instrument_builder = StringBuilder::new();
     for r in rows {
         instrument_builder.append_value(&r.instrument);
@@ -249,10 +235,6 @@ fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
 
     Ok(())
 }
-
-// ---------------------------------------------------------------------------
-//  Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -452,7 +434,7 @@ mod tests {
         let map = manifest.read_processed_ids_per_cell().expect("map");
 
         // One entry per distinct (instrument, mms_id) cell, each carrying the
-        // cell's full processed-indicator-id set — unfiltered by any external
+        // cell's full processed-indicator-id set, unfiltered by any external
         // cell universe, so manifest-only cells reach the report builder.
         assert_eq!(map.len(), 3);
         assert_eq!(

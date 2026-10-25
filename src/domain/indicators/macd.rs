@@ -1,3 +1,8 @@
+//! MACD: the difference of two moving averages of the close.
+//!
+//! `MACD[i] = MA(close, fast) - MA(close, slow)`, each line `ema` or `sma`.
+//! The MQL5 example (`MACD.mq5`) hardcodes `MODE_EMA` for both lines; the
+//! database generalises it with a per-line type, so each uses its own.
 use crate::domain::cast;
 use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::indicators::IndicatorError;
@@ -6,16 +11,12 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Moving-average method for a MACD line, parsed from the database
-/// `fast_type` / `slow_type` parameter values.
 #[derive(Clone, Copy)]
 enum MaMethod {
     Ema,
     Sma,
 }
 
-/// Parses a MACD moving-average method name. Only `"ema"` and `"sma"` exist
-/// in the database; anything else is an error.
 fn parse_ma_method(ma_type: &str) -> Result<MaMethod, IndicatorError> {
     match ma_type {
         "ema" => Ok(MaMethod::Ema),
@@ -26,9 +27,6 @@ fn parse_ma_method(ma_type: &str) -> Result<MaMethod, IndicatorError> {
     }
 }
 
-/// Computes the moving average with the given method. Both helpers share the
-/// same index convention: entry `j` corresponds to original series index
-/// `period - 1 + j`.
 fn moving_average(values: &[f64], method: MaMethod, period: usize) -> Vec<f64> {
     match method {
         MaMethod::Ema => ema(values, period),
@@ -36,29 +34,6 @@ fn moving_average(values: &[f64], method: MaMethod, period: usize) -> Vec<f64> {
     }
 }
 
-/// Compute the MACD main line from resampled daily points.
-///
-/// `MACD[i] = MA(close, fast) - MA(close, slow)` at every bar where both
-/// moving averages exist (MQL5 `MACD.mq5`:
-/// `ExtMacdBuffer[i] = ExtFastMaBuffer[i] - ExtSlowMaBuffer[i]` on
-/// `PRICE_CLOSE`). The MQL5 example hardcodes `MODE_EMA` for both lines; the
-/// database generalises it with a per-line `fast_type` / `slow_type`
-/// (`"ema"` or `"sma"`), so each line uses its own method.
-///
-/// Both moving-average helpers share the index convention (entry `j`
-/// corresponds to original index `period - 1 + j`), so the first MACD value
-/// sits at index `slow - 1`: the slow MA is always the limiting buffer.
-/// Like the CHO/OsMA modules, the fast/slow order is enforced, and a row
-/// with `fast_n >= slow_n` is rejected as invalid configuration
-/// (`InvalidMacdPeriodOrder`). Such rows are currently silent no-ops in the
-/// signal generator; once Ticket 4 lands they will surface as logged skips.
-/// Each value is tagged with the timestamp of the resampled point at
-/// the evaluated index.
-///
-/// Insufficient data (fewer than `slow` points) yields an empty
-/// `items` vector (not an error), per umbrella PRD Decision 10. A non-positive
-/// `fast_n` or `slow_n`, a `fast_n >= slow_n` order, or a method other than
-/// `"ema"` / `"sma"`, is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     fast_type: &str,
@@ -87,12 +62,6 @@ pub fn compute(
         empty_oscillator!();
     }
 
-    // Entry `j` of an MA with period `p` corresponds to original index
-    // `p - 1 + j`, so MACD is emitted at every original index from
-    // `slow - 1` (fast < slow is validated above): the shorter-period MA
-    // is skipped ahead by the period difference to stay aligned with the
-    // longer-period one.
-    // Limiting buffer: slow MA (entries map to indices `slow - 1 + j`).
     let delta = slow.saturating_sub(fast);
     let items = slow_ma
         .iter()
@@ -353,7 +322,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `macd::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `fast = 12`, `slow = 20`, both `"ema"` (a database-plausible
     /// configuration) and capturing the output. They serve as a regression

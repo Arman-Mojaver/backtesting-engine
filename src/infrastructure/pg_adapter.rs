@@ -15,7 +15,6 @@ use crate::domain::operation_point::{
 };
 use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repository};
 
-/// Wire format of `indicator.parameters` for `type = "macd"`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct MacdParams {
@@ -25,7 +24,6 @@ struct MacdParams {
     fast_n: i32,
 }
 
-/// Wire format of `indicator.parameters` for `type = "rsi"`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RsiParams {
@@ -34,15 +32,12 @@ struct RsiParams {
     low_threshold: i32,
 }
 
-/// Wire format of `indicator.parameters` for the period-only indicator types
-/// (`bears`, `bulls`, `dpo`, `force`, `roc`, `vroc`).
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PeriodParams {
     period: i32,
 }
 
-/// Wire format of `indicator.parameters` for `type = "cho"`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ChoParams {
@@ -50,8 +45,6 @@ struct ChoParams {
     slow_ma: i32,
 }
 
-/// Wire format of `indicator.parameters` for `type = "chaikin_volatility"`
-/// (type not yet present in the database).
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ChvParams {
@@ -59,8 +52,6 @@ struct ChvParams {
     chv_period: i32,
 }
 
-/// Wire format of `indicator.parameters` for `type = "osma"`
-/// (type not yet present in the database).
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct OsMaParams {
@@ -69,8 +60,6 @@ struct OsMaParams {
     signal_sma: i32,
 }
 
-/// Deserializes `indicator.parameters` (fetched as `parameters::text`) into
-/// `T`, attaching the indicator type and the raw JSON to any parse error.
 fn parse_params<T>(indicator_type: &str, json_text: &str) -> anyhow::Result<T>
 where
     T: DeserializeOwned,
@@ -80,8 +69,6 @@ where
     })
 }
 
-/// Parses `indicator.parameters` for the parameterless indicator types
-/// (`ao`, `ac`): the JSON must be an empty object.
 fn parse_empty_params(indicator_type: &str, json_text: &str) -> anyhow::Result<()> {
     let map: Map<String, Value> = parse_params(indicator_type, json_text)?;
     if !map.is_empty() {
@@ -95,9 +82,8 @@ fn parse_empty_params(indicator_type: &str, json_text: &str) -> anyhow::Result<(
     Ok(())
 }
 
-/// Maps a database `indicator.type` string plus its `parameters` JSON onto
-/// the domain enum. The matched strings and JSON shapes mirror the database
-/// exactly; an unknown type or malformed parameters is an error.
+/// The type strings and JSON shapes mirror the `indicator` table, which is
+/// owned by the Django companion.
 fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<IndicatorParameters> {
     Ok(match indicator_type {
         "macd" => {
@@ -236,7 +222,7 @@ where
     let duration = start.elapsed();
 
     debug!(
-        "query executed: {label} — {} rows in {duration:?}",
+        "query executed ({label}): {} rows in {duration:?}",
         rows.len()
     );
 
@@ -345,8 +331,9 @@ impl ResampledPointD1Repository for PgResampledPointAdapter {
         fetch_rows(
             &self.conn,
             "resampled_point_d1 get_all",
-            // ORDER BY timestamp is load-bearing: moving-average indicator math depends on chronological order.
-            // The table's `high_low_order` column is deliberately not fetched
+            // ORDER BY timestamp is load-bearing: indicator math assumes
+            // chronological order. `high_low_order` exists in the table but
+            // nothing reads it.
             "SELECT id, instrument, open, high, low, close, volume, timestamp \
              FROM resampled_point_d1 ORDER BY timestamp",
             &[],

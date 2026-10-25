@@ -1,3 +1,8 @@
+//! Rate of Change (ROC): percentage price change over `period` bars.
+//!
+//! `ROC[i] = (close[i] - close[i - period]) / close[i] * 100`, dividing by
+//! the current close like the MQL5 source. Ported from `ROC.mq5`
+//! (`PRICE_CLOSE`).
 use crate::domain::cast;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -5,22 +10,6 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Compute the Rate of Change (ROC) from resampled daily points.
-///
-/// `ROC[i] = (close[i] - close[i - period]) / close[i] * 100` when
-/// `close[i] != 0.0`, otherwise `0.0` (MQL5 `ROC.mq5`, `PRICE_CLOSE` baked in
-/// via the `price[]` array which defaults to `PRICE_CLOSE`). No MA helpers are
-/// needed — ROC is a pure price-momentum formula with a single subtraction,
-/// division, and multiplication.
-///
-/// ROC entry `k` corresponds to original index `period + k`. The MQL5 source
-/// sets `PLOT_DRAW_BEGIN = InpRocPeriod` (= `period`); warm-up bars produce no
-/// `IndicatorValue` entries (per umbrella PRD Decision 10). Each value is
-/// tagged with the timestamp of the resampled point at the evaluated index.
-///
-/// Insufficient data (fewer than `period + 1` points, i.e. `N <= period`)
-/// yields an empty `items` vector (not an error), per umbrella PRD Decision 10.
-/// A non-positive `period` is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
@@ -33,8 +22,6 @@ pub fn compute(
         empty_oscillator!();
     }
 
-    // ROC entry k pairs the point at index p + k (current) with the point
-    // at index k (period bars earlier).
     let items = points
         .iter()
         .skip(p)
@@ -239,7 +226,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `roc::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `period = 12` (the MQL5 default) and capturing the output. They serve
     /// as a regression baseline. The user will later compare them against an

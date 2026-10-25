@@ -1,16 +1,8 @@
 //! Logging initialization.
 //!
-//! Sets up a [`CombinedLogger`] that writes to **stderr** (for container output)
-//! and to the file `logs/bt-engine.log` (for persistent on-disk logs). The log
-//! directory is created on init if missing, so the binary also works outside
-//! the compose setup, which relies on a pre-mounted `logs/` volume.
-//!
-//! Log timestamps carry the UTC date and time-of-day (`YYYY-MM-DD HH:MM:SS`),
-//! so multi-day batch runs can be correlated by day.
-//!
-//! The log level is controlled by the `RUST_LOG` environment variable
-//! (e.g. `info`, `debug`, `backtesting_engine=debug`). Defaults to `info`
-//! when unset.
+//! stderr captures container output and `logs/bt-engine.log` persists it.
+//! The directory is created on init so the binary also works outside the
+//! compose setup, which pre-mounts a `logs/` volume.
 
 use std::fs::{self, File, OpenOptions};
 use std::path::Path;
@@ -22,22 +14,10 @@ use simplelog::{
     WriteLogger,
 };
 
-/// Default log level when `RUST_LOG` is not set.
 const DEFAULT_LOG_LEVEL: &str = "info";
 
-/// Log file path, relative to the process working directory.
 const LOG_FILE: &str = "logs/bt-engine.log";
 
-/// Initializes the global logger.
-///
-/// Reads `RUST_LOG` (defaulting to `info`), opens `logs/bt-engine.log` in
-/// append/create mode — creating the log directory if it does not exist —
-/// and installs a `CombinedLogger` that fans out to both stderr and the
-/// file.
-///
-/// # Errors
-/// Returns an error if the log directory or file cannot be created/opened,
-/// or if the global logger has already been initialized.
 pub fn init() -> Result<()> {
     let level = parse_level(std::env::var("RUST_LOG").ok().as_deref());
 
@@ -66,12 +46,6 @@ pub fn init() -> Result<()> {
     Ok(())
 }
 
-/// Opens `path` in append/create mode, creating its parent directory first
-/// if it does not exist (std treats an empty parent path as a no-op).
-///
-/// # Errors
-/// Returns an error if the parent directory cannot be created or the file
-/// cannot be opened.
 fn open_log_file(path: &Path) -> Result<File> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| {
@@ -90,18 +64,12 @@ fn open_log_file(path: &Path) -> Result<File> {
         })
 }
 
-/// Parses a `RUST_LOG`-style string into a `LevelFilter`.
-///
-/// Accepts a bare level (`"info"`, `"debug"`, …) or a module-targeted
-/// spec (`"backtesting_engine=debug"`). Falls back to `Info` on any
-/// unrecognised value.
 fn parse_level(raw: Option<&str>) -> LevelFilter {
     let raw = match raw {
         Some(s) if !s.is_empty() => s,
         _ => return LevelFilter::Info,
     };
 
-    // Handle "module=level" syntax — take the level after '='.
     let token = raw.split('=').next_back().unwrap_or(raw);
 
     token.parse::<LevelFilter>().unwrap_or_else(|_| {

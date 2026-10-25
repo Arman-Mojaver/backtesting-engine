@@ -1,23 +1,16 @@
+//! Awesome Oscillator (AO): median-price momentum.
+//!
+//! `AO[i] = SMA(median, 5)[i] - SMA(median, 34)[i]` with
+//! `median = (high + low) / 2` (MQL5 `PRICE_MEDIAN`). Ported from
+//! `Awesome_Oscillator.mq5`.
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
-/// Fast SMA period (fixed per the MQL5 `Awesome_Oscillator.mq5` source).
 const FAST_PERIOD: usize = 5;
-/// Slow SMA period (fixed per the MQL5 `Awesome_Oscillator.mq5` source).
 const SLOW_PERIOD: usize = 34;
 
-/// Compute the Awesome Oscillator from resampled daily points.
-///
-/// `AO[i] = SMA(median, 5)[i] − SMA(median, 34)[i]` where
-/// `median = (high + low) / 2` (MQL5 `PRICE_MEDIAN`). The first valid AO
-/// value is at index 33 (the 34th bar); warm-up bars produce no
-/// `IndicatorValue` entries. Each value is tagged with the timestamp of the
-/// resampled point at the index of the newest contributing bar.
-///
-/// Insufficient data (fewer than 34 points) yields an empty buffer, not an
-/// error — consistent with the RSI reference and umbrella PRD Decision 10.
 pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, IndicatorError> {
     let medians: Vec<f64> = points
         .iter()
@@ -27,15 +20,8 @@ pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, Indicato
     let fast = sma(&medians, FAST_PERIOD);
     let slow = sma(&medians, SLOW_PERIOD);
 
-    // fast[k] ends at index k + FAST_PERIOD - 1 (= k + 4).
-    // slow[k] ends at index k + SLOW_PERIOD - 1 (= k + 33).
-    // AO at ending index i pairs slow[k] with fast[k + offset] where
-    // offset = SLOW_PERIOD - FAST_PERIOD (= 29). AO is defined for ending
-    // indices 33..n, i.e. one value per slow entry.
     let offset = SLOW_PERIOD - FAST_PERIOD;
 
-    // AO at ending index k + SLOW_PERIOD - 1 pairs slow[k] with
-    // fast[k + offset].
     let items = slow
         .iter()
         .zip(fast.iter().skip(offset))
@@ -171,7 +157,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `ao::compute` on the 2400 real EURUSD `resampled_point_d1` rows and
     /// capturing the output. They serve as a regression baseline. The user
     /// will later compare them against an external source of truth.

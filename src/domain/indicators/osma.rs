@@ -1,3 +1,8 @@
+//! OsMA: the MACD histogram.
+//!
+//! `MACD = EMA(close, fast_ema) - EMA(close, slow_ema)` and
+//! `Signal = SMA(MACD, signal_sma)`; `OsMA = MACD - Signal`. Ported from
+//! `OsMA.mq5`.
 use crate::domain::cast;
 use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::indicators::IndicatorError;
@@ -6,26 +11,6 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Compute the OsMA (Moving Average of Oscillator, aka MACD histogram) from
-/// resampled daily points.
-///
-/// `MACD = EMA(close, fast_ema) - EMA(close, slow_ema)` and
-/// `Signal = SMA(MACD, signal_sma)`, then `OsMA[k] = MACD[k + signal_sma - 1]
-/// - Signal[k]` (MQL5 `OsMA.mq5`, `MODE_EMA` on `PRICE_CLOSE` for fast/slow,
-/// `MODE_SMA` via `SimpleMAOnBuffer` for the signal line).
-///
-/// The slow EMA is the limiting factor (`slow_ema >= fast_ema` is validated;
-/// a reversed order is an error).
-/// The slow EMA seed is at index `slow_ema - 1`; MACD starts at the same
-/// index. Signal starts at `slow_ema + signal_sma - 2`; OsMA starts at the
-/// same index. The MQL5 source sets
-/// `PLOT_DRAW_BEGIN = InpSlowEMAPeriod + InpSignalSMAPeriod - 2`. Each value
-/// is tagged with the timestamp of the resampled point at the evaluated index.
-///
-/// Insufficient data (fewer than `slow_ema + signal_sma - 1` points, i.e.
-/// `signal` is empty) yields an empty `items` vector (not an error), per
-/// umbrella PRD Decision 10. A non-positive `fast_ema`, `slow_ema`, or
-/// `signal_sma` is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     fast_ema: i32,
@@ -47,9 +32,6 @@ pub fn compute(
     let fast_ema_result = ema(&closes, fast);
     let slow_ema_result = ema(&closes, slow);
 
-    // Slow EMA entry `j_s` corresponds to original index `slow - 1 + j_s`.
-    // MACD[j_s] = FastEMA[delta + j_s] - SlowEMA[j_s] where
-    // `delta = slow - fast` (fast <= slow validated above).
     let delta = slow.saturating_sub(fast);
     let macd: Vec<f64> = slow_ema_result
         .iter()
@@ -63,8 +45,6 @@ pub fn compute(
         empty_oscillator!();
     }
 
-    // OsMA[k] = macd[k + signal - 1] - signal[k] for k = 0..(signal.len()).
-    // OsMA entry `k` corresponds to original index `slow + signal - 2 + k`.
     let start = slow.saturating_add(signal).saturating_sub(2);
     let items = signal_line
         .iter()
@@ -329,7 +309,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `osma::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `fast_ema = 12`, `slow_ema = 26`, and `signal_sma = 9` (the MQL5
     /// defaults) and capturing the output. They serve as a regression

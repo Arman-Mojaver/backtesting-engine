@@ -1,3 +1,8 @@
+//! Volume Rate of Change (VROC): ROC applied to volume.
+//!
+//! `VROC[i] = 100 * (volume[i] - volume[i - (period - 1)]) /
+//! volume[i - (period - 1)]`, carrying the previous value forward when the
+//! old volume is zero. Ported from `VROC.mq5` (`VOLUME_TICK`).
 use crate::domain::cast;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -5,24 +10,6 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Compute the Volume Rate of Change (VROC) from resampled daily points.
-///
-/// `VROC[i] = 100 * (volume[i] - volume[i - (period - 1)]) /
-/// volume[i - (period - 1)]` when the previous volume is non-zero, otherwise
-/// the previous VROC value is carried forward (MQL5 `VROC.mq5`,
-/// `VOLUME_TICK` baked in via `f64::from(point.volume)`). No MA helpers are needed
-/// — VROC is a pure volume-momentum formula with a single subtraction,
-/// division, and multiplication, plus a carry-forward zero-division guard.
-///
-/// VROC entry `k` corresponds to original index `(period - 1) + k`. The MQL5
-/// source sets `PLOT_DRAW_BEGIN = ExtPeriodVROC - 1` (= `period - 1`); warm-up
-/// bars produce no `IndicatorValue` entries (per umbrella PRD Decision 10).
-/// Each value is tagged with the timestamp of the resampled point at the
-/// evaluated index.
-///
-/// Insufficient data (fewer than `period` points, i.e. `N < period`) yields an
-/// empty `items` vector (not an error), per umbrella PRD Decision 10. A
-/// non-positive `period` is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
@@ -37,8 +24,6 @@ pub fn compute(
 
     let mut items: Vec<IndicatorValue> = Vec::with_capacity(n.saturating_sub(lookback));
     let mut carry = 0.0;
-    // VROC entry k pairs the point at index lookback + k (current) with the
-    // point at index k (lookback bars earlier).
     for (curr, prev) in points.iter().skip(lookback).zip(points.iter()) {
         let curr_volume = f64::from(curr.volume);
         let prev_volume = f64::from(prev.volume);
@@ -266,7 +251,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `vroc::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `period = 25` (the MQL5 default) and capturing the output. They serve
     /// as a regression baseline. The user will later compare them against an

@@ -348,7 +348,7 @@ pub fn indicators_default() -> Vec<Indicator> {
 // Signal-generation fixtures: resampled-point series long enough to drive RSI
 // windows, plus indicator builders with RSI parameters.
 
-/// 5 resampled points with alternating close prices (1,2,1,2,1) — yields 4
+/// 5 resampled points with alternating close prices (1,2,1,2,1): yields 4
 /// price diffs and supports RSI windows of n up to 4. Enough to exercise the
 /// RSI computation path through `create_signals`.
 pub fn resampled_points_for_rsi() -> Vec<ResampledPointD1> {

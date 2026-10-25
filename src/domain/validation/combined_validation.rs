@@ -21,8 +21,6 @@ pub enum CombinedValidationError {
 impl fmt::Display for CombinedValidationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            // The inner error already renders a complete sentence naming
-            // the empty input; delegate (thiserror `transparent` style).
             Self::Empty(inner) => write!(f, "{inner}"),
             Self::InstrumentMismatch => write!(
                 f,
@@ -42,7 +40,6 @@ impl fmt::Display for CombinedValidationError {
 
 impl Error for CombinedValidationError {}
 
-/// Runs all validation checks in order. Returns early on the first failure.
 pub fn validate_all(
     long_ops: &[OperationPoint],
     short_ops: &[OperationPoint],

@@ -18,15 +18,12 @@ pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceM
         };
     }
 
-    // -- Sorting (defensive) --------------------------------------------------
     let mut sorted: Vec<&OperationPoint> = operation_points.to_vec();
     sorted.sort_by_key(|op| op.timestamp);
 
-    // -- Shared compounding state ------------------------
     let mut cumsum: f64 = 1.0;
     let mut cummax: f64 = 1.0;
 
-    // -- Draw-down tracking (max_draw_down only) --------------------------------
     let mut max_dd: f64 = 0.0;
 
     for point in sorted {
@@ -34,12 +31,10 @@ pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceM
         cumsum += contribution;
         cummax = cummax.max(cumsum);
 
-        // Draw-down only: current distance below the running peak.
         let draw_down = (cummax - cumsum) / cummax;
         max_dd = max_dd.max(draw_down);
     }
 
-    // -- Rounding -----------------------------------------------------------------
     PerformanceMetrics {
         global_roi: ((cumsum - 1.0) * 10000.0).round() / 100.0,
         max_draw_down: (max_dd * 10000.0).round() / 100.0,
@@ -59,7 +54,6 @@ impl PerformanceMetrics {
     }
 }
 
-/// Span between two unix timestamps in years; `0.0` for a non-positive span.
 fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
     let days = cast::i64_to_f64(end_timestamp.saturating_sub(start_timestamp)) / SECONDS_PER_DAY;
     if days <= 0.0 {
@@ -116,7 +110,7 @@ mod tests {
     }
 
     // =========================================================================
-    // Mapped 1:1 from src/domain/global_roi.rs::tests — names, inputs and
+    // Mapped 1:1 from src/domain/global_roi.rs::tests; names, inputs and
     // expectations preserved verbatim; each now asserts the `global_roi`
     // field of the combined result.
     // =========================================================================
@@ -204,7 +198,7 @@ mod tests {
     }
 
     // =========================================================================
-    // Mapped 1:1 from src/domain/max_draw_down.rs::tests — names, inputs and
+    // Mapped 1:1 from src/domain/max_draw_down.rs::tests; names, inputs and
     // expectations preserved verbatim; each now asserts the `max_draw_down`
     // field of the combined result.
     // =========================================================================
@@ -338,7 +332,7 @@ mod tests {
     }
 
     // =========================================================================
-    // NEW tests — no 1:1 ancestor. Cover the defensive sort inside
+    // NEW tests, no 1:1 ancestor. Cover the defensive sort inside
     // `performance_metrics()`: unsorted input must be computed in
     // chronological order, and equal timestamps must keep input order.
     // =========================================================================
@@ -375,14 +369,14 @@ mod tests {
             //   t2: cumsum = 1.01
             //   roi = 1.0
             // A flipped order [+30, -20] would give cumsum 1.03 then 1.0094,
-            // i.e. roi 0.94 — so this asserts the tie-break, not just the math.
+            // i.e. roi 0.94, so this asserts the tie-break, not just the math.
             let ops = [make_op(-20, 30, 20, 0.02), make_op(30, 30, 20, 0.02)];
             assert_eq!(metrics(&ops).global_roi, 1.0);
         }
     }
 
     // =========================================================================
-    // Mapped 1:1 from src/domain/annual_roi.rs::tests — names, inputs and
+    // Mapped 1:1 from src/domain/annual_roi.rs::tests; names, inputs and
     // expectations preserved verbatim. The free function
     // `annual_roi(start, end, roi)` became a method:
     // `metrics_with_roi(roi).annual_roi(start, end)`.

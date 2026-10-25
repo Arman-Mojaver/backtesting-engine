@@ -57,7 +57,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
         &unprocessed_ids,
     )?;
     info!(
-        "run_strategies done in {:?} — {} strategies",
+        "run_strategies done in {:?}: {} strategies",
         run_start.elapsed(),
         strategies.len()
     );

@@ -1,3 +1,7 @@
+//! Chaikin Volatility: rate of change of an EMA-smoothed high-low spread.
+//!
+//! `CHV[i] = 100 * (SHL[i] - SHL[i - chv_period]) / SHL[i - chv_period]`
+//! with `SHL = EMA(high - low, smooth_period)`. Ported from `CHV.mq5`.
 use crate::domain::cast;
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
@@ -6,26 +10,6 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Compute the Chaikin Volatility from resampled daily points.
-///
-/// `CHV[i] = 100 * (SHL[i] - SHL[i - chv_period]) / SHL[i - chv_period]` when
-/// `SHL[i - chv_period] != 0.0`, otherwise `0.0`, where
-/// `SHL = EMA(HL, smooth_period)` and `HL[i] = high[i] - low[i]`. The EMA is
-/// computed via the shared `ema` helper from `moving_averages.rs` (MQL5
-/// `CHV.mq5`, `InpSmoothType = EMA`).
-///
-/// SHL entry `j` corresponds to original index `smooth_period - 1 + j`. CHV
-/// requires both `SHL[k + chv_period]` (current) and `SHL[k]`
-/// (`chv_period` bars ago) to be valid, so the first CHV value is at original
-/// index `smooth_period - 1 + chv_period`. The MQL5 source sets
-/// `PLOT_DRAW_BEGIN = smooth_period + chv_period - 1`; warm-up bars produce
-/// no `IndicatorValue` entries (per umbrella PRD Decision 10). Each value is
-/// tagged with the timestamp of the resampled point at the evaluated index.
-///
-/// Insufficient data (SHL has `chv_period` or fewer entries, i.e. fewer than
-/// `smooth_period + chv_period` points) yields an empty `items` vector (not
-/// an error), per umbrella PRD Decision 10. A non-positive `smooth_period`
-/// or `chv_period` is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     smooth_period: i32,
@@ -38,14 +22,10 @@ pub fn compute(
     let hl: Vec<f64> = points.iter().map(|p| p.high - p.low).collect();
     let shl = ema(&hl, smooth);
 
-    // SHL entry j -> original index smooth - 1 + j.
-    // CHV[k] uses SHL[k + chv] (current) and SHL[k] (chv_period bars ago).
-    // Need more than `chv` SHL entries for at least one CHV value.
     if shl.len() <= chv {
         empty_oscillator!();
     }
 
-    // CHV entry k evaluates the bar at original index smooth - 1 + k + chv.
     let skip_count = smooth.saturating_sub(1).saturating_add(chv);
     let items = shl
         .iter()
@@ -236,7 +216,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `chv::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `smooth_period = 10` and `chv_period = 10` (the MQL5 defaults) and
     /// capturing the output. They serve as a regression baseline. The user

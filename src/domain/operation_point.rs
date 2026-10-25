@@ -33,9 +33,9 @@ impl OperationPoints<'_> {
             .collect()
     }
 
-    /// Returns the (start_timestamp, end_timestamp) range for long operation points,
-    /// or `None` when there are no long operation points.
-    /// Both `long_operation_points` and `short_operation_points` share identical timestamps.
+    /// Long and short operation points carry identical timestamps (they are
+    /// generated in lockstep upstream), so the range from the long side
+    /// bounds both.
     pub fn start_end_timestamps(&self) -> Option<(i64, i64)> {
         let start = self
             .long_operation_points
@@ -70,7 +70,6 @@ pub trait LongOperationPointRepository {
         instrument: &str,
     ) -> anyhow::Result<Vec<OperationPoint>>;
 
-    /// All long operation points grouped by their `(instrument, mms_id)` cell.
     fn index_by_cell(&self) -> anyhow::Result<FxHashMap<(String, i32), Vec<OperationPoint>>> {
         Ok(group_by_cell(self.get_all()?))
     }
@@ -84,7 +83,6 @@ pub trait ShortOperationPointRepository {
         instrument: &str,
     ) -> anyhow::Result<Vec<OperationPoint>>;
 
-    /// All short operation points grouped by their `(instrument, mms_id)` cell.
     fn index_by_cell(&self) -> anyhow::Result<FxHashMap<(String, i32), Vec<OperationPoint>>> {
         Ok(group_by_cell(self.get_all()?))
     }

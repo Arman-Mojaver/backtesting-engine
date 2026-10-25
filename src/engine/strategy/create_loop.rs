@@ -23,7 +23,6 @@ use crate::infrastructure::pg_adapter::{
 };
 use crate::infrastructure::strategy_persistence::StrategyPersistence;
 
-/// The source data, loaded from the database and indexed for the parallel compute phase.
 struct SourceIndex {
     indicators: Vec<Indicator>,
     indicator_ids: Vec<i32>,
@@ -95,13 +94,9 @@ impl SourceIndex {
     }
 }
 
-/// The result of attempting one `(instrument, mms_id)` cell in the batch loop.
 enum CellOutcome {
-    /// Fresh strategies were computed for the cell.
     Computed(CellOutput),
-    /// The processed manifest already lists every indicator for the cell.
     AlreadyProcessed,
-    /// `run_strategies` failed; the error has been logged with the cell identity.
     Failed { instrument: String, mms_id: i32 },
 }
 
@@ -156,8 +151,6 @@ fn compute_cell(
     })
 }
 
-/// Aggregate outcome counts for one batch run, plus the identity of every
-/// failed cell for the error-level summary log.
 struct BatchSummary {
     computed: usize,
     skipped: usize,
@@ -165,8 +158,6 @@ struct BatchSummary {
     failed_cells: Vec<(String, i32)>,
 }
 
-/// Summarizes per-cell outcomes into counts of computed / skipped / failed
-/// and collects the identity of every failed cell.
 fn summarize_outcomes(outcomes: &[CellOutcome]) -> BatchSummary {
     let failed_cells: Vec<(String, i32)> = outcomes
         .iter()
@@ -190,8 +181,6 @@ fn summarize_outcomes(outcomes: &[CellOutcome]) -> BatchSummary {
     }
 }
 
-/// Renders failed cells in the same `{instrument} (mms_id={mms_id})` shape as
-/// the per-cell error logs.
 fn format_failed_cells(failed_cells: &[(String, i32)]) -> String {
     failed_cells
         .iter()
@@ -200,9 +189,9 @@ fn format_failed_cells(failed_cells: &[(String, i32)]) -> String {
         .join(", ")
 }
 
-/// Exit-policy predicate: true when every cell that attempted work failed and
-/// none computed — the signature of a systemic outage (e.g. the DB going down
-/// between load and compute), not of isolated per-cell failures.
+// Exit-policy predicate: every cell that attempted work failed and none
+// computed, the signature of a systemic outage (the DB going down mid-run)
+// rather than isolated per-cell failures.
 const fn is_total_failure(summary: &BatchSummary) -> bool {
     summary.failed > 0 && summary.computed == 0
 }
@@ -229,7 +218,7 @@ pub fn execute() -> anyhow::Result<()> {
         .collect();
     let summary = summarize_outcomes(&outcomes);
     info!(
-        "Compute done — {} computed, {} skipped (already processed), {} failed in {:?}.",
+        "Compute done: {} computed, {} skipped (already processed), {} failed in {:?}.",
         summary.computed,
         summary.skipped,
         summary.failed,
@@ -247,13 +236,13 @@ pub fn execute() -> anyhow::Result<()> {
     let persist_start = Instant::now();
     persistence.persist_cells(computed)?;
     info!(
-        "Persist done — {} cells in {:?}.",
+        "Persist done: {} cells in {:?}.",
         summary.computed,
         persist_start.elapsed()
     );
 
     info!(
-        "Done — {} computed, {} skipped (already processed), {} failed. Total command time: {:?}.",
+        "Done: {} computed, {} skipped (already processed), {} failed. Total command time: {:?}.",
         summary.computed,
         summary.skipped,
         summary.failed,
@@ -272,7 +261,7 @@ pub fn execute() -> anyhow::Result<()> {
 
     if is_total_failure(&summary) {
         bail!(
-            "total failure: {} failed, {} skipped, 0 computed — no progress, likely systemic",
+            "total failure: {} failed, {} skipped, 0 computed, no progress; likely systemic",
             summary.failed,
             summary.skipped
         );
@@ -388,7 +377,7 @@ mod tests {
     #[test]
     fn failed_attempts_without_computed_is_total_failure_despite_skips() {
         // Already-processed cells were never attempted; when every cell that
-        // WAS attempted fails, the run made no progress — treat as systemic.
+        // WAS attempted fails, the run made no progress: treat as systemic.
         let outcomes = vec![CellOutcome::AlreadyProcessed, failed_outcome("EURUSD", 1)];
         let summary = summarize_outcomes(&outcomes);
         assert!(is_total_failure(&summary));

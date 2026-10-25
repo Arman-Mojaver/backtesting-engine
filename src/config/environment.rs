@@ -12,13 +12,8 @@ pub enum Environment {
     Testing,
 }
 
-/// Error returned when a value does not name a valid [`Environment`].
-///
-/// The [`fmt::Display`] implementation names the rejected value and lists the
-/// accepted ones, so a fail-fast abort is self-explanatory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InvalidEnvironmentError {
-    /// The rejected value, exactly as it was read.
     value: String,
 }
 
@@ -50,32 +45,20 @@ impl FromStr for Environment {
     }
 }
 
-/// The environment variable that selects the target environment.
 const ENVIRONMENT_VARIABLE: &str = "ENVIRONMENT";
 
 /// Resolves the target environment from the `ENVIRONMENT` variable.
 ///
-/// This is the crate's single resolution path — call sites must not read
-/// `ENVIRONMENT` on their own.
-///
-/// Behaviour:
-///
-/// - Variable **absent** → defaults to [`Environment::Development`] (the
-///   default is also documented in the README) and emits a debug-level log so
-///   the fallback is discoverable under `RUST_LOG=debug`.
-/// - Variable **present but invalid** — including non-UTF-8 values — → fails
-///   fast with [`InvalidEnvironmentError`], which names the accepted values.
-///   A typo like `produciton` can therefore never silently target the
-///   development database and parquet tree.
+/// The crate's single resolution path: no other code may read the variable
+/// directly. Absent defaults to development; invalid (including non-UTF-8)
+/// fails fast so a typo can never silently target the development database
+/// and parquet tree.
 pub fn resolve_environment() -> Result<Environment, InvalidEnvironmentError> {
     resolve_from_raw(env::var(ENVIRONMENT_VARIABLE))
 }
 
-/// Pure decision core of [`resolve_environment`].
-///
-/// Takes the raw result of an env-var read instead of reading the process
-/// environment itself, so the resolution logic is unit-testable without
-/// mutating process-global state (which would race with parallel tests).
+/// Takes the raw env-var result so the decision logic is testable without
+/// mutating process-global state.
 fn resolve_from_raw(raw: Result<String, VarError>) -> Result<Environment, InvalidEnvironmentError> {
     match raw {
         Ok(value) => value.parse(),
@@ -149,7 +132,6 @@ impl DbConfig {
     }
 }
 
-/// The root directory for parquet files inside the container.
 const PARQUET_FILES_PATH: &str = "/app/parquet_files";
 
 pub fn parquet_base_dir(env: Environment) -> String {

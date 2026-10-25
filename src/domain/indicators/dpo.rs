@@ -1,3 +1,8 @@
+//! Detrended Price Oscillator (DPO): price with its trend removed.
+//!
+//! `close` minus the SMA of `period / 2 + 1` closes, keeping the source's
+//! half-period shift so values line up with the bar they describe. Ported
+//! from `DPO.mq5`.
 use crate::domain::cast;
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
@@ -6,35 +11,11 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Compute the Detrended Price Oscillator from resampled daily points.
-///
-/// `DPO[i] = close[i] - SMA(close, ExtMAPeriod)[i]` where
-/// `ExtMAPeriod = InpDetrendPeriod / 2 + 1` (integer division) and the SMA is
-/// computed via the shared `sma` helper from `moving_averages.rs` (MQL5
-/// `DPO.mq5`, `SimpleMAOnBuffer` on `PRICE_CLOSE`).
-///
-/// SMA entry `j` corresponds to original index `ExtMAPeriod - 1 + j`. DPO
-/// compares `close[i]` with `SMA_close[i]` at the same index `i`, so
-/// `DPO[j] = close[ExtMAPeriod - 1 + j] - SMA_close[j]`. The MQL5 source sets
-/// `first_index = begin + ExtMAPeriod - 1` (= `ExtMAPeriod - 1` for
-/// `begin = 0`), which is the index of the first DPO value (0-indexed). This
-/// is `period / 2` (since `ExtMAPeriod - 1 = period / 2`).
-///
-/// The MQL5 source sets `PLOT_DRAW_BEGIN = ExtMAPeriod - 1`; warm-up bars
-/// produce no `IndicatorValue` entries (per umbrella PRD Decision 10). Each
-/// value is tagged with the timestamp of the resampled point at the evaluated
-/// index.
-///
-/// Insufficient data (fewer than `ExtMAPeriod` points, i.e. `sma_close` is
-/// empty) yields an empty `items` vector (not an error), per umbrella PRD
-/// Decision 10. A non-positive `period` is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
 ) -> Result<OscillatorSeries, IndicatorError> {
     validate_period!(period, InvalidDpoPeriod);
-    // ExtMAPeriod = period / 2 + 1; DPO entry j evaluates the bar at index
-    // period / 2 + j (= ExtMAPeriod - 1 + j).
     let skip_count = cast::i32_to_usize(period / 2);
     let ext_ma_period = skip_count.saturating_add(1);
 
@@ -230,7 +211,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `dpo::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `period = 12` (the MQL5 default) and capturing the output. They serve
     /// as a regression baseline. The user will later compare them against an

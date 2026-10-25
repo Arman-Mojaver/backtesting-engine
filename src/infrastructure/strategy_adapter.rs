@@ -55,6 +55,8 @@ impl ParquetStrategyRepository {
         Self { base_dir }
     }
 
+    // strategy_id is persistence-assigned: new ids start from the global max
+    // across all partitions, so they stay unique across the whole tree.
     pub fn write(
         &self,
         instrument: &str,
@@ -80,8 +82,6 @@ impl ParquetStrategyRepository {
         Self::write_partition(&path, rows)
     }
 
-    /// Returns the parquet path for a single `(instrument, mms_id)` partition,
-    /// creating the partition directory if needed.
     fn partition_path(&self, instrument: &str, mms_id: i32) -> anyhow::Result<PathBuf> {
         let partition_dir = format!(
             "{}/instrument={}/money_management_strategy_id={}",
@@ -99,6 +99,9 @@ impl ParquetStrategyRepository {
             Vec::new()
         };
 
+        // indicator_id is the partition's identity: incoming duplicates are
+        // dropped, so re-writing a partition preserves the original rows and
+        // their ids.
         let existing_ids: FxHashSet<i32> = existing_rows.iter().map(|r| r.indicator_id).collect();
         let fresh_rows: Vec<StrategyRow> = new_rows
             .into_iter()
@@ -107,7 +110,7 @@ impl ParquetStrategyRepository {
 
         if fresh_rows.is_empty() {
             debug!(
-                "parquet partition skipped: {} — 0 fresh rows ({} existing) in {:?}",
+                "parquet partition skipped ({}): 0 fresh rows ({} existing) in {:?}",
                 path.display(),
                 existing_rows.len(),
                 start.elapsed()
@@ -133,7 +136,7 @@ impl ParquetStrategyRepository {
         writer.close()?;
 
         debug!(
-            "parquet partition written: {} — {} rows ({} existing + {} fresh) in {:?}",
+            "parquet partition written ({}): {} rows ({} existing + {} fresh) in {:?}",
             path.display(),
             combined.len(),
             existing_count,

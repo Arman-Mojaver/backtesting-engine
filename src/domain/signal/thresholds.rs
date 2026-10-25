@@ -7,8 +7,6 @@ pub fn create(buffer: &ThresholdSeries) -> (Vec<i64>, Vec<i64>) {
     let high_threshold = buffer.high_threshold;
     let low_threshold = buffer.low_threshold;
 
-    // Threshold-cross detection over consecutive pairs: crossing above the
-    // low threshold is a long signal, crossing below the high is short.
     let (long_signals, short_signals) = values
         .iter()
         .tuple_windows()

@@ -1,25 +1,15 @@
+//! Accelerator/Decelerator (AC): the rate of change of the Awesome Oscillator.
+//!
+//! `AC[k] = AO[k + 4] - SMA(AO, 5)[k]`. Ported from `Accelerator.mq5`.
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 
-/// Fast SMA period (fixed per the MQL5 `Accelerator.mq5` source).
 const FAST_PERIOD: usize = 5;
-/// Slow SMA period (fixed per the MQL5 `Accelerator.mq5` source).
 const SLOW_PERIOD: usize = 34;
-/// Number of warm-up bars before the first valid AC value
-/// (`FAST_PERIOD - 1 + SLOW_PERIOD - 1` = 4 + 33).
 const DATA_LIMIT: usize = 37;
 
-/// Compute the inlined Awesome Oscillator series as a plain `Vec<f64>`.
-///
-/// `AO[k] = SMA(median, 5)[k + offset] − SMA(median, 34)[k]` where
-/// `offset = SLOW_PERIOD − FAST_PERIOD` and `median = (high + low) / 2`.
-/// The returned series has length `N − SLOW_PERIOD + 1` (= `N − 33`); entry
-/// `k` corresponds to the resampled point at ending index `k + SLOW_PERIOD − 1`.
-///
-/// Inlined (rather than calling `ao::compute`) per umbrella PRD Decision 6 so
-/// AC stays self-contained with no cross-module coupling to `ao.rs`.
 fn ao_series(points: &[ResampledPointD1]) -> Vec<f64> {
     let medians: Vec<f64> = points
         .iter()
@@ -34,22 +24,10 @@ fn ao_series(points: &[ResampledPointD1]) -> Vec<f64> {
         .collect()
 }
 
-/// Compute the Accelerator/Decelerator oscillator from resampled daily points.
-///
-/// `AC[k] = AO[k + 4] − SMA(AO, 5)[k]` where `AO` is the inlined Awesome
-/// Oscillator series. The first valid AC value is at index `DATA_LIMIT` (37);
-/// warm-up bars produce no `IndicatorValue` entries. Each value is tagged
-/// with the timestamp of the resampled point at index `37 + k` (the newest
-/// contributing point).
-///
-/// Insufficient data (fewer than 38 points) yields an empty buffer, not an
-/// error — consistent with the AO reference and umbrella PRD Decision 10.
 pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, IndicatorError> {
     let ao = ao_series(points);
     let sma_ao = sma(&ao, FAST_PERIOD);
 
-    // AC[k] = AO[k + 4] − SMA(AO, 5)[k]; AO[k+4] ends at index k + 37
-    // (= DATA_LIMIT + k), the newest contributing point.
     let items = sma_ao
         .iter()
         .zip(ao.iter().skip(FAST_PERIOD - 1))
@@ -185,7 +163,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `ac::compute` on the 2400 real EURUSD `resampled_point_d1` rows and
     /// capturing the output. They serve as a regression baseline. The user
     /// will later compare them against an external source of truth.

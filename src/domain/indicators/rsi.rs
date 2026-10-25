@@ -1,32 +1,26 @@
+//! Relative Strength Index (RSI).
+//!
+//! Windowed sums of gains and losses over `n` price diffs (not Wilder's
+//! recursive smoothing), rounded to the nearest integer like the MQL5
+//! source.
 use crate::domain::cast;
 use crate::domain::indicators::{IndicatorError, PriceField};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, ThresholdSeries};
 use crate::validate_period;
 
-/// A price diff tagged with the timestamp of the newer point.
 #[derive(Debug, Clone, Copy)]
 struct PriceDiff {
     timestamp: i64,
     diff: f64,
 }
 
-/// `f64` in `0.0..=100.0` -> `i32`. Used to put validated thresholds in
-/// error payloads. Caller must guarantee the input is in range.
 const fn f64_to_i32_in_0_100(v: f64) -> i32 {
-    // `as` is denied project-wide; this thin wrapper is the allow-listed
-    // site. `f64 -> i32` for v in 0.0..=100.0 cannot overflow.
     #[allow(clippy::as_conversions, clippy::cast_possible_truncation)]
     let i = v as i32;
     i
 }
 
-/// Compute RSI over the resampled points for the given price field.
-///
-/// Mirrors the source algorithm: build per-step price diffs, then for each
-/// window of `n` consecutive diffs sum the gains and losses, compute
-/// `rs = gain / loss` (with `+∞` when loss is 0 and `0` when gain is 0),
-/// `raw_rsi = 100 - 100 / (1 + rs)`, and round to the nearest integer.
 pub fn compute(
     points: &[ResampledPointD1],
     field: PriceField,
@@ -36,7 +30,6 @@ pub fn compute(
 ) -> Result<ThresholdSeries, IndicatorError> {
     validate_period!(n, InvalidRsiPeriod);
 
-    // Range validation (0-100) checked before ordering
     if high_threshold < 0.0 || high_threshold > 100.0 {
         return Err(IndicatorError::InvalidRsiThresholdRange {
             value: f64_to_i32_in_0_100(high_threshold),
@@ -58,7 +51,6 @@ pub fn compute(
 
     let period = cast::i32_to_usize(n);
 
-    // Build per-step price diffs: diff[i] = price[i+1] - price[i].
     let diffs: Vec<PriceDiff> = points
         .iter()
         .zip(points.iter().skip(1))
@@ -68,7 +60,6 @@ pub fn compute(
         })
         .collect();
 
-    // Each RSI point needs `period` consecutive diffs.
     let indicator_values: Vec<IndicatorValue> = if diffs.len() >= period {
         diffs.windows(period).map(compute_rsi_point).collect()
     } else {
@@ -82,10 +73,6 @@ pub fn compute(
     })
 }
 
-/// Compute one RSI value for a window of price diffs.
-///
-/// The window comes from `windows(period)` with `period >= 1` (validated),
-/// so it is never empty; the loop leaves `timestamp` at the last diff's.
 fn compute_rsi_point(window: &[PriceDiff]) -> IndicatorValue {
     let mut gain: f64 = 0.0;
     let mut loss: f64 = 0.0;

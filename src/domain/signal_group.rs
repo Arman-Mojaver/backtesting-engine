@@ -9,22 +9,6 @@ pub struct SignalGroup {
     pub instrument: String,
 }
 
-/// Filters signal groups by annualized operation count.
-///
-/// Enforces [`crate::domain::strategy::GlobalStrategyFilter::min_operation_count`] here,
-/// before strategies exist, because the count is known up front and needs none of the
-/// expensive strategy metrics that draw-down and ROI require — those are applied
-/// later by [`crate::domain::strategy::filter_strategies`].
-///
-/// Groups with zero operations are always excluded, even at a `0.0` threshold, where
-/// `annual_operation_count` would return `0.0` and pass the check: a zero minimum
-/// means "any non-empty group", not "keep everything".
-///
-/// # Arguments
-/// * `signal_groups` - Groups to filter; consumed.
-/// * `min_operation_count` - Minimum annualized count to keep.
-/// * `start_timestamp` - Window start, in unix seconds.
-/// * `end_timestamp` - Window end, in unix seconds.
 pub fn filter_signal_groups_by_annual_ops(
     signal_groups: Vec<SignalGroup>,
     min_operation_count: f64,

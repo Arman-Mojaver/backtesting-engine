@@ -1,3 +1,8 @@
+//! Ports of the MQL5 indicator sources under `Indicators/`.
+//!
+//! Warm-up bars produce no entries and too little data yields an empty
+//! buffer, never an error; a non-positive period is the only configuration
+//! error.
 pub mod ac;
 pub mod ao;
 pub mod bears;
@@ -25,7 +30,6 @@ use crate::domain::indicator::IndicatorParameters;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::IndicatorOutput;
 
-/// Which price component of a resampled point an indicator consumes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PriceField {
     Open,
@@ -45,12 +49,6 @@ impl PriceField {
     }
 }
 
-/// Typed error taxonomy for indicator computation.
-///
-/// Each variant names one invalid indicator configuration (which
-/// indicator, which parameter, the offending value) or a data shortfall,
-/// so callers can report or skip the offending row precisely instead of
-/// aborting the whole run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndicatorError {
     InvalidMacdFastPeriod { n: i32 },
@@ -80,9 +78,6 @@ pub enum IndicatorError {
 }
 
 impl fmt::Display for IndicatorError {
-    // A flat, exhaustive per-variant match is the canonical shape for a
-    // hand-rolled Display (it mirrors what thiserror generates); routing
-    // it through helpers would hide the exact per-variant sentences.
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

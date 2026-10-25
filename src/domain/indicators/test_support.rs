@@ -1,12 +1,12 @@
 //! Test-only fixture: 2400 real EURUSD `resampled_point_d1` rows.
 //!
 //! Frozen as a hardcoded in-repo snapshot so the level-2 indicator regression
-//! tests are hermetic — no database, deterministic, and runnable in CI.
+//! tests are hermetic: no database, deterministic, and runnable in CI.
 //!
 //! Provenance: captured from the development database
 //! (`postgresql://postgres:postgres@localhost:54320/db-development`) as the
 //! last 2400 EURUSD daily rows ending at timestamp 1646352000
-//! (2012-12-04 .. 2022-03-04) — the exact dataset the level-2 baselines were
+//! (2012-12-04 .. 2022-03-04), the exact dataset the level-2 baselines were
 //! captured against. The live DB has since been backfilled (pre-2013) and
 //! extended (post-2022), which is precisely why this snapshot is frozen:
 //! baselines stay stable no matter how the DB evolves.
@@ -2439,7 +2439,7 @@ const EURUSD_D1_ROWS: &[EurUsdRow] = &[
 ];
 
 /// The 2400 real EURUSD daily points the level-2 baselines were captured
-/// against — hardcoded, no database access, deterministic in CI.
+/// against: hardcoded, no database access, deterministic in CI.
 pub fn eurusd_points() -> Vec<ResampledPointD1> {
     EURUSD_D1_ROWS
         .iter()

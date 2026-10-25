@@ -1,3 +1,8 @@
+//! Chaikin Oscillator: an EMA difference over the accumulation/distribution line.
+//!
+//! `CHO[i] = EMA(AD, fast_ma)[i] - EMA(AD, slow_ma)[i]`, where each bar
+//! contributes `((close - low) - (high - close)) / (high - low) * volume`
+//! to the cumulative AD. Ported from `CHO.mq5` (`VOLUME_TICK`).
 use crate::domain::cast;
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
@@ -6,14 +11,6 @@ use crate::domain::signal::{IndicatorValue, OscillatorSeries};
 use crate::empty_oscillator;
 use crate::validate_period;
 
-/// Compute the Accumulation/Distribution (AD) line inline.
-///
-/// Per-bar AD value: `((close - low) - (high - close)) / (high - low) * volume`
-/// when `high != low`, otherwise `0.0`. Cumulated across bars:
-/// `AD[i] = ad_value[i] + AD[i-1]` for `i > 0`; `AD[0] = ad_value[0]`.
-///
-/// Inlined per umbrella PRD Decision 6 (inter-indicator dependencies are
-/// inlined, not cross-module). Returns a `Vec<f64>` of length `N`.
 fn compute_ad(points: &[ResampledPointD1]) -> Vec<f64> {
     let mut ad = Vec::with_capacity(points.len());
     for pt in points {
@@ -29,23 +26,6 @@ fn compute_ad(points: &[ResampledPointD1]) -> Vec<f64> {
     ad
 }
 
-/// Compute the Chaikin Oscillator from resampled daily points.
-///
-/// `CHO[i] = EMA(AD, fast_ma)[i] - EMA(AD, slow_ma)[i]` where AD is the
-/// Accumulation/Distribution line (inlined via `compute_ad`). Both EMAs are
-/// computed via the shared `ema` helper from `moving_averages.rs` (MQL5
-/// `CHO.mq5`, `MODE_EMA` on the AD buffer, `VOLUME_TICK`).
-///
-/// The slow EMA is the limiting factor (`slow_ma >= fast_ma` is validated;
-/// a reversed order is an error).
-/// The slow EMA seed is at index `slow_ma - 1`; CHO starts one bar later at
-/// index `slow_ma` (the MQL5 source sets `PLOT_DRAW_BEGIN = InpSlowMA`). Each
-/// value is tagged with the timestamp of the resampled point at the evaluated
-/// index.
-///
-/// Insufficient data (fewer than `slow_ma + 1` points, i.e. slow EMA has fewer
-/// than 2 entries) yields an empty `items` vector (not an error), per umbrella
-/// PRD Decision 10. A non-positive `fast_ma` or `slow_ma` is an error.
 pub fn compute(
     points: &[ResampledPointD1],
     fast_ma: i32,
@@ -65,21 +45,12 @@ pub fn compute(
     let fast_ema = ema(&ad, fast);
     let slow_ema = ema(&ad, slow);
 
-    // Slow EMA entry `j` corresponds to original index `slow - 1 + j`.
-    // CHO starts at original index `slow` (= slow EMA entry 1), so it
-    // consumes slow EMA entries `1..slow_ema.len()` — requiring at least
-    // two slow EMA entries (i.e. `points.len() >= slow + 1`).
     if slow_ema.len() < 2 {
         empty_oscillator!();
     }
 
-    // Fast EMA entry `j` corresponds to original index `fast - 1 + j`.
-    // At original index `slow + k`, fast EMA entry = `delta + 1 + k` where
-    // `delta = slow - fast` (fast <= slow validated above).
     let delta = slow.saturating_sub(fast);
 
-    // CHO entry k (slow EMA entry j = k + 1) evaluates the bar at original
-    // index `slow + k`.
     let items = slow_ema
         .iter()
         .skip(1)
@@ -234,7 +205,7 @@ mod tests {
 
     /// Placeholder baseline captured from real EURUSD data (frozen fixture in `test_support`).
     ///
-    /// These values are **not ground-truth** — they were produced by running
+    /// These values are **not ground-truth**; they were produced by running
     /// `cho::compute` on the 2400 real EURUSD `resampled_point_d1` rows with
     /// `fast_ma = 3` and `slow_ma = 10` (the MQL5 defaults) and capturing the
     /// output. They serve as a regression baseline. The user will later
