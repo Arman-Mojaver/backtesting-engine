@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.12 | Updated: 2026-10-24 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.13 | Updated: 2026-10-25 -->
 
 # Domain Model — Backtesting Engine
 
@@ -213,7 +213,7 @@ The domain defines repository traits — ports in a ports-and-adapters architect
 | `ResampledPointD1Repository` | `get_all()`, `get_by_instrument(instrument)`, `index_by_instrument()` (default) | Daily candles |
 | `IndicatorRepository` | `get_all()` | Indicators |
 
-Infrastructure provides the `Pg*Adapter` (PostgreSQL) implementations. The in-memory test repos were removed (2026-08); tests use `domain::fixtures` builders + `tempfile`-based adapter tests instead. There is no dedicated money-management-strategy adapter: `strategy metadata` currently derives distinct money-management ids from the long operation-point table (`PgLongOperationPointAdapter::get_distinct_mms_ids()`); this will change in Ticket 6, which unions the long and short sources.
+Infrastructure provides the `Pg*Adapter` (PostgreSQL) implementations. The in-memory test repos were removed (2026-08); tests use `domain::fixtures` builders + `tempfile`-based adapter tests instead. There is no dedicated money-management-strategy adapter: `strategy metadata` derives distinct money-management ids from the long operation-point table (`PgLongOperationPointAdapter::get_distinct_mms_ids()`). The long and short tables carry the same money-management id set (written together by the upstream Backtesting-4.0 project), so the long table alone is a complete id universe.
 
 PG adapters expose extra read methods beyond the traits: `get_all_indicator_ids()`, `get_distinct_instruments()`, `get_distinct_mms_ids()` (used by `strategy metadata` and `create_loop`).
 
