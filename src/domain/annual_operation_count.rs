@@ -1,8 +1,9 @@
 use crate::domain::cast;
+
 const SECONDS_PER_DAY: f64 = 86400.0;
 const DAYS_PER_YEAR: f64 = 365.25;
 
-fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
+pub fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
     let days = cast::i64_to_f64(end_timestamp.saturating_sub(start_timestamp)) / SECONDS_PER_DAY;
     if days <= 0.0 {
         return 0.0;
@@ -21,7 +22,7 @@ pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_time
     }
 
     let annualized = cast::usize_to_f64(total_count) / years;
-    (annualized * 100.0).round() / 100.0
+    cast::round_to(annualized, 2)
 }
 
 #[cfg(test)]

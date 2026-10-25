@@ -32,3 +32,8 @@ pub fn usize_to_i32(n: usize) -> i32 {
 pub fn i32_to_usize(n: i32) -> usize {
     usize::try_from(n).unwrap_or(usize::MAX)
 }
+
+pub fn round_to(value: f64, decimals: i32) -> f64 {
+    let multiplier = 10_f64.powi(decimals);
+    (value * multiplier).round() / multiplier
+}

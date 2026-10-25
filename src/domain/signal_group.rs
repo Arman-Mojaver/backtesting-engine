@@ -29,7 +29,7 @@ pub fn filter_signal_groups_by_annual_ops(
 mod tests {
     use super::*;
 
-    const ONE_YEAR_SECS: i64 = 365 * 86400;
+    const ONE_YEAR_SECS: i64 = 31_557_600; // 365.25 * 86400
 
     fn make_group(long_count: usize, short_count: usize) -> SignalGroup {
         SignalGroup {

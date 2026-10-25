@@ -1,8 +1,6 @@
+use crate::domain::annual_operation_count::difference_in_years;
 use crate::domain::cast;
 use crate::domain::operation_point::OperationPoint;
-
-const SECONDS_PER_DAY: f64 = 86400.0;
-const DAYS_PER_YEAR: f64 = 365.25;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PerformanceMetrics {
@@ -36,8 +34,8 @@ pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceM
     }
 
     PerformanceMetrics {
-        global_roi: ((cumsum - 1.0) * 10000.0).round() / 100.0,
-        max_draw_down: (max_dd * 10000.0).round() / 100.0,
+        global_roi: cast::round_to((cumsum - 1.0) * 100.0, 2),
+        max_draw_down: cast::round_to(max_dd * 100.0, 2),
     }
 }
 
@@ -50,16 +48,8 @@ impl PerformanceMetrics {
 
         let global_accumulated = 1.0 + self.global_roi / 100.0;
         let annual_accumulated = global_accumulated.powf(1.0 / years);
-        ((annual_accumulated - 1.0) * 10000.0).round() / 100.0
+        cast::round_to((annual_accumulated - 1.0) * 100.0, 2)
     }
-}
-
-fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
-    let days = cast::i64_to_f64(end_timestamp.saturating_sub(start_timestamp)) / SECONDS_PER_DAY;
-    if days <= 0.0 {
-        return 0.0;
-    }
-    days / DAYS_PER_YEAR
 }
 
 #[cfg(test)]
