@@ -1000,6 +1000,49 @@ Data management and the iteration table are reached exclusively through the comp
 
 ---
 
+## Decision: Remove the `strategy metadata` Command
+
+**Date**: 2026-10-25
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+`bt-engine strategy metadata` was a read-only diagnostic: it cross-referenced DB state (distinct instruments, money-management ids, indicator ids) with the processed manifest and printed the done vs remaining `(instrument, mms_id, indicator_id)` triples. It was born as a free by-product of the Processed Manifest decision (2026-08-07) and changed no state. It existed as a one-consumer surface: a CLI handler, an application module with 11 tests, and three PG adapter read methods that nothing else called. In the ongoing dead-code sweep series (server scaffold, `strategy generate`, in-memory repos, `ct` CLI), the command was removed to shrink the CLI to the engine's actual job: compute (`create` / `create_loop`).
+
+### Decision
+Remove the command and everything that existed only to serve it (465 lines total):
+- `src/engine/strategy/metadata.rs` (59 lines) deleted; `StrategyCommand::Metadata` variant, subcommand, parse arm, execute arm removed from `src/engine/strategy/mod.rs`
+- `src/application/metadata_report.rs` (406 lines, 11 inline tests) deleted; module removed from `src/application/mod.rs`
+- Three metadata-only PG adapter methods deleted from `src/infrastructure/pg_adapter.rs`: `get_distinct_mms_ids()`, `get_distinct_instruments()`, `get_all_indicator_ids()` — adapters, constructors, and trait impls stay (used by `create_loop` and `fetch_source_data`)
+- Shared infrastructure untouched: `ParquetProcessedManifest` (incl. `read_processed_ids_per_cell()`), `domain::cast`, config resolution
+- README + project-intelligence docs updated to match
+
+### Rationale
+- CLI surface shrinks to the two compute commands — one mental model: `bt-engine strategy create|create_loop`
+- Removes a one-consumer surface: fewer modules to lint/test, three fewer adapter methods to keep schema-synced
+- The manifest ledger is untouched — done/remaining remains derivable by diffing DB ids against `processed.parquet` whenever a progress report is actually needed
+- Removal is purely subtractive: exhaustive grep + clippy's denied `dead_code` lint + the full test suite verify nothing dangles
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep the command as operator tooling | Progress report for free | One-consumer surface duplicating what `create_loop` already skips/logs; costs a module + tests + adapter methods | Dead-code sweep takes precedence |
+| Move reporting into the companion Python service | Keeps a packaged progress report | Adds a manifest+DB read path to the service for a diagnostic | YAGNI; derive on demand instead |
+| Keep `metadata_report` module, drop only the CLI | Report logic stays testable | Dead module with zero callers — exactly what the sweep removes | Contradicts the removal |
+
+### Impact
+**Positive**: Smaller CLI surface; 465 fewer lines; three fewer adapter methods; 11 fewer tests with zero coverage loss (no other code used those paths)
+**Negative**: No one-command progress report — operators derive done/remaining from the manifest vs DB when needed
+**Risk**: Low — subtractive change; clippy dead-code deny + test suite gate the result
+
+### Related
+- Deprecates item 3 of: Processed Manifest + Idempotent Partitions (2026-08-07) — the manifest itself (items 1–2) remains in force
+- Same sweep precedent: server scaffold (2026-06-04), `strategy generate` (2026-06-28), in-memory repos (2026-08), `ct` CLI (2026-10-21)
+- Implementation: deletion of `src/engine/strategy/metadata.rs` + `src/application/metadata_report.rs`; edits to `src/engine/strategy/mod.rs`, `src/application/mod.rs`, `src/infrastructure/pg_adapter.rs`
+- Documentation updates: `README.md`, `.opencode/context/project-intelligence/{domain-model,business-tech-bridge,business-domain,living-notes}.md`
+
+---
+
 ## Deprecated Decisions
 
 | Decision | Date | Replaced By | Why |
@@ -1011,6 +1054,7 @@ Data management and the iteration table are reached exclusively through the comp
 | `eprintln!` progress output | pre-2026-08 | Structured Logging via `log` + `simplelog` (2026-08-29) | Batch tooling needs levels, timestamps, and file routing |
 | Manual Docker build/push (Makefile only) | pre-2026-09 | CI Workflow (2026-09-03) | Publishing must be gated on fmt + clippy + tests |
 | `ct` Python-wrapping CLI binary | 2026-10-21 | Remove the `ct` Python-Wrapping CLI (2026-10-21) | Operator frontend had no unique capability; dragged Python forward path and Docker indirection into the engine |
+| `strategy metadata` command (item 3 of the Processed Manifest decision) | 2026-08-07 | Remove the `strategy metadata` Command (2026-10-25) | Read-only diagnostic with no other consumers; done/remaining stays derivable from the manifest ledger |
 
 ## Onboarding Checklist
 

@@ -44,7 +44,7 @@ Solution: A Rust engine that loads historical OHLCV candles, long/short trade re
 The engine is in **active development** — the strategy pipeline is real end-to-end:
 - ✅ Domain model defined (entities, repository traits)
 - ✅ Five validation rules implemented and tested (fail-fast, ordered)
-- ✅ Engine CLI (`bt-engine` binary: strategy create, create_loop, metadata)
+- ✅ Engine CLI (`bt-engine` binary: strategy create, create_loop)
 - ✅ Environment/DB configuration (production / development / testing)
 - ✅ PostgreSQL adapters for indicators, operation points, resampled points (+ indexed batch loads)
 - ✅ `Strategy` entity + `GlobalStrategyFilter` + `filter_strategies()` (DD ≤ 30%, ROI ≥ 5%)
@@ -59,7 +59,6 @@ The engine is in **active development** — the strategy pipeline is real end-to
 - ✅ Partitioned Parquet persistence (instrument × MMS, ZSTD, idempotent by indicator_id)
 - ✅ Processed manifest — idempotency ledger of (instrument, mms_id, indicator_id) triples
 - ✅ `create_loop` — batch pipeline over all cells, parallel compute + persist
-- ✅ `metadata` — DB vs manifest progress report
 - ✅ CI: fmt + clippy (-D warnings) + 429 tests + Docker build/push
 - ⬜ MACD signal generation (parameters parse, compute unsupported — skipped for now)
 - ⬜ Exit-date-aware metrics (ROI/DD currently assume operations close in entry order — see living-notes)

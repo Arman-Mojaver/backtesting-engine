@@ -38,7 +38,6 @@
 | **Strategy Runner** | The core use case: validate → signal groups → filter by annual ops → create strategies (real metrics) → filter by DD/ROI. | `run_strategies` | `application::strategy_runner` |
 | **Strategy Generator** | Builds `Strategy` records from signal groups + operation points, computing real metrics (`annual_roi`, `max_draw_down`, `annual_operation_count`) for each. Parallelized with rayon. | `create_strategies`, `create_strategy` | `application::strategy_generator` |
 | **Source Data** | The fetched-from-PostgreSQL inputs for strategy generation: indicators, resampled points, long/short operation points for one (instrument, mms_id). | `SourceData`, `fetch_source_data` | `application::source_data` |
-| **Metadata Report** | DB-vs-manifest progress report: which (instrument, mms_id, indicator_id) triples are processed and which remain. | `build_metadata_report` | `application::metadata_report` |
 | **Global ROI** | Total return on investment across a sequence of operation points, as a percentage. Compounds each trade's contribution against a running cummax. Computed together with max draw down in one pass. | `f64` field on `PerformanceMetrics` | `domain::performance_metrics` |
 | **Signal Generator** | Produces `SignalGroup`s from indicators + resampled points by computing real indicator outputs (`create_indicator_output`) and applying signal semantics (zero-cross / threshold / crossover). Memoized per `(indicator_id, instrument)` via the `cached` crate. | `create_signal_groups` | `application::signal_generator` |
 
@@ -213,9 +212,9 @@ The domain defines repository traits — ports in a ports-and-adapters architect
 | `ResampledPointD1Repository` | `get_all()`, `get_by_instrument(instrument)`, `index_by_instrument()` (default) | Daily candles |
 | `IndicatorRepository` | `get_all()` | Indicators |
 
-Infrastructure provides the `Pg*Adapter` (PostgreSQL) implementations. The in-memory test repos were removed (2026-08); tests use `domain::fixtures` builders + `tempfile`-based adapter tests instead. There is no dedicated money-management-strategy adapter: `strategy metadata` derives distinct money-management ids from the long operation-point table (`PgLongOperationPointAdapter::get_distinct_mms_ids()`). The long and short tables carry the same money-management id set (written together by the upstream Backtesting-4.0 project), so the long table alone is a complete id universe.
+Infrastructure provides the `Pg*Adapter` (PostgreSQL) implementations. The in-memory test repos were removed (2026-08); tests use `domain::fixtures` builders + `tempfile`-based adapter tests instead. There is no dedicated money-management-strategy adapter: `create_loop` derives its cell universe from the operation-point indexes themselves (`index_by_cell()`), and the long and short tables carry the same money-management id set (written together by the upstream Backtesting-4.0 project).
 
-PG adapters expose extra read methods beyond the traits: `get_all_indicator_ids()`, `get_distinct_instruments()`, `get_distinct_mms_ids()` (used by `strategy metadata` and `create_loop`).
+PG adapters expose no extra public read methods beyond the repository traits.
 
 ---
 
@@ -231,7 +230,6 @@ PG adapters expose extra read methods beyond the traits: `get_all_indicator_ids(
 | `run_strategies` | `application::strategy_runner` | The core use case: `validate_all` → `create_signal_groups` → `filter_signal_groups_by_annual_ops` → `create_strategies` → `filter_strategies`. |
 | `get_unprocessed` | `application::strategy_runner_utils` | Set-diff of all indicator IDs vs manifest-processed IDs. |
 | `CellOutput` | `application::cell_output` | One cell's compute result: instrument, mms_id, strategies, processed indicator IDs. |
-| `build_metadata_report` | `application::metadata_report` | DB state vs manifest state → remaining (instrument, mms_id, indicator_id) triples report. |
 
 ---
 
@@ -257,7 +255,7 @@ Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_
 `{root_dir}/processed.parquet` — schema: `instrument` (Utf8), `mms_id` (Int32), `indicator_id` (Int32), `processed_at` (Int64).
 - `read(instrument, mms_id)`, `read_processed_ids_per_cell()`, `append(...)`, `append_all(entries, processed_at)`.
 - Dedups on the (instrument, mms_id, indicator_id) triple; atomic writes (temp file + rename).
-- Consumed by `strategy create` (skip processed), `create_loop` (per-cell skip), `strategy metadata` (progress report).
+- Consumed by `strategy create` (skip processed) and `create_loop` (per-cell skip).
 
 ---
 
@@ -282,7 +280,6 @@ src/
 ├── application/                # Orchestration between domain & infrastructure
 │   ├── mod.rs
 │   ├── cell_output.rs          # CellOutput — one (instrument, mms_id) cell's compute result
-│   ├── metadata_report.rs      # DB vs manifest progress report
 │   ├── signal_generator.rs     # create_signal_groups() — REAL indicator-derived signals
 │   ├── source_data.rs          # fetch_source_data() — PG-backed data assembly
 │   ├── strategy_generator.rs   # create_strategies() / create_strategy() — real metrics
@@ -313,10 +310,9 @@ src/
 ├── engine/                     # Standalone Rust CLI engine (own binary)
 │   ├── mod.rs                  # EngineCommand enum, build_cli(), parse(), execute()
 │   └── strategy/               # bt-engine strategy commands
-│       ├── mod.rs              # StrategyCommand enum (create, create_loop, metadata)
+│       ├── mod.rs              # StrategyCommand enum (create, create_loop)
 │       ├── create.rs           # strategy create — single cell pipeline
-│       ├── create_loop.rs      # strategy create_loop — all cells, parallel, idempotent
-│       └── metadata.rs         # strategy metadata — DB vs manifest report
+│       └── create_loop.rs      # strategy create_loop — all cells, parallel, idempotent
 ├── infrastructure/             # Adapters (PG, parquet, manifest, logging)
 │   ├── pg_adapter.rs           # PG adapters implementing domain repo traits
 │   ├── strategy_adapter.rs     # ParquetStrategyRepository (partitioned, idempotent parquet writes)

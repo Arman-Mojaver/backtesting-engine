@@ -18,7 +18,7 @@
 | MACD indicator unsupported | MACD rows parse from DB but `create_indicator_output` returns `UnsupportedIndicator`; MACD strategies are silently skipped | Medium | Implement MACD compute (fast/slow MA diff + signal line → Crossover output kind) |
 | PG adapter hand-parses indicator JSON | `json_extract_str`/`json_extract_i32` are panic-on-miss string scanners, not a real JSON parser | Medium | Replace with `serde_json` parsing once `serde` is on the hot path, or keep for performance |
 | DbConfig is hardcoded per environment | Host (`host.docker.internal`), ports, and credentials cannot be overridden by env vars | Medium | Fine for the Docker workflow; add env overrides if the engine must target arbitrary PG instances |
-| Engine CLI handlers have no direct unit tests | `create.rs` / `create_loop.rs` / `metadata.rs` handlers are thin but untested; the functions they call ARE tested | Low-Medium | Logic is pushed into tested application/infrastructure functions; add handler tests if handlers grow |
+| Engine CLI handlers have no direct unit tests | `create.rs` / `create_loop.rs` handlers are thin but untested; the functions they call ARE tested | Low-Medium | Logic is pushed into tested application/infrastructure functions; add handler tests if handlers grow |
 | Parquet write cost at scale | Partition append = full file rewrite; `max_strategy_id()` scans all partitions | Low | Fine at current scale; rethink if partition counts grow by orders of magnitude |
 
 ### Technical Debt Details
@@ -44,7 +44,7 @@
 *Resolution*: `create_signal_groups()` now computes real indicator outputs via `create_indicator_output()` (14 indicators) and derives signals via zero-cross / threshold / crossover semantics in `domain/signal/`. MACD remains the one unsupported indicator (skipped, not aborted).
 
 **~~Engine module has no unit tests~~ (PARTIALLY RESOLVED)**
-*Resolution*: The logic the engine handlers call is now tested: `application` (signal_generator 5, metadata_report 11, strategy_runner_utils 5), `infrastructure` (strategy_adapter 13, processed_manifest 8, strategy_persistence 1, logging 5). The thin `engine/strategy/*.rs` handlers themselves remain untested — acceptable while they stay thin.
+*Resolution*: The logic the engine handlers call is now tested: `application` (signal_generator 5, strategy_runner_utils 5), `infrastructure` (strategy_adapter 13, processed_manifest 8, strategy_persistence 1, logging 5). The thin `engine/strategy/*.rs` handlers themselves remain untested — acceptable while they stay thin.
 
 **~~Missing HTTP API layer~~ (DEFERRED — deliberate)**
 *Status*: Deferred (YAGNI). Actix-web scaffold removed 2026-06-04. Re-add when API consumers exist.
@@ -75,7 +75,7 @@
 - **Single-binary engine** — The engine is the entire CLI surface (`bt-engine`); data management and the iteration table belong to the companion Python service, accessed there directly.
 - **Application layer** — `run_strategies()` keeps `engine/` CLI handlers thin and reusable across binaries.
 - **Parquet partitioning by (instrument, mms_id)** — Mirrors the single-instrument/single-MMS backtest constraint; enables partition pruning.
-- **Processed manifest** — Idempotency ledger makes `create`/`create_loop` safely re-runnable; `metadata` gives operators a progress report for free.
+- **Processed manifest** — Idempotency ledger makes `create`/`create_loop` safely re-runnable.
 - **Batch parallelism in create_loop** — Load each table once (`rayon::join`), index in memory, compute cells with `par_iter`, persist in one batch. Scales without changing the per-cell logic.
 
 ### What Could Be Better
@@ -119,7 +119,6 @@
 | Real signal generation | Indicator outputs → SignalGroup via oscillator/threshold/crossover semantics | Arman Mojaver | Complete |
 | Processed manifest + idempotency | Ledger of (instrument, mms_id, indicator_id) triples; atomic writes | Arman Mojaver | Complete |
 | create_loop batch pipeline | All cells: load once, parallel compute, batch persist | Arman Mojaver | Complete |
-| metadata command | DB vs manifest progress report | Arman Mojaver | Complete |
 | CI workflow | fmt + clippy -D warnings + tests + Docker build/push (pinned 1.98.1) | Arman Mojaver | Complete |
 | Exit-date-aware metrics | Compound on exit order, not entry order | Arman Mojaver | Pending — high priority |
 | MACD compute | Crossover-kind output for MACD parameters | Arman Mojaver | Pending |

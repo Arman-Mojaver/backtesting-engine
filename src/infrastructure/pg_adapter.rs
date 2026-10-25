@@ -254,16 +254,6 @@ impl PgLongOperationPointAdapter {
             conn: RefCell::new(conn),
         })
     }
-
-    pub fn get_distinct_mms_ids(&self) -> anyhow::Result<Vec<i32>> {
-        fetch_rows(
-            &self.conn,
-            "long_operation_point distinct mms_ids",
-            "SELECT DISTINCT money_management_strategy_id FROM long_operation_point ORDER BY 1",
-            &[],
-            |r| Ok(r.get("money_management_strategy_id")),
-        )
-    }
 }
 
 impl LongOperationPointRepository for PgLongOperationPointAdapter {
@@ -348,16 +338,6 @@ impl PgResampledPointAdapter {
             conn: RefCell::new(conn),
         })
     }
-
-    pub fn get_distinct_instruments(&self) -> anyhow::Result<Vec<String>> {
-        fetch_rows(
-            &self.conn,
-            "resampled_point_d1 distinct instruments",
-            "SELECT DISTINCT instrument FROM resampled_point_d1 ORDER BY 1",
-            &[],
-            |r| Ok(r.get("instrument")),
-        )
-    }
 }
 
 impl ResampledPointD1Repository for PgResampledPointAdapter {
@@ -396,16 +376,6 @@ impl PgIndicatorAdapter {
         Ok(Self {
             conn: RefCell::new(conn),
         })
-    }
-
-    pub fn get_all_indicator_ids(&self) -> anyhow::Result<Vec<i32>> {
-        fetch_rows(
-            &self.conn,
-            "indicator ids",
-            "SELECT id FROM indicator ORDER BY 1",
-            &[],
-            |r| Ok(r.get("id")),
-        )
     }
 }
 

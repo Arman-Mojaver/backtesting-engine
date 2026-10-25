@@ -1,6 +1,5 @@
 mod create;
 mod create_loop;
-mod metadata;
 
 use clap::{value_parser, Arg, ArgMatches, Command};
 
@@ -10,7 +9,6 @@ pub enum StrategyCommand {
         instrument: String,
     },
     CreateLoop,
-    Metadata,
 }
 
 pub fn build_strategy_cli() -> Command {
@@ -42,10 +40,6 @@ pub fn build_strategy_cli() -> Command {
             Command::new("create_loop")
                 .about("Run idempotent strategy pipeline for all (instrument, mms_id) pairs"),
         )
-        .subcommand(
-            Command::new("metadata")
-                .about("Show metadata: DB vs manifest state and remaining triples"),
-        )
 }
 
 pub fn parse_strategy(m: &ArgMatches) -> anyhow::Result<StrategyCommand> {
@@ -62,7 +56,6 @@ pub fn parse_strategy(m: &ArgMatches) -> anyhow::Result<StrategyCommand> {
                 .unwrap_or_else(|| "EURUSD".to_string()),
         }),
         Some(("create_loop", _sub_m)) => Ok(StrategyCommand::CreateLoop),
-        Some(("metadata", _sub_m)) => Ok(StrategyCommand::Metadata),
         _ => anyhow::bail!("invalid strategy command"),
     }
 }
@@ -75,7 +68,6 @@ impl StrategyCommand {
                 instrument,
             } => create::execute(money_management_strategy_id, &instrument),
             Self::CreateLoop => create_loop::execute(),
-            Self::Metadata => metadata::execute(),
         }
     }
 }

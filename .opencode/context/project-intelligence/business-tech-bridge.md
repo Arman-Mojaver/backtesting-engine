@@ -40,7 +40,6 @@
 | Run the full pipeline for one cell | `run_strategies()` | `src/application/strategy_runner.rs` | validate → signals → filter ops → strategies → filter DD/ROI |
 | Which indicators are already done? | `get_unprocessed()` | `src/application/strategy_runner_utils.rs` | Set-diff DB indicator IDs vs manifest |
 | One cell's compute result | `CellOutput` | `src/application/cell_output.rs` | instrument, mms_id, strategies, processed IDs |
-| DB vs manifest progress | `build_metadata_report()` | `src/application/metadata_report.rs` | Remaining (instrument, mms_id, indicator_id) triples |
 | Write strategies to parquet | `ParquetStrategyRepository::write()` / `write_rows()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD; idempotent by indicator_id; IDs assigned at write time |
 | Record processed indicators | `ParquetProcessedManifest` | `src/infrastructure/processed_manifest.rs` | `processed.parquet` ledger; atomic writes; dedup per triple |
 | Batch commit (create_loop) | `StrategyPersistence::persist_cells()` | `src/infrastructure/strategy_persistence.rs` | Assign IDs once, write partitions in parallel, commit manifest once |
@@ -48,7 +47,6 @@
 | Engine CLI module | Command tree for `bt-engine` (the sole CLI) | `src/engine/mod.rs` | `EngineCommand` enum + `build_cli()`, `parse()`, `execute()` |
 | Engine strategy create | `bt-engine strategy create -m <mms_id> [-i <instrument>]` | `src/engine/strategy/create.rs` | fetch → manifest diff → run_strategies → parquet → manifest append |
 | Engine strategy create_loop | `bt-engine strategy create_loop` | `src/engine/strategy/create_loop.rs` | All cells: load once (rayon::join) → parallel compute → batch persist |
-| Engine strategy metadata | `bt-engine strategy metadata` | `src/engine/strategy/metadata.rs` | DB vs manifest state + remaining triples |
 | Refresh engine binary after changes | `cargo install --path . --bin bt-engine --force` | `Cargo.toml` defines the single `[[bin]]` entry | Installs updated `bt-engine` to `~/.cargo/bin/bt-engine` |
 | Parquet files volume | `${PARQUET_FILES_PATH}:/app/parquet_files` | `docker-compose.yaml`, `.env.example` | Host path configurable via `PARQUET_FILES_PATH` env var |
 
@@ -74,7 +72,6 @@ Business Question                              Code Path
 "Create strategies for one cell?"         →   bt-engine strategy create -m <mms_id> [-i <instrument>]
 "Create strategies for everything?"       →   bt-engine strategy create_loop (load once → parallel cells → batch persist)
 "Which indicators are already processed?" →   ParquetProcessedManifest::read() / read_processed_ids_per_cell()
-"How much work remains?"                  →   bt-engine strategy metadata
 ```
 
 ## Adding New Features — Where Things Go

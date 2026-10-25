@@ -202,7 +202,6 @@ directory).
 ```
 bt-engine strategy create -m <MMS_ID> [-i <INSTRUMENT>]   # one cell (default instrument: EURUSD)
 bt-engine strategy create_loop                           # all cells, idempotent batch
-bt-engine strategy metadata                             # DB vs manifest progress report
 ```
 
 ## Output format
@@ -244,7 +243,6 @@ A single Parquet ledger next to the partitions records every completed
 `(instrument, MMS, indicator)` triple with a completion timestamp. It is the engine's
 idempotency ledger: `create` and `create_loop` compute only what it doesn't list,
 appends are deduplicated on the triple, and writes are atomic (temp file + rename).
-`strategy metadata` turns it into a progress report for free.
 
 ## Configuration
 
