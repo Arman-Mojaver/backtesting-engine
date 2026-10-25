@@ -1,5 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
 use anyhow::Context;
 use log::info;
 
@@ -26,26 +24,23 @@ pub fn execute() -> anyhow::Result<()> {
     let resampled_adapter = PgResampledPointAdapter::new(&conn_string)
         .context("Failed to connect for resampled points")?;
     let long_adapter = PgLongOperationPointAdapter::new(&conn_string)
-        .context("Failed to connect for operation points")?;
+        .context("Failed to connect for long operation points")?;
 
     let indicator_ids = indicator_adapter.get_all_indicator_ids()?;
     let instruments = resampled_adapter.get_distinct_instruments()?;
+    // The long and short operation-point tables carry the same
+    // money-management id set (written together by the upstream
+    // Backtesting-4.0 project), so the long table alone is a complete
+    // id universe — no need to also query the short table here.
     let mms_ids = long_adapter.get_distinct_mms_ids()?;
 
-    // Fetch manifest state
+    // Fetch manifest state in a single decode: the one-pass map builder reads
+    // the manifest parquet once and returns the processed-indicator-id set for
+    // every cell in it — including cells with no DB presence (manifest-only
+    // cells), which the report builder renders with zero DB indicators.
     let root_dir = parquet_root_dir(env);
     let manifest = ParquetProcessedManifest::new(root_dir);
-
-    let mut processed_ids_per_cell: HashMap<(String, i32), HashSet<i32>> = HashMap::new();
-    for instrument in &instruments {
-        for mms_id in &mms_ids {
-            let rows = manifest.read(instrument, *mms_id)?;
-            let ids: HashSet<i32> = rows.iter().map(|r| r.indicator_id).collect();
-            if !ids.is_empty() {
-                processed_ids_per_cell.insert((instrument.clone(), *mms_id), ids);
-            }
-        }
-    }
+    let processed_ids_per_cell = manifest.read_processed_ids_per_cell()?;
 
     let db_state = DbMetadataState {
         instruments,

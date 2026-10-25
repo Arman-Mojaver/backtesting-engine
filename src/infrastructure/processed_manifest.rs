@@ -434,4 +434,46 @@ mod tests {
             "processed.parquet.tmp should not exist after rename"
         );
     }
+
+    #[test]
+    fn read_processed_ids_per_cell_returns_every_cell() {
+        let (_tmp, manifest) = new_manifest();
+
+        manifest
+            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .expect("EURUSD 390");
+        manifest
+            .append("EURUSD", 391, &[2002], 1700000000)
+            .expect("EURUSD 391");
+        manifest
+            .append("USDJPY", 390, &[3001], 1700000000)
+            .expect("USDJPY 390");
+
+        let map = manifest.read_processed_ids_per_cell().expect("map");
+
+        // One entry per distinct (instrument, mms_id) cell, each carrying the
+        // cell's full processed-indicator-id set — unfiltered by any external
+        // cell universe, so manifest-only cells reach the report builder.
+        assert_eq!(map.len(), 3);
+        assert_eq!(
+            map.get(&("EURUSD".to_string(), 390)),
+            Some(&HashSet::from([2001, 2002]))
+        );
+        assert_eq!(
+            map.get(&("EURUSD".to_string(), 391)),
+            Some(&HashSet::from([2002]))
+        );
+        assert_eq!(
+            map.get(&("USDJPY".to_string(), 390)),
+            Some(&HashSet::from([3001]))
+        );
+    }
+
+    #[test]
+    fn read_processed_ids_per_cell_on_empty_manifest_is_empty() {
+        let (_tmp, manifest) = new_manifest();
+
+        let map = manifest.read_processed_ids_per_cell().expect("map");
+        assert!(map.is_empty());
+    }
 }
