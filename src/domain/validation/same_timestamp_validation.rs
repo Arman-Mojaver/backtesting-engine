@@ -68,7 +68,7 @@ mod tests {
     fn test_long_is_not_subset_of_resampled() {
         let resampled = resampled_points_ts_123();
         let long = op_points_ts_124();
-        let short = op_points_ts_123();
+        let short = op_points_ts_124();
 
         assert_eq!(
             validate_timestamps_match(&resampled[..], &long[..], &short[..]),
@@ -79,11 +79,11 @@ mod tests {
     #[test]
     fn test_short_is_not_subset_of_resampled() {
         let resampled = resampled_points_ts_123();
-        let long = op_points_ts_124();
-        let short = op_points_ts_123();
+        let long = op_points_ts_123();
+        let short = op_points_ts_124();
 
         assert_eq!(
-            validate_timestamps_match(&resampled[..], &long[..], &short[..]),
+            validate_timestamps_match(&resampled[..], &long[..2], &short[..]),
             Err(ValidationError::TimestampMismatch)
         );
     }
