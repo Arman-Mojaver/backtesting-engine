@@ -25,10 +25,6 @@ pub const fn round_f64_to_i128(x: f64) -> i128 {
     x.round() as i128
 }
 
-pub fn usize_to_i32(n: usize) -> i32 {
-    i32::try_from(n).unwrap_or(i32::MAX)
-}
-
 pub fn i32_to_usize(n: i32) -> usize {
     usize::try_from(n).unwrap_or(usize::MAX)
 }

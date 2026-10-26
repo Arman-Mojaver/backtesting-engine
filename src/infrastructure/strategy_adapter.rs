@@ -5,7 +5,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use arrow::array::{
-    AsArray, Decimal128Array, Int32Array, Int32Builder, Int64Array, ListArray, PrimitiveArray,
+    AsArray, Decimal128Array, Int32Array, Int32Builder, Int64Array, ListArray, ListBuilder,
+    PrimitiveArray,
 };
 use arrow::datatypes::{DataType, Decimal128Type, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
@@ -314,26 +315,14 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
 }
 
 fn build_list_column(rows: &[StrategyRow], extract: fn(&StrategyRow) -> &[i32]) -> ListArray {
-    let mut values_builder = Int32Builder::new();
-    let mut offsets: Vec<i32> = Vec::with_capacity(rows.len().saturating_add(1));
-    let mut offset: i32 = 0;
-    offsets.push(offset);
+    // ListBuilder's default inner field is ("item", Int32, nullable), which
+    // matches the schema in build_record_batch.
+    let mut builder = ListBuilder::with_capacity(Int32Builder::new(), rows.len());
     for r in rows {
-        let ids = extract(r);
-        for id in ids {
-            values_builder.append_value(*id);
-        }
-        offset = offset.saturating_add(cast::usize_to_i32(ids.len()));
-        offsets.push(offset);
+        builder.values().append_slice(extract(r));
+        builder.append(true);
     }
-    let values = values_builder.finish();
-    let offset_buf = arrow::buffer::OffsetBuffer::new(arrow::buffer::ScalarBuffer::from(offsets));
-    ListArray::new(
-        arrow::datatypes::Field::new("item", arrow::datatypes::DataType::Int32, true).into(),
-        offset_buf,
-        Arc::new(values),
-        None,
-    )
+    builder.finish()
 }
 
 #[cfg(test)]
