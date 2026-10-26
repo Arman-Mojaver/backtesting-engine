@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
 use log::info;
 
@@ -7,7 +7,7 @@ use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::config::environment::{parquet_base_dir, parquet_root_dir, resolve_environment};
-use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
+use crate::infrastructure::processed_manifest::{unix_now_secs, ParquetProcessedManifest};
 use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
 
 pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
@@ -68,9 +68,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
     repo.write(instrument, money_management_strategy_id, &strategies)?;
     info!("Parquet write done in {:?}", write_start.elapsed());
 
-    let processed_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0));
+    let processed_at = unix_now_secs()?;
 
     info!(
         "Appending {} unprocessed indicator IDs to manifest ...",

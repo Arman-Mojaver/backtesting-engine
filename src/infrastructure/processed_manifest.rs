@@ -4,7 +4,9 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use anyhow::Context;
 use arrow::array::{AsArray, Int32Array, Int64Array, StringBuilder};
 use arrow::datatypes::{DataType, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
@@ -24,6 +26,16 @@ static TEMP_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
 fn temp_path_for(path: &Path) -> PathBuf {
     let seq = TEMP_FILE_SEQ.fetch_add(1, Ordering::Relaxed);
     path.with_extension(format!("parquet.tmp-{}-{seq}", std::process::id()))
+}
+
+/// Current wall-clock time as Unix seconds, for stamping `processed_at`.
+/// Fails rather than falling back to epoch 0 if the clock is before 1970.
+pub(crate) fn unix_now_secs() -> anyhow::Result<i64> {
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .context("system clock is set before the Unix epoch")?
+        .as_secs();
+    i64::try_from(secs).with_context(|| format!("Unix timestamp {secs} does not fit in i64"))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -258,6 +270,12 @@ mod tests {
         let tmp = TempDir::new().expect("tempdir");
         let manifest = ParquetProcessedManifest::new(tmp.path().to_string_lossy().to_string());
         (tmp, manifest)
+    }
+
+    #[test]
+    fn unix_now_secs_is_after_2020() {
+        let now = unix_now_secs().expect("clock");
+        assert!(now > 1_600_000_000, "unexpected timestamp {now}");
     }
 
     #[test]

@@ -1,10 +1,9 @@
 use std::collections::{HashMap, HashSet};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use rayon::prelude::*;
 
 use crate::application::cell_output::CellOutput;
-use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
+use crate::infrastructure::processed_manifest::{unix_now_secs, ParquetProcessedManifest};
 use crate::infrastructure::strategy_adapter::{ParquetStrategyRepository, StrategyRow};
 
 pub struct CellOutputDto {
@@ -70,9 +69,7 @@ impl StrategyPersistence {
                 .write_rows(&c.instrument, c.mms_id, c.strategy_rows)
         })?;
 
-        let processed_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0));
+        let processed_at = unix_now_secs()?;
         self.manifest.append_all(&manifest_entries, processed_at)?;
 
         Ok(())
