@@ -25,6 +25,13 @@ pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceM
     let mut max_dd: f64 = 0.0;
 
     for point in sorted {
+        // The PG adapter rejects sl <= 0, so the division below stays finite.
+        debug_assert!(
+            point.sl > 0,
+            "operation point {} has sl {}",
+            point.id,
+            point.sl
+        );
         let contribution = cummax * f64::from(point.result) * (point.risk / f64::from(point.sl));
         cumsum += contribution;
         cummax = cummax.max(cumsum);
@@ -97,6 +104,42 @@ mod tests {
         let m = performance_metrics(&[]);
         assert_eq!(m.global_roi, 0.0);
         assert_eq!(m.max_draw_down, 0.0);
+    }
+
+    #[test]
+    fn metrics_on_valid_points_are_finite() {
+        let fixtures: [&[OperationPoint]; 4] = [
+            &[make_op(-20, 30, 20, 0.02)],
+            &[make_op(30, 30, 20, 0.02), make_op(25, 25, 20, 0.02)],
+            &[
+                make_op(-20, 30, 20, 0.02),
+                make_op(-20, 30, 20, 0.02),
+                make_op(30, 30, 20, 0.02),
+                make_op(25, 25, 20, 0.02),
+                make_op(-200, 300, 200, 0.02),
+                make_op(300, 300, 250, 0.02),
+            ],
+            &[
+                make_op(-20, 30, 20, 0.02),
+                make_op(-20, 30, 20, 0.02),
+                make_op(30, 30, 20, 0.02),
+                make_op(25, 25, 20, 0.02),
+                make_op(-200, 300, 200, 0.02),
+                make_op(-250, 300, 250, 0.02),
+                make_op(-250, 300, 250, 0.02),
+                make_op(25, 300, 250, 0.02),
+                make_op(-250, 300, 250, 0.02),
+            ],
+        ];
+        for ops in fixtures {
+            let m = metrics(ops);
+            assert!(m.global_roi.is_finite(), "global_roi {}", m.global_roi);
+            assert!(
+                m.max_draw_down.is_finite(),
+                "max_draw_down {}",
+                m.max_draw_down
+            );
+        }
     }
 
     // =========================================================================

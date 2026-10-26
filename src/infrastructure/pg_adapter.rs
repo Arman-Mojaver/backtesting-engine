@@ -165,17 +165,25 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
     })
 }
 
-fn row_to_operation_point(row: &Row) -> OperationPoint {
-    OperationPoint {
-        id: row.get("id"),
-        instrument: row.get("instrument"),
+/// Rejects `sl <= 0`: performance metrics divide by `sl`, so a zero stop
+/// loss would yield inf/NaN and silently drop the strategy downstream.
+fn row_to_operation_point(row: &Row) -> anyhow::Result<OperationPoint> {
+    let id: i32 = row.get("id");
+    let instrument: String = row.get("instrument");
+    let sl: i32 = row.get("sl");
+    if sl <= 0 {
+        bail!("operation point id {id} ({instrument}) has non-positive sl {sl}");
+    }
+    Ok(OperationPoint {
+        id,
+        instrument,
         result: row.get("result"),
         tp: row.get("tp"),
-        sl: row.get("sl"),
+        sl,
         risk: row.get("risk"),
         timestamp: i64::from(row.get::<_, i32>("timestamp")),
         money_management_strategy_id: row.get("money_management_strategy_id"),
-    }
+    })
 }
 
 fn row_to_resampled_point(row: &Row) -> ResampledPointD1 {
@@ -250,7 +258,7 @@ impl LongOperationPointRepository for PgLongOperationPointAdapter {
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
              FROM long_operation_point",
             &[],
-            |row| Ok(row_to_operation_point(row)),
+            row_to_operation_point,
         )
     }
 
@@ -266,7 +274,7 @@ impl LongOperationPointRepository for PgLongOperationPointAdapter {
              FROM long_operation_point \
              WHERE money_management_strategy_id = $1 AND instrument = $2",
             &[&mms_id, &instrument],
-            |row| Ok(row_to_operation_point(row)),
+            row_to_operation_point,
         )
     }
 }
@@ -292,7 +300,7 @@ impl ShortOperationPointRepository for PgShortOperationPointAdapter {
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
              FROM short_operation_point",
             &[],
-            |row| Ok(row_to_operation_point(row)),
+            row_to_operation_point,
         )
     }
 
@@ -308,7 +316,7 @@ impl ShortOperationPointRepository for PgShortOperationPointAdapter {
              FROM short_operation_point \
              WHERE money_management_strategy_id = $1 AND instrument = $2",
             &[&mms_id, &instrument],
-            |row| Ok(row_to_operation_point(row)),
+            row_to_operation_point,
         )
     }
 }
