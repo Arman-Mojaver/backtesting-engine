@@ -7,14 +7,14 @@ use crate::application::cell_output::CellOutput;
 use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
 use crate::infrastructure::strategy_adapter::{ParquetStrategyRepository, StrategyRow};
 
-pub struct CellOutputDTO {
+pub struct CellOutputDto {
     pub instrument: String,
     pub mms_id: i32,
     pub strategy_rows: Vec<StrategyRow>,
     pub processed_indicator_ids: Vec<i32>,
 }
 
-impl CellOutputDTO {
+impl CellOutputDto {
     pub(crate) fn manifest_entry(&self) -> (String, i32, Vec<i32>) {
         (
             self.instrument.clone(),
@@ -45,24 +45,24 @@ impl StrategyPersistence {
 
     pub fn persist_cells(&self, cells: Vec<CellOutput>) -> anyhow::Result<()> {
         let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
-        let mut dto_cells: Vec<CellOutputDTO> = Vec::with_capacity(cells.len());
+        let mut dto_cells: Vec<CellOutputDto> = Vec::with_capacity(cells.len());
         for cell in cells {
             let mut strategy_rows = Vec::with_capacity(cell.strategies.len());
             for strategy in cell.strategies {
                 strategy_rows.push(StrategyRow::from_strategy(&strategy, next_id));
                 next_id = next_id.saturating_add(1);
             }
-            dto_cells.push(CellOutputDTO {
+            dto_cells.push(CellOutputDto {
                 instrument: cell.instrument,
                 mms_id: cell.mms_id,
                 strategy_rows,
-                processed_indicator_ids: cell.processed_indicator_ids,
+                processed_indicator_ids: cell.computed_indicator_ids,
             });
         }
 
         let manifest_entries: Vec<(String, i32, Vec<i32>)> = dto_cells
             .iter()
-            .map(CellOutputDTO::manifest_entry)
+            .map(CellOutputDto::manifest_entry)
             .collect();
 
         dto_cells.into_par_iter().try_for_each(|c| {
@@ -113,13 +113,13 @@ mod tests {
                 instrument: "EURUSD".to_string(),
                 mms_id: 390,
                 strategies: vec![strategy("EURUSD", 2001, 390), strategy("EURUSD", 2002, 390)],
-                processed_indicator_ids: vec![2001, 2002, 2003],
+                computed_indicator_ids: vec![2001, 2002, 2003],
             },
             CellOutput {
                 instrument: "USDJPY".to_string(),
                 mms_id: 400,
                 strategies: vec![strategy("USDJPY", 3001, 400)],
-                processed_indicator_ids: vec![3001],
+                computed_indicator_ids: vec![3001],
             },
         ];
 

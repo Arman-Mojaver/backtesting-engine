@@ -120,8 +120,8 @@ fn compute_cell(
         .get(cell)
         .cloned()
         .unwrap_or_default();
-    let processed_indicator_ids = get_unprocessed(&source.indicator_ids, &processed_ids);
-    if processed_indicator_ids.is_empty() {
+    let unprocessed_indicator_ids = get_unprocessed(&source.indicator_ids, &processed_ids);
+    if unprocessed_indicator_ids.is_empty() {
         return CellOutcome::AlreadyProcessed;
     }
 
@@ -131,7 +131,7 @@ fn compute_cell(
         long_operation_points,
         short_operation_points,
         *mms_id,
-        &processed_indicator_ids,
+        &unprocessed_indicator_ids,
     ) {
         Ok(strategies) => strategies,
         Err(e) => {
@@ -147,7 +147,7 @@ fn compute_cell(
         instrument: instrument.clone(),
         mms_id: *mms_id,
         strategies,
-        processed_indicator_ids,
+        computed_indicator_ids: unprocessed_indicator_ids,
     })
 }
 
@@ -279,7 +279,7 @@ mod tests {
             instrument: instrument.to_string(),
             mms_id,
             strategies: Vec::new(),
-            processed_indicator_ids: Vec::new(),
+            computed_indicator_ids: Vec::new(),
         })
     }
 
