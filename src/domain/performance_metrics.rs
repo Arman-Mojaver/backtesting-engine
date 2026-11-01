@@ -54,6 +54,9 @@ impl PerformanceMetrics {
         }
 
         let global_accumulated = 1.0 + self.global_roi / 100.0;
+        if global_accumulated <= 0.0 {
+            return 0.0;
+        }
         let annual_accumulated = global_accumulated.powf(1.0 / years);
         cast::round_to((annual_accumulated - 1.0) * 100.0, 2)
     }
@@ -521,6 +524,26 @@ mod tests {
         #[test]
         fn zero_global_roi_returns_zero() {
             assert_eq!(metrics_with_roi(0.0).annual_roi(0, ONE_YEAR_SECS), 0.0);
+        }
+
+        #[test]
+        fn total_loss_global_roi_returns_zero_not_nan() {
+            // global_roi = -100 -> accumulated = 0.0: nothing left to
+            // annualize; the guard returns 0.0.
+            assert_eq!(metrics_with_roi(-100.0).annual_roi(0, ONE_YEAR_SECS), 0.0);
+        }
+
+        #[test]
+        fn beyond_total_loss_global_roi_returns_zero_not_nan() {
+            // global_roi = -150 -> accumulated = -0.5: powf on a negative
+            // base would be NaN; the guard returns 0.0 instead.
+            assert_eq!(metrics_with_roi(-150.0).annual_roi(0, ONE_YEAR_SECS), 0.0);
+        }
+
+        #[test]
+        fn just_above_total_loss_still_annualizes() {
+            // global_roi = -99 -> accumulated = 0.01 -> annual = -99.0.
+            assert_eq!(metrics_with_roi(-99.0).annual_roi(0, ONE_YEAR_SECS), -99.0);
         }
     }
 }
