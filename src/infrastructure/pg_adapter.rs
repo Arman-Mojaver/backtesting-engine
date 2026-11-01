@@ -237,11 +237,17 @@ where
     rows.iter().map(map).collect()
 }
 
-pub struct PgLongOperationPointAdapter {
+/// One PostgreSQL connection serving every repository port.
+///
+/// The single-cell `create` path needs one of these for its sequential
+/// reads; the batch (`create_loop`) path constructs one per table
+/// because its loads run concurrently and a sync `postgres::Client`
+/// is single-connection.
+pub struct PgStore {
     conn: RefCell<Client>,
 }
 
-impl PgLongOperationPointAdapter {
+impl PgStore {
     pub fn new(connection_string: &str) -> anyhow::Result<Self> {
         let conn = connect(connection_string)?;
         Ok(Self {
@@ -250,7 +256,7 @@ impl PgLongOperationPointAdapter {
     }
 }
 
-impl LongOperationPointRepository for PgLongOperationPointAdapter {
+impl LongOperationPointRepository for PgStore {
     fn get_all(&self) -> anyhow::Result<Vec<OperationPoint>> {
         fetch_rows(
             &self.conn,
@@ -279,20 +285,7 @@ impl LongOperationPointRepository for PgLongOperationPointAdapter {
     }
 }
 
-pub struct PgShortOperationPointAdapter {
-    conn: RefCell<Client>,
-}
-
-impl PgShortOperationPointAdapter {
-    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
-        let conn = connect(connection_string)?;
-        Ok(Self {
-            conn: RefCell::new(conn),
-        })
-    }
-}
-
-impl ShortOperationPointRepository for PgShortOperationPointAdapter {
+impl ShortOperationPointRepository for PgStore {
     fn get_all(&self) -> anyhow::Result<Vec<OperationPoint>> {
         fetch_rows(
             &self.conn,
@@ -321,20 +314,7 @@ impl ShortOperationPointRepository for PgShortOperationPointAdapter {
     }
 }
 
-pub struct PgResampledPointAdapter {
-    conn: RefCell<Client>,
-}
-
-impl PgResampledPointAdapter {
-    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
-        let conn = connect(connection_string)?;
-        Ok(Self {
-            conn: RefCell::new(conn),
-        })
-    }
-}
-
-impl ResampledPointD1Repository for PgResampledPointAdapter {
+impl ResampledPointD1Repository for PgStore {
     fn get_all(&self) -> anyhow::Result<Vec<ResampledPointD1>> {
         fetch_rows(
             &self.conn,
@@ -361,20 +341,7 @@ impl ResampledPointD1Repository for PgResampledPointAdapter {
     }
 }
 
-pub struct PgIndicatorAdapter {
-    conn: RefCell<Client>,
-}
-
-impl PgIndicatorAdapter {
-    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
-        let conn = connect(connection_string)?;
-        Ok(Self {
-            conn: RefCell::new(conn),
-        })
-    }
-}
-
-impl IndicatorRepository for PgIndicatorAdapter {
+impl IndicatorRepository for PgStore {
     fn get_all(&self) -> anyhow::Result<Vec<Indicator>> {
         fetch_rows(
             &self.conn,

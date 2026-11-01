@@ -17,10 +17,7 @@ use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
 };
 use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repository};
-use crate::infrastructure::pg_adapter::{
-    PgIndicatorAdapter, PgLongOperationPointAdapter, PgResampledPointAdapter,
-    PgShortOperationPointAdapter,
-};
+use crate::infrastructure::pg_adapter::PgStore;
 use crate::infrastructure::strategy_persistence::StrategyPersistence;
 
 struct SourceIndex {
@@ -38,25 +35,29 @@ impl SourceIndex {
         let db_config = DbConfig::from_env(resolve_environment()?);
         let conn_string = db_config.connection_string();
 
-        let indicator_adapter =
-            PgIndicatorAdapter::new(&conn_string).context("Failed to connect for indicators")?;
-        let resampled_adapter = PgResampledPointAdapter::new(&conn_string)
-            .context("Failed to connect for resampled points")?;
-        let long_adapter = PgLongOperationPointAdapter::new(&conn_string)
-            .context("Failed to connect for long operation points")?;
-        let short_adapter = PgShortOperationPointAdapter::new(&conn_string)
-            .context("Failed to connect for short operation points")?;
+        // One store (connection) per table: the four loads below run
+        // concurrently via nested rayon::join, and a sync postgres::Client
+        // is single-connection. The single-cell `create` path needs only
+        // one store for its sequential reads.
+        let indicator_store =
+            PgStore::new(&conn_string).context("Failed to connect for indicators")?;
+        let resampled_store =
+            PgStore::new(&conn_string).context("Failed to connect for resampled points")?;
+        let long_store =
+            PgStore::new(&conn_string).context("Failed to connect for long operation points")?;
+        let short_store =
+            PgStore::new(&conn_string).context("Failed to connect for short operation points")?;
 
         let load_start = Instant::now();
         let (indicators, (resampled_by_instrument, (long_by_cell, short_by_cell))) = rayon::join(
-            move || indicator_adapter.get_all(),
+            move || IndicatorRepository::get_all(&indicator_store),
             move || {
                 rayon::join(
-                    move || resampled_adapter.index_by_instrument(),
+                    move || ResampledPointD1Repository::index_by_instrument(&resampled_store),
                     move || {
                         rayon::join(
-                            move || long_adapter.index_by_cell(),
-                            move || short_adapter.index_by_cell(),
+                            move || LongOperationPointRepository::index_by_cell(&long_store),
+                            move || ShortOperationPointRepository::index_by_cell(&short_store),
                         )
                     },
                 )

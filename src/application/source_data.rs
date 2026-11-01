@@ -7,10 +7,7 @@ use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
 };
 use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repository};
-use crate::infrastructure::pg_adapter::{
-    PgIndicatorAdapter, PgLongOperationPointAdapter, PgResampledPointAdapter,
-    PgShortOperationPointAdapter,
-};
+use crate::infrastructure::pg_adapter::PgStore;
 
 pub struct SourceData {
     pub money_management_strategy_id: i32,
@@ -30,26 +27,28 @@ pub fn fetch_source_data(
 
     info!("Connecting to {} ...", config.database);
 
-    let indicator_adapter =
-        PgIndicatorAdapter::new(&conn_string).with_context(|| connection_diagnostics(&config))?;
-    let long_adapter = PgLongOperationPointAdapter::new(&conn_string)
-        .with_context(|| connection_diagnostics(&config))?;
-    let short_adapter = PgShortOperationPointAdapter::new(&conn_string)
-        .with_context(|| connection_diagnostics(&config))?;
-    let resampled_adapter = PgResampledPointAdapter::new(&conn_string)
-        .with_context(|| connection_diagnostics(&config))?;
+    // One connection serves all four sequential reads; the batch path
+    // (create_loop) opens one per table because its loads run in parallel.
+    let store = PgStore::new(&conn_string).with_context(|| connection_diagnostics(&config))?;
 
-    let indicators = indicator_adapter.get_all()?;
-    let resampled_points = resampled_adapter
-        .get_by_instrument(instrument)
+    let indicators = IndicatorRepository::get_all(&store)?;
+    let resampled_points = ResampledPointD1Repository::get_by_instrument(&store, instrument)
         .with_context(|| format!("failed to fetch resampled points for {instrument}"))?;
 
-    let long_operation_points: Vec<OperationPoint> = long_adapter
-        .get_by_mms_id_and_instrument(money_management_strategy_id, instrument)
+    let long_operation_points: Vec<OperationPoint> =
+        LongOperationPointRepository::get_by_mms_id_and_instrument(
+            &store,
+            money_management_strategy_id,
+            instrument,
+        )
         .with_context(|| format!("failed to fetch long operation points for {instrument}"))?;
 
-    let short_operation_points: Vec<OperationPoint> = short_adapter
-        .get_by_mms_id_and_instrument(money_management_strategy_id, instrument)
+    let short_operation_points: Vec<OperationPoint> =
+        ShortOperationPointRepository::get_by_mms_id_and_instrument(
+            &store,
+            money_management_strategy_id,
+            instrument,
+        )
         .with_context(|| format!("failed to fetch short operation points for {instrument}"))?;
 
     Ok(SourceData {
