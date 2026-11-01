@@ -48,11 +48,11 @@ impl StrategyRow {
 }
 
 pub struct ParquetStrategyRepository {
-    base_dir: String,
+    base_dir: PathBuf,
 }
 
 impl ParquetStrategyRepository {
-    pub const fn new(base_dir: String) -> Self {
+    pub const fn new(base_dir: PathBuf) -> Self {
         Self { base_dir }
     }
 
@@ -84,12 +84,12 @@ impl ParquetStrategyRepository {
     }
 
     fn partition_path(&self, instrument: &str, mms_id: i32) -> anyhow::Result<PathBuf> {
-        let partition_dir = format!(
-            "{}/instrument={}/money_management_strategy_id={}",
-            self.base_dir, instrument, mms_id
-        );
+        let partition_dir = self
+            .base_dir
+            .join(format!("instrument={instrument}"))
+            .join(format!("money_management_strategy_id={mms_id}"));
         fs::create_dir_all(&partition_dir)?;
-        Ok(PathBuf::from(format!("{partition_dir}/strategies.parquet")))
+        Ok(partition_dir.join("strategies.parquet"))
     }
 
     fn write_partition(path: &Path, new_rows: Vec<StrategyRow>) -> anyhow::Result<()> {
@@ -150,13 +150,12 @@ impl ParquetStrategyRepository {
 
     pub fn max_strategy_id(&self) -> anyhow::Result<i64> {
         let start = Instant::now();
-        let root = PathBuf::from(&self.base_dir);
-        if !root.exists() {
+        if !self.base_dir.exists() {
             return Ok(0);
         }
         let mut max_id: i64 = 0;
         let mut partitions_scanned: usize = 0;
-        let mut dirs: Vec<PathBuf> = vec![root];
+        let mut dirs: Vec<PathBuf> = vec![self.base_dir.clone()];
         while let Some(dir) = dirs.pop() {
             for entry in fs::read_dir(&dir)? {
                 let entry = entry?;
@@ -359,7 +358,9 @@ mod tests {
     fn read_back_ids(repo: &ParquetStrategyRepository, instrument: &str, mms_id: i32) -> Vec<i64> {
         let path = PathBuf::from(format!(
             "{}/instrument={}/money_management_strategy_id={}/strategies.parquet",
-            repo.base_dir, instrument, mms_id
+            repo.base_dir.display(),
+            instrument,
+            mms_id
         ));
         let rows = ParquetStrategyRepository::read_rows(&path).expect("read back");
         rows.into_iter().map(|r| r.strategy_id).collect()
@@ -372,7 +373,9 @@ mod tests {
     ) -> Vec<i32> {
         let path = PathBuf::from(format!(
             "{}/instrument={}/money_management_strategy_id={}/strategies.parquet",
-            repo.base_dir, instrument, mms_id
+            repo.base_dir.display(),
+            instrument,
+            mms_id
         ));
         let rows = ParquetStrategyRepository::read_rows(&path).expect("read back");
         rows.into_iter().map(|r| r.indicator_id).collect()
@@ -381,7 +384,7 @@ mod tests {
     #[test]
     fn write_does_not_error() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
         repo.write("EURUSD", 390, &strategies).unwrap();
@@ -395,7 +398,7 @@ mod tests {
     #[test]
     fn write_multiple_partitions() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
         repo.write("EURUSD", 390, &strategies).unwrap();
@@ -419,7 +422,7 @@ mod tests {
     #[test]
     fn first_write_starts_ids_at_one() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
         repo.write("EURUSD", 390, &strategies).unwrap();
@@ -431,7 +434,7 @@ mod tests {
     #[test]
     fn second_write_continues_from_global_max() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
         repo.write("EURUSD", 390, &strategies).unwrap();
@@ -446,7 +449,7 @@ mod tests {
     #[test]
     fn global_max_across_multiple_partitions() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
         repo.write("EURUSD", 390, &strategies).unwrap();
@@ -460,7 +463,7 @@ mod tests {
     #[test]
     fn sequential_ids_are_contiguous_within_a_batch() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies: Vec<Strategy> = (0..5)
             .map(|i| Strategy {
                 instrument: "EURUSD".to_string(),
@@ -483,7 +486,7 @@ mod tests {
     #[test]
     fn append_preserves_existing_rows() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let first = sample_strategies();
         let second: Vec<Strategy> = vec![Strategy {
             instrument: "EURUSD".to_string(),
@@ -506,7 +509,7 @@ mod tests {
     #[test]
     fn rewriting_same_partition_preserves_original_ids() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
         repo.write("EURUSD", 390, &strategies).unwrap();
@@ -523,7 +526,7 @@ mod tests {
     #[test]
     fn write_deduplicates_same_batch() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
         repo.write("EURUSD", 390, &strategies).unwrap();
@@ -538,7 +541,7 @@ mod tests {
     #[test]
     fn write_preserves_different_indicators() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let first = sample_strategies();
         let second: Vec<Strategy> = vec![Strategy {
             instrument: "EURUSD".to_string(),
@@ -564,7 +567,7 @@ mod tests {
     #[test]
     fn write_partial_overlap_ignores_duplicate() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let first = sample_strategies();
         let second: Vec<Strategy> = vec![
             Strategy {
@@ -604,7 +607,7 @@ mod tests {
     #[test]
     fn dedup_does_not_affect_ids_from_other_partitions() {
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
         repo.write("EURUSD", 390, &strategies).unwrap();
@@ -631,7 +634,7 @@ mod tests {
         }
 
         let tmp = TempDir::new().unwrap();
-        let repo = ParquetStrategyRepository::new(tmp.path().to_string_lossy().to_string());
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
 
         // First write assigns id 1 to indicator 2001.
         repo.write("EURUSD", 390, &[s(2001)]).unwrap();

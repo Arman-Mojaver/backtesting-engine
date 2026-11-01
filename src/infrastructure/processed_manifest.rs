@@ -50,16 +50,16 @@ pub struct ProcessedRow {
 /// computed, persisted as a single `processed.parquet` under `root_dir` so
 /// reruns only compute what is missing.
 pub struct ParquetProcessedManifest {
-    root_dir: String,
+    root_dir: PathBuf,
 }
 
 impl ParquetProcessedManifest {
-    pub const fn new(root_dir: String) -> Self {
+    pub const fn new(root_dir: PathBuf) -> Self {
         Self { root_dir }
     }
 
     fn path(&self) -> PathBuf {
-        PathBuf::from(format!("{}/processed.parquet", self.root_dir))
+        self.root_dir.join("processed.parquet")
     }
 
     fn read_all(&self) -> anyhow::Result<Vec<ProcessedRow>> {
@@ -268,7 +268,7 @@ mod tests {
 
     fn new_manifest() -> (TempDir, ParquetProcessedManifest) {
         let tmp = TempDir::new().expect("tempdir");
-        let manifest = ParquetProcessedManifest::new(tmp.path().to_string_lossy().to_string());
+        let manifest = ParquetProcessedManifest::new(tmp.path().to_path_buf());
         (tmp, manifest)
     }
 

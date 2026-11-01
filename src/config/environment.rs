@@ -1,4 +1,5 @@
 use std::env::{self, VarError};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use log::debug;
@@ -121,28 +122,31 @@ impl DbConfig {
 
 const PARQUET_FILES_PATH: &str = "/app/parquet_files";
 
-pub fn parquet_base_dir(env: Environment) -> String {
+pub fn parquet_base_dir(env: Environment) -> PathBuf {
     let subdirectory = match env {
         Environment::Production => "production",
         Environment::Development => "development",
         Environment::Testing => "testing",
     };
-    format!("{PARQUET_FILES_PATH}/{subdirectory}/strategy")
+    PathBuf::from(PARQUET_FILES_PATH)
+        .join(subdirectory)
+        .join("strategy")
 }
 
-pub fn parquet_root_dir(env: Environment) -> String {
+pub fn parquet_root_dir(env: Environment) -> PathBuf {
     let subdirectory = match env {
         Environment::Production => "production",
         Environment::Development => "development",
         Environment::Testing => "testing",
     };
-    format!("{PARQUET_FILES_PATH}/{subdirectory}")
+    PathBuf::from(PARQUET_FILES_PATH).join(subdirectory)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::ffi::OsString;
+    use std::path::Path;
 
     #[test]
     fn environment_from_str_parses_valid_values() {
@@ -271,36 +275,36 @@ mod tests {
     #[test]
     fn parquet_base_dir_development() {
         let dir = parquet_base_dir(Environment::Development);
-        assert_eq!(dir, "/app/parquet_files/development/strategy");
+        assert_eq!(dir, Path::new("/app/parquet_files/development/strategy"));
     }
 
     #[test]
     fn parquet_base_dir_production() {
         let dir = parquet_base_dir(Environment::Production);
-        assert_eq!(dir, "/app/parquet_files/production/strategy");
+        assert_eq!(dir, Path::new("/app/parquet_files/production/strategy"));
     }
 
     #[test]
     fn parquet_base_dir_testing() {
         let dir = parquet_base_dir(Environment::Testing);
-        assert_eq!(dir, "/app/parquet_files/testing/strategy");
+        assert_eq!(dir, Path::new("/app/parquet_files/testing/strategy"));
     }
 
     #[test]
     fn parquet_root_dir_development() {
         let dir = parquet_root_dir(Environment::Development);
-        assert_eq!(dir, "/app/parquet_files/development");
+        assert_eq!(dir, Path::new("/app/parquet_files/development"));
     }
 
     #[test]
     fn parquet_root_dir_production() {
         let dir = parquet_root_dir(Environment::Production);
-        assert_eq!(dir, "/app/parquet_files/production");
+        assert_eq!(dir, Path::new("/app/parquet_files/production"));
     }
 
     #[test]
     fn parquet_root_dir_testing() {
         let dir = parquet_root_dir(Environment::Testing);
-        assert_eq!(dir, "/app/parquet_files/testing");
+        assert_eq!(dir, Path::new("/app/parquet_files/testing"));
     }
 }

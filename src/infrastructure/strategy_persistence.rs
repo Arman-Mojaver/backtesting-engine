@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use rayon::prelude::*;
 
@@ -29,7 +30,7 @@ pub struct StrategyPersistence {
 }
 
 impl StrategyPersistence {
-    pub const fn new(base_dir: String, root_dir: String) -> Self {
+    pub const fn new(base_dir: PathBuf, root_dir: PathBuf) -> Self {
         Self {
             strategies: ParquetStrategyRepository::new(base_dir),
             manifest: ParquetProcessedManifest::new(root_dir),
@@ -100,10 +101,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().to_path_buf();
         let base = root.join("strategy");
-        let persistence = StrategyPersistence::new(
-            base.to_string_lossy().to_string(),
-            root.to_string_lossy().to_string(),
-        );
+        let persistence = StrategyPersistence::new(base.clone(), root);
 
         let cells = vec![
             CellOutput {
