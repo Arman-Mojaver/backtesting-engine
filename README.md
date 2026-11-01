@@ -54,7 +54,7 @@ strategy)` pair. For each cell, the engine:
 6. **Records completed work** in a processed manifest, making every command
    **idempotent**: re-running skips work already done.
 
-`bt-engine strategy create_loop` runs the same pipeline over *all* cells in the
+`bte strategy create_loop` runs the same pipeline over *all* cells in the
 database: each source table is loaded once, cells are computed in parallel with rayon,
 and output is committed as a single batch.
 
@@ -65,7 +65,7 @@ domain layer has no I/O and no framework types, so the business rules can be und
 and unit-tested in complete isolation.
 
 ```
-CLI              bt-engine the native Rust engine — runs directly, no operator frontend
+CLI              bte: the native Rust engine — runs directly, no operator frontend
 
 Application      use-case orchestration: fetching inputs, generating signals,
                  building and filtering candidate strategies
@@ -273,7 +273,7 @@ cargo build                                # debug
 cargo build --release
 
 # Install the binaries to ~/.cargo/bin
-cargo install --path . --bin bt-engine --force
+cargo install --path . --bin bte --force
 ```
 
 The Docker runtime image bakes `-C target-cpu=apple-m2` into its release build
@@ -350,7 +350,7 @@ Honest list — read before trusting the numbers:
 2. **MACD is not implemented.** MACD configurations are read from the database but
    produce no strategies; runs continue without them.
 3. **Data management and strategy display live in the companion Python service.** The
-   Rust engine is `bt-engine`-only — all data CRUD and the iteration table are owned
+   Rust engine is `bte`-only — all data CRUD and the iteration table are owned
    by [Backtesting-4.0](../Backtesting-4.0) and accessed there directly.
 4. **DB configuration is hardcoded per environment** (host, ports, credentials). Fine
    for the Docker workflow; limiting if you want to point the engine at arbitrary
@@ -370,7 +370,7 @@ Honest list — read before trusting the numbers:
 This engine is the Rust computation core of a two-repo system. The companion
 **[Backtesting-4.0](../Backtesting-4.0)** repository (Python/Django) owns persistence,
 user-facing APIs, data CRUD, and the iteration table (strategy display). The Rust
-engine is the standalone `bt-engine` binary and has no dependency on the Python
+engine is the standalone `bte` binary and has no dependency on the Python
 service.
 
 ## License

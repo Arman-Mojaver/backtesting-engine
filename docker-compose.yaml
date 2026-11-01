@@ -17,7 +17,7 @@ services:
       - cargo-git:/usr/local/cargo/git
       - target:/app/target
     working_dir: /app
-    command: ["sh", "-c", "touch logs/bt-engine.log && tail -F logs/bt-engine.log"]
+    command: ["sh", "-c", "touch logs/bte.log && tail -F logs/bte.log"]
 
 volumes:
   cargo-registry:

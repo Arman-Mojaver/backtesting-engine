@@ -1,6 +1,6 @@
 //! Logging initialization.
 //!
-//! stderr captures container output and `logs/bt-engine.log` persists it.
+//! stderr captures container output and `logs/bte.log` persists it.
 //! The directory is created on init so the binary also works outside the
 //! compose setup, which pre-mounts a `logs/` volume.
 
@@ -16,7 +16,7 @@ use simplelog::{
 
 const DEFAULT_LOG_LEVEL: &str = "info";
 
-const LOG_FILE: &str = "logs/bt-engine.log";
+const LOG_FILE: &str = "logs/bte.log";
 
 pub fn init() -> Result<()> {
     let level = parse_level(std::env::var("RUST_LOG").ok().as_deref());
@@ -120,7 +120,7 @@ mod tests {
     fn open_log_file_creates_missing_parent_directory() {
         let dir = tempfile::tempdir().expect("tempdir creation failed");
         // Neither `<tmp>/logs/` nor the log file exists yet.
-        let log_path = dir.path().join("logs").join("bt-engine.log");
+        let log_path = dir.path().join("logs").join("bte.log");
 
         let file = open_log_file(&log_path).expect("open should create the parent directory");
         drop(file);
@@ -138,7 +138,7 @@ mod tests {
 
         let dir = tempfile::tempdir().expect("tempdir creation failed");
         // Parent directory already exists; opening must not truncate it.
-        let log_path = dir.path().join("bt-engine.log");
+        let log_path = dir.path().join("bte.log");
 
         let mut first = open_log_file(&log_path).expect("initial open");
         writeln!(first, "one").expect("initial write");

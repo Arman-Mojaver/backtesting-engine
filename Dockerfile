@@ -20,7 +20,7 @@ WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir -p src/bin && echo "" > src/lib.rs
-RUN echo "fn main() {}" > src/bin/bt-engine.rs
+RUN echo "fn main() {}" > src/bin/bte.rs
 RUN cargo fetch
 
 
@@ -64,7 +64,7 @@ COPY --from=fetcher /usr/local/cargo/registry /usr/local/cargo/registry
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir -p src/bin \
  && echo "" > src/lib.rs \
- && echo "fn main() {}" > src/bin/bt-engine.rs \
+ && echo "fn main() {}" > src/bin/bte.rs \
  && cargo build --release --locked --target aarch64-unknown-linux-gnu --bin bte
 
 # Real sources. `touch` is required: the context files' mtimes can predate the
@@ -74,7 +74,7 @@ RUN mkdir -p src/bin \
 # shipped image does not need them; the symbol table stays, so backtraces
 # keep function names.
 COPY src ./src
-RUN touch src/lib.rs src/bin/bt-engine.rs \
+RUN touch src/lib.rs src/bin/bte.rs \
  && cargo build --release --locked --target aarch64-unknown-linux-gnu --bin bte \
  && strip --strip-debug target/aarch64-unknown-linux-gnu/release/bte
 

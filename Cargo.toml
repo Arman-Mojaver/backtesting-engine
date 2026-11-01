@@ -10,7 +10,7 @@ doctest = false
 
 [[bin]]
 name = "bte"
-path = "src/bin/bt-engine.rs"
+path = "src/bin/bte.rs"
 
 [profile.dev]
 # Use `debug = "line-tables-only"` if you need backtraces.
@@ -47,7 +47,7 @@ time = { version = "0.3", features = ["formatting", "macros"] }
 itertools = "0.15.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-# Global allocator (wired in src/bin/bt-engine.rs): Arrow/Parquet buffer churn
+# Global allocator (wired in src/bin/bte.rs): Arrow/Parquet buffer churn
 # across many rayon threads favors mimalloc over the platform default.
 mimalloc = "0.1"
 
