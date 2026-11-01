@@ -53,6 +53,10 @@ mimalloc = "0.1"
 
 [dev-dependencies]
 tempfile = "3"
+# No in-tree benches (autobenches = false; benches/ is intentionally empty):
+# criterion powers ad-hoc /bench measurement sessions, which create
+# temporary bench targets. Removing it breaks /bench; keeping it costs
+# dev-only compile time.
 criterion = { version = "0.8", features = ["html_reports"] }
 
 [lints.clippy]
