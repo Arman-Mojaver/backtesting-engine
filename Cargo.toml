@@ -24,6 +24,10 @@ debug = "line-tables-only"
 # kills the batch run either way — abort drops the unwind tables for free.
 panic = "abort"
 
+[package.metadata.cargo-machete]
+# False positive: only referenced via the `format_description!` macro expansion.
+ignored = ["time"]
+
 [dependencies]
 clap = { version = "4.5", features = ["string", "derive"] }
 cached = "4"
@@ -38,6 +42,7 @@ rustc-hash = "2.1.2"
 rayon = "1.12"
 log = "0.4"
 simplelog = "0.12"
+# Needed directly: simplelog's `format_description!` expands to `::time::` paths.
 time = { version = "0.3", features = ["formatting", "macros"] }
 itertools = "0.15.0"
 serde = { version = "1.0", features = ["derive"] }
