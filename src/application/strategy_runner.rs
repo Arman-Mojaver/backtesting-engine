@@ -77,3 +77,192 @@ pub fn run_strategies(
 
     Ok(strategies)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::indicator::IndicatorParameters;
+
+    /// Bar spacing chosen so bars 5 and 21 are exactly one year apart:
+    /// 16 * BAR_SPACING_SECS = 31_557_600 (365.25 days). With the long
+    /// operation points sitting on bars 5 and 21, every annualized figure
+    /// in these tests is computed over exactly one year.
+    const BAR_SPACING_SECS: i64 = 1_972_350;
+
+    /// Closes repeat [5, 4, 3, 4]: diffs repeat [-1, -1, +1, +1]. RSI(3)
+    /// windows then always hold both gains and losses, so the series is
+    /// 33.33 / 66.67 / 66.67 / 33.33 by bar index (mod 4) — deterministic
+    /// threshold crossings with no zero-gain/zero-loss edge case.
+    fn pipeline_resampled_points() -> Vec<ResampledPointD1> {
+        let closes = [5.0, 4.0, 3.0, 4.0];
+        (0..28)
+            .map(|k: i32| {
+                let close = closes[usize::try_from(k % 4).unwrap()];
+                ResampledPointD1 {
+                    id: k.saturating_add(1),
+                    instrument: "EURUSD".to_string(),
+                    open: close,
+                    high: close + 0.1,
+                    low: close - 0.1,
+                    close,
+                    volume: 1000,
+                    timestamp: i64::from(k).saturating_mul(BAR_SPACING_SECS),
+                }
+            })
+            .collect()
+    }
+
+    fn op(id: i32, result: i32, timestamp: i64) -> OperationPoint {
+        OperationPoint {
+            instrument: "EURUSD".to_string(),
+            result,
+            tp: 30,
+            sl: 20,
+            risk: 0.02,
+            money_management_strategy_id: 1,
+            id,
+            timestamp,
+        }
+    }
+
+    /// Long and short operation points share the bar-5 / bar-21 timestamps
+    /// (validation requires identical timestamp sets). Short results are
+    /// losers that no signal resolves: if one ever did, the 6.09 ROI
+    /// assertions below would catch it.
+    fn pipeline_long_ops() -> Vec<OperationPoint> {
+        vec![
+            op(1, 30, 4 * BAR_SPACING_SECS),
+            op(2, 30, 20 * BAR_SPACING_SECS),
+        ]
+    }
+
+    fn pipeline_short_ops() -> Vec<OperationPoint> {
+        vec![
+            op(10, -20, 4 * BAR_SPACING_SECS),
+            op(11, -20, 20 * BAR_SPACING_SECS),
+        ]
+    }
+
+    fn rsi(id: i32, high: i32, low: i32) -> Indicator {
+        Indicator {
+            id,
+            parameters: IndicatorParameters::Rsi {
+                n: 3,
+                high_threshold: high,
+                low_threshold: low,
+            },
+        }
+    }
+
+    fn pipeline_indicators() -> Vec<Indicator> {
+        vec![
+            // 7: RSI(3) 60/40 — long signals at bars 5, 9, .., 25 and
+            // short signals at bars 7, 11, .., 27 (12 signals/year). Only
+            // the bar-5 and bar-21 longs resolve: two +30 trades compounding
+            // 1.03 -> 1.0609 over exactly one year -> ROI 6.09, DD 0.
+            rsi(7, 60, 40),
+            // 8: RSI(3) 70/30 — values 33/67 never cross either threshold:
+            // dropped at the activity stage before any strategy is built.
+            rsi(8, 70, 30),
+            // 9: ROC(5) — 11 signals (passes the 10/year activity bar) but
+            // none land on an operation-point timestamp: ROI 0 fails the
+            // quality bar -> dropped at the second stage.
+            Indicator {
+                id: 9,
+                parameters: IndicatorParameters::Roc { period: 5 },
+            },
+            // 10: identical parameters to 7 — also passes both stages.
+            rsi(10, 60, 40),
+        ]
+    }
+
+    #[test]
+    fn full_pipeline_applies_validation_and_both_filter_stages() {
+        let indicators = pipeline_indicators();
+        let resampled = pipeline_resampled_points();
+        let long_ops = pipeline_long_ops();
+        let short_ops = pipeline_short_ops();
+        let all_ids: Vec<i32> = indicators.iter().map(|i| i.id).collect();
+
+        let strategies =
+            run_strategies(&indicators, &resampled, &long_ops, &short_ops, 1, &all_ids)
+                .expect("valid inputs must pass validation");
+
+        // Stage 1 dropped indicator 8 (no signals); stage 2 dropped
+        // indicator 9 (no resolved trades -> ROI 0 < 5); 7 and 10 survive.
+        let ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
+        assert_eq!(ids, vec![7, 10]);
+
+        let s = &strategies[0];
+        assert_eq!(s.instrument, "EURUSD");
+        assert_eq!(s.money_management_strategy_id, 1);
+        // Two +30 trades compounding at risk/sl = 0.001: 1.03 -> 1.0609
+        // over exactly one year (bars 5 to 21), so annual == global.
+        assert_eq!(s.annual_roi, 6.09);
+        assert_eq!(s.max_draw_down, 0.0);
+        assert_eq!(s.annual_operation_count, 2.0);
+        assert_eq!(s.long_operation_point_ids, vec![1, 2]);
+        assert!(s.short_operation_point_ids.is_empty());
+    }
+
+    #[test]
+    fn processed_indicators_are_excluded_before_compute() {
+        let indicators = pipeline_indicators();
+        let resampled = pipeline_resampled_points();
+        let long_ops = pipeline_long_ops();
+        let short_ops = pipeline_short_ops();
+
+        // Indicator 10 passes both filter stages in the full run above;
+        // marking it processed must exclude it before any compute.
+        let unprocessed = vec![7, 8, 9];
+        let strategies = run_strategies(
+            &indicators,
+            &resampled,
+            &long_ops,
+            &short_ops,
+            1,
+            &unprocessed,
+        )
+        .expect("valid inputs must pass validation");
+
+        let ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
+        assert_eq!(ids, vec![7]);
+    }
+
+    #[test]
+    fn all_indicators_processed_yields_no_strategies() {
+        let indicators = pipeline_indicators();
+        let resampled = pipeline_resampled_points();
+        let long_ops = pipeline_long_ops();
+        let short_ops = pipeline_short_ops();
+
+        let strategies = run_strategies(
+            &indicators,
+            &resampled,
+            &long_ops,
+            &short_ops,
+            1,
+            &[], // idempotent re-run: everything already processed
+        )
+        .expect("valid inputs must pass validation");
+
+        assert!(strategies.is_empty());
+    }
+
+    #[test]
+    fn validation_failure_surfaces_the_invariant_and_context() {
+        let indicators = pipeline_indicators();
+        let resampled = pipeline_resampled_points();
+        let long_ops = pipeline_long_ops();
+        let short_ops = pipeline_short_ops();
+        let all_ids: Vec<i32> = indicators.iter().map(|i| i.id).collect();
+
+        // Every fixture operation point carries mms_id 1; expecting 2 must
+        // fail validation with the context and the invariant named.
+        let err = run_strategies(&indicators, &resampled, &long_ops, &short_ops, 2, &all_ids)
+            .expect_err("mms mismatch must fail validation");
+        let chain = format!("{err:#}");
+        assert!(chain.contains("Validation failed"));
+        assert!(chain.contains("money management strategy id"));
+    }
+}
