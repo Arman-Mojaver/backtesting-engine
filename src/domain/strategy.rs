@@ -1,5 +1,3 @@
-use std::default::Default;
-
 #[derive(Debug, Clone)]
 pub struct Strategy {
     pub instrument: String,

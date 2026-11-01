@@ -115,12 +115,12 @@ fn compute_cell(
         source.long_by_cell.get(cell).map_or(&[], Vec::as_slice);
     let short_operation_points: &[OperationPoint] =
         source.short_by_cell.get(cell).map_or(&[], Vec::as_slice);
-
+    
+    let empty_processed_ids: HashSet<i32> = HashSet::new();
     let processed_ids = processed_ids_per_cell
         .get(cell)
-        .cloned()
-        .unwrap_or_default();
-    let unprocessed_indicator_ids = get_unprocessed(&source.indicator_ids, &processed_ids);
+        .unwrap_or(&empty_processed_ids);
+    let unprocessed_indicator_ids = get_unprocessed(&source.indicator_ids, processed_ids);
     if unprocessed_indicator_ids.is_empty() {
         return CellOutcome::AlreadyProcessed;
     }
