@@ -1,0 +1,27 @@
+# cargo-deny configuration: https://embarkstudios.github.io/cargo-deny/
+# Run locally with `make deny` (or `cargo deny check`).
+
+[graph]
+all-features = true
+
+[advisories]
+# Defaults: vulnerabilities are denied, unmaintained/unsound crates are reported.
+
+[licenses]
+# Only the licenses the dependency tree actually needs. When a crate offers a
+# choice (e.g. "MIT OR Apache-2.0"), one allowed option is enough.
+allow = [
+    "Apache-2.0",
+    "BSD-3-Clause",  # brotli, snap, zstd (parquet compression codecs)
+    "CC0-1.0",       # tiny-keccak
+    "MIT",
+    "Unicode-3.0",   # unicode-ident
+    "Zlib",          # foldhash, zlib-rs
+]
+
+[bans]
+multiple-versions = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

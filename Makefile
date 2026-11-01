@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-.PHONY: help bash logs up in down build buildr push pull pushr pullr upr inr downr fmt test
+.PHONY: help bash logs up in down build buildr push pull pushr pullr upr inr downr fmt test lint deny ci
 
 .DEFAULT_GOAL := help
 
@@ -69,4 +69,13 @@ fmt:  ## Run rust formatter
 	cd $(PWD) && cargo fmt
 
 test: ## Run tests
-	cargo-nextest nextest run
+	cargo nextest run
+
+lint: ## Check formatting and run clippy (same as CI)
+	cargo fmt --check
+	cargo clippy --locked --all-targets --all-features -- -D warnings
+
+deny: ## Run supply-chain checks with cargo-deny
+	cargo deny check
+
+ci: test lint deny ## Run lint and tests (same as CI)

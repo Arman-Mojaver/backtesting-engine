@@ -3,6 +3,8 @@
 #   preflight ──┬──> lint ──┐
 #               └──> test ──┴──> docker (build & push runtime + dev, linux/arm64)
 #
+#   deny (cargo-deny: advisories, licenses, bans, sources) runs independently.
+#
 # preflight gates the whole pipeline: if the Docker Hub login fails
 # (invalid or revoked credentials), lint and test are skipped
 # (fail fast, no wasted compute).
@@ -62,6 +64,11 @@ jobs:
       - name: Lint with clippy (warnings denied)
         run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
+      - name: Build docs (warnings denied)
+        run: cargo doc --no-deps --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
+
   test:
     name: Test
     needs: preflight
@@ -79,8 +86,24 @@ jobs:
       - name: Cache cargo build artifacts
         uses: Swatinem/rust-cache@v2
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
       - name: Run tests
-        run: cargo test --locked
+        run: cargo nextest run --locked
+
+  deny:
+    name: Supply-chain checks (cargo-deny)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Run cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
 
   docker:
     name: Build and push Docker images (linux/arm64)
