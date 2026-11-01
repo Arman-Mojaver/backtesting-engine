@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use arrow::array::{AsArray, Int32Array, Int64Array, StringBuilder};
@@ -12,6 +13,18 @@ use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
+
+/// Per-call temp-file suffix: concurrent manifest writes never share
+/// a temp file, so their contents cannot interleave.
+static TEMP_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// Temp path for an atomic write of `path`: unique per call (process
+/// id plus a counter) and in the same directory, so the rename stays
+/// on one filesystem.
+fn temp_path_for(path: &Path) -> PathBuf {
+    let seq = TEMP_FILE_SEQ.fetch_add(1, Ordering::Relaxed);
+    path.with_extension(format!("parquet.tmp-{}-{seq}", std::process::id()))
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessedRow {
@@ -98,7 +111,7 @@ impl ParquetProcessedManifest {
             });
         }
 
-        let temp_path = path.with_extension("parquet.tmp");
+        let temp_path = temp_path_for(&path);
         write_parquet(&temp_path, &rows)?;
         fs::rename(&temp_path, &path)?;
 
@@ -136,7 +149,7 @@ impl ParquetProcessedManifest {
             }
         }
 
-        let temp_path = path.with_extension("parquet.tmp");
+        let temp_path = temp_path_for(&path);
         write_parquet(&temp_path, &rows)?;
         fs::rename(&temp_path, &path)?;
 
@@ -409,12 +422,14 @@ mod tests {
         let path = manifest.path();
         assert!(path.exists(), "processed.parquet should exist");
 
-        // Verify no temp file remains after atomic rename
-        let temp_path = manifest.path().with_extension("parquet.tmp");
-        assert!(
-            !temp_path.exists(),
-            "processed.parquet.tmp should not exist after rename"
-        );
+        // Verify no temp file remains after the atomic rename: the temp
+        // name is unique per call, so assert the directory holds only the
+        // manifest itself.
+        let entries: Vec<String> = fs::read_dir(path.parent().expect("parent"))
+            .expect("read_dir")
+            .map(|e| e.expect("entry").file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(entries, vec!["processed.parquet"]);
     }
 
     #[test]
