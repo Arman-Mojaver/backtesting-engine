@@ -69,7 +69,7 @@ fmt:  ## Run rust formatter
 	cd $(PWD) && cargo fmt
 
 test: ## Run tests
-	cargo nextest run
+	cargo nextest run --locked
 
 lint: ## Check formatting and run clippy (same as CI)
 	cargo fmt --check
@@ -78,4 +78,4 @@ lint: ## Check formatting and run clippy (same as CI)
 deny: ## Run supply-chain checks with cargo-deny
 	cargo deny check
 
-ci: test lint deny ## Run lint and tests (same as CI)
+ci: lint test deny ## Run the CI gates locally (same as CI)
