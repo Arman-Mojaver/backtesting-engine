@@ -1,9 +1,12 @@
+use thiserror::Error;
+
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 use std::collections::HashSet;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ValidationError {
+    #[error("operation point timestamps must match each other and be contained in the resampled point timestamps")]
     TimestampMismatch,
 }
 
@@ -85,6 +88,14 @@ mod tests {
         assert_eq!(
             validate_timestamps_match(&resampled[..], &long[..2], &short[..]),
             Err(ValidationError::TimestampMismatch)
+        );
+    }
+
+    #[test]
+    fn display_message_names_the_violated_constraint() {
+        assert_eq!(
+            ValidationError::TimestampMismatch.to_string(),
+            "operation point timestamps must match each other and be contained in the resampled point timestamps"
         );
     }
 }

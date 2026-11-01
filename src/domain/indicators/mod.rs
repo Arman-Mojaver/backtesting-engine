@@ -23,8 +23,7 @@ pub mod test_support;
 pub mod trix;
 pub mod vroc;
 
-use std::error::Error;
-use std::fmt;
+use thiserror::Error;
 
 use crate::domain::indicator::IndicatorParameters;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -49,145 +48,59 @@ impl PriceField {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum IndicatorError {
+    #[error("macd fast period must be positive, got {n}")]
     InvalidMacdFastPeriod { n: i32 },
+    #[error("macd slow period must be positive, got {n}")]
     InvalidMacdSlowPeriod { n: i32 },
+    #[error("macd moving-average type must be \"ema\" or \"sma\", got \"{ma_type}\"")]
     InvalidMacdMaType { ma_type: String },
+    #[error("macd fast period must be less than slow period, got fast {fast}, slow {slow}")]
     InvalidMacdPeriodOrder { fast: i32, slow: i32 },
+    #[error("rsi period must be positive, got {n}")]
     InvalidRsiPeriod { n: i32 },
+    #[error("rsi low threshold must be less than high threshold, got high {high}, low {low}")]
     InvalidRsiThresholdOrder { high: i32, low: i32 },
+    #[error("rsi threshold must be between 0 and 100, got {value}")]
     InvalidRsiThresholdRange { value: i32 },
+    #[error("bears power period must be positive, got {n}")]
     InvalidBearsPeriod { n: i32 },
+    #[error("bulls power period must be positive, got {n}")]
     InvalidBullsPeriod { n: i32 },
+    #[error("chaikin oscillator fast period must be positive, got {n}")]
     InvalidChoFastPeriod { n: i32 },
+    #[error("chaikin oscillator slow period must be positive, got {n}")]
     InvalidChoSlowPeriod { n: i32 },
+    #[error(
+        "chaikin oscillator fast period must not exceed slow period, got fast {fast}, slow {slow}"
+    )]
     InvalidChoPeriodOrder { fast: i32, slow: i32 },
+    #[error("chaikin volatility smoothing period must be positive, got {n}")]
     InvalidChvSmoothPeriod { n: i32 },
+    #[error("chaikin volatility period must be positive, got {n}")]
     InvalidChvPeriod { n: i32 },
+    #[error("detrended price oscillator period must be positive, got {n}")]
     InvalidDpoPeriod { n: i32 },
+    #[error("force index period must be positive, got {n}")]
     InvalidForcePeriod { n: i32 },
+    #[error("osma fast period must be positive, got {n}")]
     InvalidOsMaFastPeriod { n: i32 },
+    #[error("osma slow period must be positive, got {n}")]
     InvalidOsMaSlowPeriod { n: i32 },
+    #[error("osma signal period must be positive, got {n}")]
     InvalidOsMaSignalPeriod { n: i32 },
+    #[error("osma fast period must not exceed slow period, got fast {fast}, slow {slow}")]
     InvalidOsMaPeriodOrder { fast: i32, slow: i32 },
+    #[error("rate of change period must be positive, got {n}")]
     InvalidRocPeriod { n: i32 },
+    #[error("trix period must be positive, got {n}")]
     InvalidTrixPeriod { n: i32 },
+    #[error("volume rate of change period must be positive, got {n}")]
     InvalidVrocPeriod { n: i32 },
+    #[error("not enough data points to compute indicator: saw {points}, required {required}")]
     NotEnoughData { points: usize, required: usize },
 }
-
-impl fmt::Display for IndicatorError {
-    #[allow(clippy::too_many_lines)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidMacdFastPeriod { n } => {
-                write!(f, "macd fast period must be positive, got {n}")
-            }
-            Self::InvalidMacdSlowPeriod { n } => {
-                write!(f, "macd slow period must be positive, got {n}")
-            }
-            Self::InvalidMacdMaType { ma_type } => {
-                write!(
-                    f,
-                    "macd moving-average type must be \"ema\" or \"sma\", got \"{ma_type}\""
-                )
-            }
-            Self::InvalidMacdPeriodOrder { fast, slow } => {
-                write!(
-                    f,
-                    "macd fast period must be less than slow period, got fast {fast}, slow {slow}"
-                )
-            }
-            Self::InvalidRsiPeriod { n } => {
-                write!(f, "rsi period must be positive, got {n}")
-            }
-            Self::InvalidRsiThresholdOrder { high, low } => {
-                write!(
-                    f,
-                    "rsi low threshold must be less than high threshold, got high {high}, low {low}"
-                )
-            }
-            Self::InvalidRsiThresholdRange { value } => {
-                write!(f, "rsi threshold must be between 0 and 100, got {value}")
-            }
-            Self::InvalidBearsPeriod { n } => {
-                write!(f, "bears power period must be positive, got {n}")
-            }
-            Self::InvalidBullsPeriod { n } => {
-                write!(f, "bulls power period must be positive, got {n}")
-            }
-            Self::InvalidChoFastPeriod { n } => {
-                write!(
-                    f,
-                    "chaikin oscillator fast period must be positive, got {n}"
-                )
-            }
-            Self::InvalidChoSlowPeriod { n } => {
-                write!(
-                    f,
-                    "chaikin oscillator slow period must be positive, got {n}"
-                )
-            }
-            Self::InvalidChoPeriodOrder { fast, slow } => {
-                write!(
-                    f,
-                    "chaikin oscillator fast period must not exceed slow period, got fast {fast}, slow {slow}"
-                )
-            }
-            Self::InvalidChvSmoothPeriod { n } => {
-                write!(
-                    f,
-                    "chaikin volatility smoothing period must be positive, got {n}"
-                )
-            }
-            Self::InvalidChvPeriod { n } => {
-                write!(f, "chaikin volatility period must be positive, got {n}")
-            }
-            Self::InvalidDpoPeriod { n } => {
-                write!(
-                    f,
-                    "detrended price oscillator period must be positive, got {n}"
-                )
-            }
-            Self::InvalidForcePeriod { n } => {
-                write!(f, "force index period must be positive, got {n}")
-            }
-            Self::InvalidOsMaFastPeriod { n } => {
-                write!(f, "osma fast period must be positive, got {n}")
-            }
-            Self::InvalidOsMaSlowPeriod { n } => {
-                write!(f, "osma slow period must be positive, got {n}")
-            }
-            Self::InvalidOsMaSignalPeriod { n } => {
-                write!(f, "osma signal period must be positive, got {n}")
-            }
-            Self::InvalidOsMaPeriodOrder { fast, slow } => {
-                write!(
-                    f,
-                    "osma fast period must not exceed slow period, got fast {fast}, slow {slow}"
-                )
-            }
-            Self::InvalidRocPeriod { n } => {
-                write!(f, "rate of change period must be positive, got {n}")
-            }
-            Self::InvalidTrixPeriod { n } => {
-                write!(f, "trix period must be positive, got {n}")
-            }
-            Self::InvalidVrocPeriod { n } => {
-                write!(f, "volume rate of change period must be positive, got {n}")
-            }
-            Self::NotEnoughData { points, required } => {
-                write!(
-                    f,
-                    "not enough data points to compute indicator: saw {points}, required {required}"
-                )
-            }
-        }
-    }
-}
-
-impl Error for IndicatorError {}
 
 pub fn create_indicator_output(
     parameters: &IndicatorParameters,

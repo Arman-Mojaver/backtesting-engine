@@ -1,30 +1,20 @@
-use std::error::Error;
-use std::fmt;
+use thiserror::Error;
 
 use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum EmptyRepoValidationError {
+    #[error("long operation points list is empty")]
     LongOperationPointsEmpty,
+    #[error("short operation points list is empty")]
     ShortOperationPointsEmpty,
+    #[error("indicators list is empty")]
     IndicatorsEmpty,
+    #[error("resampled points list is empty")]
     ResampledPointsEmpty,
 }
-
-impl fmt::Display for EmptyRepoValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::LongOperationPointsEmpty => write!(f, "long operation points list is empty"),
-            Self::ShortOperationPointsEmpty => write!(f, "short operation points list is empty"),
-            Self::IndicatorsEmpty => write!(f, "indicators list is empty"),
-            Self::ResampledPointsEmpty => write!(f, "resampled points list is empty"),
-        }
-    }
-}
-
-impl Error for EmptyRepoValidationError {}
 
 pub const fn validate_empty_entities(
     long_ops: &[OperationPoint],

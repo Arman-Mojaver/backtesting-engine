@@ -32,6 +32,8 @@ ignored = ["time"]
 clap = { version = "4.5", features = ["string", "derive"] }
 cached = "4"
 anyhow = "1.0"
+# Typed domain errors: derives Display + std::error::Error for error enums.
+thiserror = "2"
 postgres = "0.19"
 # Feature-trimmed: only ZSTD parquet and core Arrow types are used — the other
 # codec backends (snap/brotli/flate2/lz4) and arrow's csv/ipc/json features

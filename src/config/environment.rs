@@ -1,9 +1,8 @@
 use std::env::{self, VarError};
-use std::error::Error;
-use std::fmt;
 use std::str::FromStr;
 
 use log::debug;
+use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Environment {
@@ -12,23 +11,11 @@ pub enum Environment {
     Testing,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("invalid ENVIRONMENT value '{value}': expected 'production', 'development', or 'testing' (case-insensitive)")]
 pub struct InvalidEnvironmentError {
     value: String,
 }
-
-impl fmt::Display for InvalidEnvironmentError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "invalid ENVIRONMENT value '{}': expected 'production', 'development', or 'testing' \
-             (case-insensitive)",
-            self.value
-        )
-    }
-}
-
-impl Error for InvalidEnvironmentError {}
 
 impl FromStr for Environment {
     type Err = InvalidEnvironmentError;

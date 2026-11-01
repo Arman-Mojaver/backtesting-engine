@@ -1,10 +1,12 @@
 use itertools::Itertools;
+use thiserror::Error;
 
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ValidationError {
+    #[error("instruments must match across resampled points, long operation points, and short operation points")]
     InstrumentMismatch,
 }
 
@@ -110,6 +112,14 @@ mod tests {
         assert_eq!(
             validate_same_instrument(&resampled, &long, &short),
             Err(ValidationError::InstrumentMismatch)
+        );
+    }
+
+    #[test]
+    fn display_message_names_the_violated_constraint() {
+        assert_eq!(
+            ValidationError::InstrumentMismatch.to_string(),
+            "instruments must match across resampled points, long operation points, and short operation points"
         );
     }
 }

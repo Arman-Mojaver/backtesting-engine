@@ -1,5 +1,4 @@
-use std::error::Error;
-use std::fmt;
+use thiserror::Error;
 
 use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::OperationPoint;
@@ -10,35 +9,17 @@ use super::same_instrument_validation;
 use super::same_mms_validation;
 use super::same_timestamp_validation;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum CombinedValidationError {
+    #[error("{0}")]
     Empty(empty_validation::EmptyRepoValidationError),
+    #[error("instruments must match across resampled points, long operation points, and short operation points")]
     InstrumentMismatch,
+    #[error("all operation points must reference the expected money management strategy id")]
     MoneyManagementStrategyMismatch,
+    #[error("operation point timestamps must match each other and be contained in the resampled point timestamps")]
     TimestampMismatch,
 }
-
-impl fmt::Display for CombinedValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Empty(inner) => write!(f, "{inner}"),
-            Self::InstrumentMismatch => write!(
-                f,
-                "instruments must match across resampled points, long operation points, and short operation points"
-            ),
-            Self::MoneyManagementStrategyMismatch => write!(
-                f,
-                "all operation points must reference the expected money management strategy id"
-            ),
-            Self::TimestampMismatch => write!(
-                f,
-                "operation point timestamps must match each other and be contained in the resampled point timestamps"
-            ),
-        }
-    }
-}
-
-impl Error for CombinedValidationError {}
 
 pub fn validate_all(
     long_ops: &[OperationPoint],

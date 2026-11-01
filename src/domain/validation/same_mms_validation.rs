@@ -1,7 +1,10 @@
+use thiserror::Error;
+
 use crate::domain::operation_point::OperationPoint;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ValidationError {
+    #[error("all operation points must reference the expected money management strategy id")]
     MoneyManagementStrategyMismatch,
 }
 
@@ -94,6 +97,14 @@ mod tests {
         assert_eq!(
             validate_money_management_strategy_id_matches(&long, &short, 1),
             Err(ValidationError::MoneyManagementStrategyMismatch)
+        );
+    }
+
+    #[test]
+    fn display_message_names_the_violated_constraint() {
+        assert_eq!(
+            ValidationError::MoneyManagementStrategyMismatch.to_string(),
+            "all operation points must reference the expected money management strategy id"
         );
     }
 }
