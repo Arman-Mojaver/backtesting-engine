@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.11 | Updated: 2026-10-21 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.12 | Updated: 2026-11-01 -->
 
 # Decisions Log
 
@@ -1043,6 +1043,59 @@ Remove the command and everything that existed only to serve it (465 lines total
 
 ---
 
+## Decision: Arm64-Only Runtime Image Tuned for Apple Silicon (M2)
+
+**Date**: 2026-11-01
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The runtime image only ever runs on the owner's MacBook Pro (M2), but CI built it on `ubuntu-latest` with no `platforms:` setting — every published `latest`/SHA image was linux/amd64, executed on the Mac through Rosetta/QEMU emulation (≈1.5–10× slower than native arm64). Separately, notes.md asked for `RUSTFLAGS="-C target-cpu=native"`; `native` is wrong in CI (it resolves to the *runner's* CPU — Neoverse on GitHub's arm64 runners, x86 on amd64) and is invalid when cross-compiling. Finally, running the runtime image with a dev-compose-style `command: ["sh", "-c", ...]` collided with its `ENTRYPOINT ["bte"]`, producing `bte sh -c ...` → `error: unrecognized subcommand 'sh'` replayed on a `restart: unless-stopped` loop.
+
+### Decision
+1. CI publishes **linux/arm64 only**, built natively on GitHub's arm64 runners (`ubuntu-24.04-arm` — free for public repos, available in private repos since 2026-01). No QEMU, no cross-toolchain. `latest` is replaced by an arm64-only image; amd64 consumers are dropped by design.
+2. M2 tuning is explicit, not `native`: `CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C target-cpu=apple-m2 -C link-arg=-fuse-ld=mold"` in the builder stage. Verified on rustc 1.98.1: accepted, and its 29-feature set (lse, rcpc/rcpc2, fp16, dotprod, i8mm, bf16, …) is identical to `native` on the M2 and to the listed `apple-a15` (same Avalanche microarchitecture; fallback name if a future LLVM drops the alias). Bare `cargo build --release` on the Mac may still use `target-cpu=native` — identical CPU. The per-target env form keeps host build scripts unflagged.
+3. Runtime base: `debian:trixie-slim` mirroring the dev container's userland (bash, coreutils, ca-certificates) minus the toolchain — same Debian release as the builder (glibc 2.41 matches); non-root `bte` user (uid 10001, as in the original runtime image); `mkdir /app/logs /app/parquet_files` owned by `bte`; `CMD ["sleep", "infinity"]` exactly like dev; **no ENTRYPOINT** — it is a workspace container, not a batch entrypoint (the ENTRYPOINT design was what turned a compose `sh -c` command into `bte sh -c ...` → "unrecognized subcommand 'sh'"). 157 MB (measured) vs 209 MB before. A first iteration of this change shipped distroless `cc-debian13:nonroot` (65 MB, no shell) before the owner clarified the runtime workflow is get-in-and-call-the-CLI, matching the dev container — which requires the Debian userland.
+4. Release profile: `panic = "abort"` added (unwind tables dropped; clippy already denies panics); `lto = "thin"`, `codegen-units = 1`, `debug = "line-tables-only"` kept. The Docker build then runs `strip --strip-debug` on the final ELF — on Linux the line tables embed in the binary (~40 MB here; macOS keeps them outside via `split-debuginfo=unpacked`), so the shipped binary drops to ~8.8 MB with the symbol table intact (backtraces keep function names; local bare builds keep full info).
+5. `mimalloc` global allocator (`src/bin/bt-engine.rs`) — the hot path churns Arrow/Parquet buffers across many rayon threads.
+6. Feature-trimmed `arrow`/`parquet`: ZSTD only — `snap`/`brotli`/`flate2`/`lz4` compile out of the dependency graph (the engine writes and reads ZSTD exclusively).
+7. Builder dependency caching: fake-source dependency-compile layer — only `Cargo.toml`/`Cargo.lock` changes rebuild dependencies; source edits rebuild just the workspace crate. (GHA `mode=max` layer caching cannot do this once `COPY . .` invalidates the layer, and BuildKit cache mounts do not export to the GHA backend.)
+8. `mold` installed in the builder — release links are the slow tail under lto + codegen-units=1.
+9. Runtime workflow: `docker-compose.runtime.yaml` is a long-running workspace service (`restart: unless-stopped`, `platform: linux/arm64`, parquet + logs mounts) in its own compose project (`name: bte-runtime`, so dev and runtime containers can coexist). Makefile targets mirror the dev set with an `r` suffix: `upr`, `inr` (bash inside, like `in`), `downr`, `buildr` (renamed from `build-release`), `pushr`, `pullr`. One-shot runs: `docker compose -f docker-compose.runtime.yaml run --rm engine bte <args>`. The dev compose pins `platform: linux/arm64` as a guardrail.
+
+### Rationale
+- Native arm64 removes the emulation tax — the single largest runtime win (1.5–10×)
+- Explicit `apple-m2` enables LSE atomics (rayon's work-stealing is atomics-heavy) and is safe on every build host while exact for the only deployment target
+- Debian userland matches the dev container exactly, so the runtime workflow is muscle-memory identical — only the binary differs (release, M2-tuned)
+- Layer-cached dependency compiles turn every-push CI docker builds into "relink the workspace crate"
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Multi-arch manifest (amd64 + arm64) | Runs anywhere | 2× build time/matrix; amd64 never used | The M2 is the only consumer |
+| QEMU-emulated arm64 builds on amd64 runners | No runner change | rustc under QEMU ≈10–20× slower; LTO builds would blow the timeout | Native arm runners exist |
+| Cross-compile on amd64 (zigbuild/cross) | Works without arm runners | Cross-linker maintenance | Unnecessary — arm runners cover public and private repos |
+| `target-cpu=native` in CI | notes.md as written | Resolves to the runner's CPU (Neoverse/x86) — wrong ISA for the M2; invalid when cross-compiling | Explicit `apple-m2` is correct everywhere |
+| Static musl + `FROM scratch` | ~10–15 MB image | musl malloc/resolver semantics change; no userland for the interactive workflow | Wrong shape for a workspace container |
+| Distroless `cc-debian13:nonroot` (first iteration) | 65 MB, no shell/package surface | No `sleep`, no bash — cannot host the get-in-and-call-the-CLI workflow | Owner's workflow matches the dev container; userland required |
+| `lto = "fat"` | ~1–3% runtime | ≈2× link time on 4-vCPU runners over a large dep graph | Thin LTO already set; poor CI-cost trade |
+| `strip = true` in release profile | Smaller binary everywhere | Removes the symbol table too — backtraces lose function names | Builder-stage `--strip-debug` keeps names at the same size win |
+| Ship the Linux binary unstripped | Full in-container backtraces | 48.7 MB binary → 114 MB image | Names-only backtraces in a ~74 MB image is the right trade here |
+| UPX-compressed binary | Smallest image | Slower startup; breaks mmap page sharing | Net negative for a batch CLI |
+| PGO (cargo-pgo) | ~5–15% on compute | High CI complexity; needs a representative profile workload | Deliberate follow-up, not part of this change |
+| cargo-chef for dep caching | Battle-tested | Extra tool + image to pin | Fake-source layer achieves the same with zero added tools |
+
+### Impact
+**Positive**: Native-speed execution on the M2 (no emulation); 209 MB → 157 MB runtime image (−25%); shipped binary 48.7 → 8.8 MB (debug sections stripped, symbol table kept); every-push CI rebuilds only the workspace crate; M2-tuned codegen (LSE atomics et al.); faster allocation under rayon; a compose `command:` can never be misread as a `bte` subcommand (no ENTRYPOINT)
+**Negative**: `latest` no longer runs on x86-64 machines (accepted — M2-only by design); an `apple-m2`-tuned binary may not run on non-Apple ARM servers (e.g. older Graviton) if ever needed — rebuild without the flag then; first CI run after this change starts a cold arm64 cache
+**Risk**: non-root uid (10001) writing to macOS bind mounts — validated locally (Docker Desktop file sharing permits non-root container uids); the image ships apt, so ad-hoc tooling can be installed in a pinch
+
+### Related
+- notes.md (target-cpu advice), README.md (Docker workflow), Dockerfile, .github/workflows/ci.yml, docker-compose.runtime.yaml, docker-compose.yaml, Makefile, Cargo.toml, src/bin/bt-engine.rs, .dockerignore
+- Supersedes the publishing half of: CI Workflow (2026-09-03) — same gates, new runner/arch
+
+---
+
 ## Deprecated Decisions
 
 | Decision | Date | Replaced By | Why |
@@ -1055,6 +1108,7 @@ Remove the command and everything that existed only to serve it (465 lines total
 | Manual Docker build/push (Makefile only) | pre-2026-09 | CI Workflow (2026-09-03) | Publishing must be gated on fmt + clippy + tests |
 | `ct` Python-wrapping CLI binary | 2026-10-21 | Remove the `ct` Python-Wrapping CLI (2026-10-21) | Operator frontend had no unique capability; dragged Python forward path and Docker indirection into the engine |
 | `strategy metadata` command (item 3 of the Processed Manifest decision) | 2026-08-07 | Remove the `strategy metadata` Command (2026-10-25) | Read-only diagnostic with no other consumers; done/remaining stays derivable from the manifest ledger |
+| amd64 CI images (`ubuntu-latest`, no platform pin) | 2026-09-03 | Arm64-Only Runtime Image Tuned for Apple Silicon (2026-11-01) | Images run exclusively on Apple Silicon; native arm64 builds replace emulated amd64 |
 
 ## Onboarding Checklist
 

@@ -192,16 +192,16 @@ Default quality bar:
 
 ## CLI reference
 
-Two binaries, one crate.
+One binary: `bte`.
 
-### `bt-engine` — native Rust engine
+### `bte` — native Rust engine
 
 Runs inside the engine container (or anywhere it can reach PostgreSQL and the Parquet
 directory).
 
 ```
-bt-engine strategy create -m <MMS_ID> [-i <INSTRUMENT>]   # one cell (default instrument: EURUSD)
-bt-engine strategy create_loop                           # all cells, idempotent batch
+bte strategy create -m <MMS_ID> [-i <INSTRUMENT>]   # one cell (default instrument: EURUSD)
+bte strategy create_loop                           # all cells, idempotent batch
 ```
 
 ## Output format
@@ -276,25 +276,54 @@ cargo build --release
 cargo install --path . --bin bt-engine --force
 ```
 
-For release builds on the deployment machine, consider
-`RUSTFLAGS="-C target-cpu=native" cargo build --release` (the numeric kernels are
-leaf-heavy; this is worth ~free performance when the binary stays on one host).
+The Docker runtime image bakes `-C target-cpu=apple-m2` into its release build
+(see Dockerfile) — explicit rather than `native`, because CI builds on non-Apple
+arm64 runners where `native` would tune for the wrong CPU. For bare
+`cargo build --release` on the Mac itself, `RUSTFLAGS="-C target-cpu=native"` is
+equivalent (the host is the M2) and worth ~free performance.
 
 ### Docker workflow
 
 ```bash
 cp .env.example .env        # ENVIRONMENT, PARQUET_FILES_PATH, RUST_LOG
 
-make up                     # start the engine container
-make in                     # shell into it — bt-engine is on PATH
+make up                     # start the dev container
+make in                     # shell into it — bte is on PATH
 make logs                   # follow container logs
-make build                  # build image (multi-stage, with a dependency-fetch cache layer)
+make build                  # build dev image (multi-stage, dep-compile cache layer)
 make fmt                    # cargo fmt
 ```
 
-The image is `armanmojaver/backtesting-engine`. `docker-compose.yaml` mounts the
-source, the Parquet directory, and the logs, with named volumes for the cargo
-registries and build artifacts.
+`docker-compose.yaml` runs the **dev** image: it mounts the source, the Parquet
+directory, and the logs, with named volumes for the cargo registries and build
+artifacts — you compile inside the container.
+
+#### Running the runtime image (linux/arm64)
+
+The published runtime image (`armanmojaver/backtesting-engine:latest`) is built
+by CI on GitHub's arm64 runners and targets Apple Silicon only. It mirrors the
+dev container's userland (Debian trixie: bash, coreutils, ca-certificates) minus
+the toolchain, with the release binary at `/usr/local/bin/bte`. The workflow is
+identical to dev — get in and call the CLI:
+
+```bash
+make pullr                  # fetch the CI-built image (or buildr to build locally)
+make upr                    # start the long-running runtime container
+make inr                    # bash inside it — bte is on PATH
+# inside the container:
+bte strategy create_loop
+make downr                  # stop it
+```
+
+One-shot runs without entering the container:
+
+```bash
+docker compose -f docker-compose.runtime.yaml run --rm engine bte strategy create
+```
+
+The image has no ENTRYPOINT — commands are always explicit, so nothing can be
+misread as a `bte` subcommand (the `error: unrecognized subcommand 'sh'` failure
+came from an ENTRYPOINT design that is now gone).
 
 ## Development
 
@@ -307,7 +336,8 @@ cargo test                                                 # no PostgreSQL or Do
 The test suite is unit tests plus file-based adapter tests under temp directories —
 it runs with no database and no containers. CI runs the same three gates on every
 push to `main` (toolchain pinned to match the Docker image), then builds and pushes
-the image tagged `latest` and the short commit SHA.
+linux/arm64 images on GitHub's arm64 runners: `latest` + short commit SHA (runtime)
+and `dev`. The images target Apple Silicon only.
 
 ## Known limitations
 

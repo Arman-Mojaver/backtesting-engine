@@ -1,0 +1,27 @@
+# Long-running workspace container for the published runtime image (linux/arm64).
+#
+# Same workflow as the dev container, with the release binary: start it
+# (make upr), shell in (make inr), and call the CLI from inside —
+# `bte strategy create`. The Parquet tree and logs are mounted; the release
+# binary is on PATH at /usr/local/bin/bte. One-shot runs also work:
+#
+#   docker compose -f docker-compose.runtime.yaml run --rm engine bte strategy create_loop
+#
+# Runs as its own compose project (name: bte-runtime) so it never collides
+# with the dev containers — both can be up at once.
+
+name: bte-runtime
+
+services:
+  engine:
+    image: armanmojaver/backtesting-engine:latest
+    platform: linux/arm64
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT}
+      - RUST_LOG=${RUST_LOG}
+    volumes:
+      - ${PARQUET_FILES_PATH}:/app/parquet_files
+      - ./logs:/app/logs
+    working_dir: /app
+    command: ["sleep", "infinity"]

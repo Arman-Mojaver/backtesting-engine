@@ -1,7 +1,8 @@
 services:
   engine:
     container_name: engine
-    image: armanmojaver/backtesting-engine
+    image: armanmojaver/backtesting-engine:dev
+    platform: linux/arm64
     restart: unless-stopped
     environment:
       - ENVIRONMENT=${ENVIRONMENT}

@@ -17,3 +17,14 @@ target/
 .tmp
 
 rust-toolchain.toml
+
+# Not needed to compile the image — keeps the build context minimal.
+benches/
+tests/
+.github/
+*.md
+Makefile
+docker-compose*.yaml
+rustfmt.toml
+clippy.toml
+opencode.json

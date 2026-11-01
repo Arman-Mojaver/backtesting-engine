@@ -1,11 +1,15 @@
 # CI pipeline DAG:
 #
 #   preflight ──┬──> lint ──┐
-#               └──> test ──┴──> docker (build & push)
+#               └──> test ──┴──> docker (build & push runtime + dev, linux/arm64)
 #
 # preflight gates the whole pipeline: if the Docker Hub login fails
 # (invalid or revoked credentials), lint and test are skipped
 # (fail fast, no wasted compute).
+#
+# Images are linux/arm64 ONLY: they run exclusively on Apple Silicon. The
+# docker job builds natively on GitHub's arm64 runners — no QEMU, no
+# cross-toolchain — so the Dockerfile's target-cpu tuning stays honest.
 
 name: ci
 
@@ -79,10 +83,12 @@ jobs:
         run: cargo test --locked
 
   docker:
-    name: Build and push Docker image
+    name: Build and push Docker images (linux/arm64)
     needs: [lint, test]
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Native arm64 runners (free for public repos; available in private repos
+    # at 2 vCPU vs 4 vCPU public — hence the timeout headroom for cold builds).
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -100,16 +106,36 @@ jobs:
         id: vars
         run: echo "sha_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push image
+      # Separate cache scopes so one step's mode=max export doesn't evict the
+      # other's layers; each reads both, so the shared fetcher stage is reused.
+      - name: Build and push runtime image
         uses: docker/build-push-action@v7
         with:
           context: .
+          target: runtime
+          platforms: linux/arm64
           push: true
           tags: |
             armanmojaver/backtesting-engine:latest
             armanmojaver/backtesting-engine:${{ steps.vars.outputs.sha_short }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=runtime
+            type=gha,scope=dev
+          cache-to: type=gha,mode=max,scope=runtime
+          provenance: false
+
+      - name: Build and push dev image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: dev
+          platforms: linux/arm64
+          push: true
+          tags: armanmojaver/backtesting-engine:dev
+          cache-from: |
+            type=gha,scope=dev
+            type=gha,scope=runtime
+          cache-to: type=gha,mode=max,scope=dev
           provenance: false
 
       - name: Logout from Docker Hub
@@ -118,8 +144,9 @@ jobs:
       - name: Write job summary
         run: |
           {
-            echo "## Docker image published"
+            echo "## Docker images published (linux/arm64)"
             echo ""
             echo '- `armanmojaver/backtesting-engine:latest`'
             echo '- `armanmojaver/backtesting-engine:${{ steps.vars.outputs.sha_short }}`'
+            echo '- `armanmojaver/backtesting-engine:dev`'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-.PHONY: help bash logs up in down build fmt push pull fmt test
+.PHONY: help bash logs up in down build buildr push pull pushr pullr upr inr downr fmt test
 
 .DEFAULT_GOAL := help
 
@@ -21,7 +21,7 @@ logs:  ## Display docker-compose logs
 	docker compose logs --tail=100 -f
 
 
-# Docker commands
+# Dev image commands
 up:  ## Start containers
 	docker compose -f docker-compose.yaml up -d
 
@@ -31,16 +31,36 @@ in:  ## Start a bash shell in started container
 down:  ## Remove containers
 	docker compose -f docker-compose.yaml down
 
+build:  ## Build dev image
+	docker image build --target dev -t armanmojaver/backtesting-engine:dev .
 
-# Docker image commands
-build:  ## Build image
-	docker image build -t armanmojaver/backtesting-engine:latest .
+push:  ## Push dev image
+	cat .docker_password | docker login --username armanmojaver --password-stdin
+	docker push armanmojaver/backtesting-engine:dev
 
-push:  ## Push images
+pull:  ## Pull dev image
+	cat .docker_password | docker login --username armanmojaver --password-stdin
+	docker pull armanmojaver/backtesting-engine:dev
+
+
+# Runtime image commands
+upr:   ## Start runtime container
+	docker compose -f docker-compose.runtime.yaml up -d
+
+inr:   ## Start a bash shell in started runtime container
+	docker compose -f docker-compose.runtime.yaml exec -it engine /bin/bash
+
+downr: ## Remove runtime containers
+	docker compose -f docker-compose.runtime.yaml down
+
+buildr:  ## Build runtime image
+	docker image build --target runtime -t armanmojaver/backtesting-engine:latest .
+
+pushr:  ## Push runtime image
 	cat .docker_password | docker login --username armanmojaver --password-stdin
 	docker push armanmojaver/backtesting-engine:latest
 
-pull:  ## Pull images
+pullr:  ## Pull runtime image
 	cat .docker_password | docker login --username armanmojaver --password-stdin
 	docker pull armanmojaver/backtesting-engine:latest
 
