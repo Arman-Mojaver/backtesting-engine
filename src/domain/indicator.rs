@@ -2,7 +2,9 @@
 /// and the parameters it is computed with.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndicatorParameters {
-    /// Moving Average Convergence Divergence: `MA(close, fast) - MA(close, slow)`.
+    /// Moving Average Convergence Divergence: the MACD line
+    /// `MA(close, fast) - MA(close, slow)` crossed against its signal line
+    /// `SMA(MACD, 9)` (the signal period is an engine constant).
     Macd {
         /// Moving-average type of the slow line ("ema" or "sma").
         slow_type: String,

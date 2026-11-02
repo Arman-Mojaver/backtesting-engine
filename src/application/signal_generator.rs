@@ -101,31 +101,44 @@ mod tests {
         assert_eq!(result[0].indicator_id, 2);
     }
 
-    #[test]
-    fn macd_zero_cross_produces_long_signal() {
-        // closes [10, 10, 10, 5, 10] with fast EMA(1) (identity) and slow
-        // EMA(2): MACD = [0, 0, -1.66.., 1.11..] at ts 2000..5000. The
-        // strict negative-to-positive zero cross at ts 5000 is a long signal.
-        let closes = [10.0, 10.0, 10.0, 5.0, 10.0];
-        let points: Vec<ResampledPointD1> = (0..5)
-            .map(|i: i32| {
-                let close = closes[usize::try_from(i).unwrap()];
+    /// Build points from an explicit close series, ts = (i + 1) * 1000.
+    fn points_from_closes(closes: &[f64]) -> Vec<ResampledPointD1> {
+        closes
+            .iter()
+            .enumerate()
+            .map(|(i, close)| {
+                let i3 = i32::try_from(i).unwrap();
                 ResampledPointD1 {
-                    id: i + 1,
+                    id: i3.saturating_add(1),
                     instrument: "EURUSD".into(),
-                    open: close,
-                    high: close,
-                    low: close,
-                    close,
+                    open: *close,
+                    high: *close,
+                    low: *close,
+                    close: *close,
                     volume: 1000,
-                    timestamp: i64::from(i + 1) * 1000,
+                    timestamp: i64::from(i3.saturating_add(1)).saturating_mul(1000),
                 }
             })
-            .collect();
+            .collect()
+    }
+
+    #[test]
+    fn macd_crossing_above_signal_line_produces_long_signal() {
+        // fast EMA(1) (identity), slow SMA(2): the MACD line is half the
+        // bar-to-bar close change, evaluated at the later bar. The dip
+        // 100 -> 82 at index 9 and recovery at 10 give
+        //   line  = [0,0,0,0,0,0,0,0,-9,9,0,0,0] (ts 2000..14000)
+        //   signal = SMA(line, 9) = [-1, 0, 0, 0, 0]
+        //   diff  = [-8, 9, 0, 0, 0] -> strict - to + cross at ts 11000.
+        let closes = [
+            100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 82.0, 100.0, 100.0,
+            100.0, 100.0,
+        ];
+        let points = points_from_closes(&closes);
         let indicators = vec![Indicator {
-            id: 9,
+            id: 9001,
             parameters: IndicatorParameters::Macd {
-                slow_type: "ema".to_string(),
+                slow_type: "sma".to_string(),
                 slow_n: 2,
                 fast_type: "ema".to_string(),
                 fast_n: 1,
@@ -133,9 +146,37 @@ mod tests {
         }];
         let result = create_signal_groups(&indicators, &points);
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 9);
-        assert_eq!(result[0].long_signals, vec![5000]);
+        assert_eq!(result[0].indicator_id, 9001);
+        assert_eq!(result[0].long_signals, vec![11000]);
         assert!(result[0].short_signals.is_empty());
+    }
+
+    #[test]
+    fn macd_crossing_below_signal_line_produces_short_signal() {
+        // Mirror of the long test: the spike 100 -> 118 at index 9 and fall
+        // back at 10 give
+        //   line  = [0,0,0,0,0,0,0,0,9,-9,0,0,0]
+        //   signal = [1, 0, 0, 0, 0]
+        //   diff  = [8, -9, 0, 0, 0] -> strict + to - cross at ts 11000.
+        let closes = [
+            100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 118.0, 100.0, 100.0,
+            100.0, 100.0,
+        ];
+        let points = points_from_closes(&closes);
+        let indicators = vec![Indicator {
+            id: 9002,
+            parameters: IndicatorParameters::Macd {
+                slow_type: "sma".to_string(),
+                slow_n: 2,
+                fast_type: "ema".to_string(),
+                fast_n: 1,
+            },
+        }];
+        let result = create_signal_groups(&indicators, &points);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].indicator_id, 9002);
+        assert_eq!(result[0].short_signals, vec![11000]);
+        assert!(result[0].long_signals.is_empty());
     }
 
     #[test]
@@ -211,7 +252,7 @@ mod tests {
             },
         ];
         let indicators = vec![Indicator {
-            id: 7,
+            id: 7001,
             parameters: IndicatorParameters::Rsi {
                 n: 2,
                 high_threshold: 70,
@@ -220,7 +261,7 @@ mod tests {
         }];
         let result = create_signal_groups(&indicators, &points);
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 7);
+        assert_eq!(result[0].indicator_id, 7001);
         // RSI 0 -> 50 crosses above low threshold 30 -> long signal at ts 4000.
         assert_eq!(result[0].long_signals, vec![4000]);
         assert!(result[0].short_signals.is_empty());

@@ -22,3 +22,13 @@ macro_rules! empty_oscillator {
         return Ok($crate::domain::signal::OscillatorSeries { items: Vec::new() })
     };
 }
+
+#[macro_export]
+macro_rules! empty_crossover {
+    () => {
+        return Ok($crate::domain::signal::CrossoverPair {
+            upcross_long_buffer: Vec::new(),
+            upcross_short_buffer: Vec::new(),
+        })
+    };
+}

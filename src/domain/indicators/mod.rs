@@ -136,7 +136,7 @@ pub fn create_indicator_output(
             fast_n,
         } => {
             let buffer = macd::compute(points, fast_type, *fast_n, slow_type, *slow_n)?;
-            Ok(IndicatorOutput::Oscillator { instrument, buffer })
+            Ok(IndicatorOutput::Crossover { instrument, buffer })
         }
         IndicatorParameters::AwesomeOscillator => {
             let buffer = ao::compute(points)?;
@@ -256,10 +256,11 @@ mod tests {
         }
     }
 
-    /// 6 points with constant close -> exactly 2 MACD values
-    /// (fast=3, slow=5 -> values start at index 4).
-    fn rp_macd_6() -> Vec<ResampledPointD1> {
-        (1..=6)
+    /// 14 points with constant close -> 10 MACD values (fast=3, slow=5,
+    /// values start at index 4) and, after the 9-bar signal window, 2
+    /// aligned crossover-pair values (constant close -> 0.0).
+    fn rp_macd_14() -> Vec<ResampledPointD1> {
+        (1..=14)
             .map(|i| {
                 let m = 10.0;
                 ResampledPointD1 {
@@ -277,29 +278,35 @@ mod tests {
     }
 
     #[test]
-    fn macd_dispatch_returns_one_variant() {
+    fn macd_dispatch_returns_crossover_pair() {
         let params = IndicatorParameters::Macd {
             slow_type: "ema".to_string(),
             slow_n: 5,
             fast_type: "ema".to_string(),
             fast_n: 3,
         };
-        let points = rp_macd_6();
+        let points = rp_macd_14();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
+            IndicatorOutput::Crossover {
                 buffer: ref buf, ..
             } => {
-                // 6 points, fast=3, slow=5 -> 2 MACD values (constant close -> 0.0).
-                assert_eq!(buf.items.len(), 2);
-                assert_eq!(buf.items[0].value, 0.0);
+                // 14 points -> 10 MACD values; the 9-bar signal window leaves
+                // 2 aligned values (constant close -> 0.0).
+                assert_eq!(buf.upcross_long_buffer.len(), 2);
+                assert_eq!(buf.upcross_short_buffer.len(), 2);
+                assert_eq!(buf.upcross_long_buffer[0].value, 0.0);
+                assert_eq!(buf.upcross_short_buffer[0].value, 0.0);
+                // Both buffers share the aligned timestamps (bar 13 and 14).
+                assert_eq!(buf.upcross_long_buffer[0].timestamp, 13);
+                assert_eq!(buf.upcross_short_buffer[0].timestamp, 13);
             }
-            other => panic!("expected One, got {other:?}"),
+            other => panic!("expected Crossover, got {other:?}"),
         }
     }
 
     #[test]
-    fn macd_dispatch_with_insufficient_data_yields_empty_one() {
+    fn macd_dispatch_with_insufficient_data_yields_empty_pair() {
         let params = IndicatorParameters::Macd {
             slow_type: "ema".to_string(),
             slow_n: 26,
@@ -309,10 +316,13 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
+            IndicatorOutput::Crossover {
                 buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
-            other => panic!("expected One, got {other:?}"),
+            } => {
+                assert!(buf.upcross_long_buffer.is_empty());
+                assert!(buf.upcross_short_buffer.is_empty());
+            }
+            other => panic!("expected Crossover, got {other:?}"),
         }
     }
 
