@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/business | Priority: high | Version: 1.7 | Updated: 2026-10-21 -->
+<!-- Context: project-intelligence/business | Priority: high | Version: 1.9 | Updated: 2026-11-02 -->
 
 # Business Domain
 
@@ -43,15 +43,15 @@ Solution: A Rust engine that loads historical OHLCV candles, long/short trade re
 
 The engine is in **active development** — the strategy pipeline is real end-to-end:
 - ✅ Domain model defined (entities, repository traits)
-- ✅ Five validation rules implemented and tested (fail-fast, ordered)
-- ✅ Engine CLI (`bt-engine` binary: strategy create, create_loop)
+- ✅ Four validation rules implemented and tested (fail-fast, ordered)
+- ✅ Engine CLI (`bte` binary: strategy create, create_loop)
 - ✅ Environment/DB configuration (production / development / testing)
 - ✅ PostgreSQL adapters for indicators, operation points, resampled points (+ indexed batch loads)
-- ✅ `Strategy` entity + `GlobalStrategyFilter` + `filter_strategies()` (DD ≤ 30%, ROI ≥ 5%)
+- ✅ `Strategy` entity + `GlobalStrategyFilter` + `filter_strategies()` (DD ≤ 20%, ROI ≥ 5%)
 - ✅ Application layer (`fetch_source_data`, `create_signal_groups`, `create_strategies`, `run_strategies`)
 - ✅ Performance metrics: single-pass `performance_metrics()` (global ROI + max draw down), `annual_roi()`, `annual_operation_count()` — pure domain functions
 - ✅ Real metrics computed in the strategy generator (rayon-parallelized)
-- ✅ **Real signal generation** — 14 indicators computed from candle data (RSI, AO, AC, Bears, Bulls, CHO, CHV, DPO, Force, OsMa, ROC, TRIX, VROC) with zero-cross / threshold / crossover signal semantics
+- ✅ **Real signal generation** — 14 indicators computed from candle data (RSI, AO, AC, Bears, Bulls, CHO, CHV, DPO, Force, OsMa, MACD, ROC, TRIX, VROC) with zero-cross / threshold / crossover signal semantics
 - ✅ Two-stage filtering: signal groups by annual op count, then strategies by DD + ROI
 - ✅ In-memory signal-group memoization (`cached` crate, keyed by `indicator_id` + instrument)
 - ✅ `SignalGroup` in domain layer with embedded `indicator_id`, `instrument`, `operation_count`
@@ -59,8 +59,8 @@ The engine is in **active development** — the strategy pipeline is real end-to
 - ✅ Partitioned Parquet persistence (instrument × MMS, ZSTD, idempotent by indicator_id)
 - ✅ Processed manifest — idempotency ledger of (instrument, mms_id, indicator_id) triples
 - ✅ `create_loop` — batch pipeline over all cells, parallel compute + persist
-- ✅ CI: fmt + clippy (-D warnings) + 429 tests + Docker build/push
-- ⬜ MACD signal generation (parameters parse, compute unsupported — skipped for now)
+- ✅ CI: fmt + clippy (-D warnings) + tests + cargo-deny + Docker build/push
+- ✅ MACD signal generation (MACD line crossing its signal line; signal period fixed at 9)
 - ⬜ Exit-date-aware metrics (ROI/DD currently assume operations close in entry order — see living-notes)
 - ⬜ API endpoints for running backtests (deliberately deferred — no consumers yet)
 
@@ -68,7 +68,6 @@ The engine is in **active development** — the strategy pipeline is real end-to
 
 - **Single-instrument runs**: A backtest evaluates one instrument at a time
 - **Single-MMS runs**: A backtest evaluates one money management strategy at a time
-- **Single-indicator-type runs**: All indicators must be the same type per run
 - **Timestamp alignment**: Trades must map to existing market data points
 
 ## Related Files

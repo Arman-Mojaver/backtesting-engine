@@ -4,7 +4,7 @@
 
 A Rust engine that generates and evaluates trading strategies against historical daily (D1)
 market data. It loads indicators, OHLCV candles, and long/short trade records from
-PostgreSQL, enforces five data-integrity invariants before computing anything, derives
+PostgreSQL, enforces four data-integrity invariants before computing anything, derives
 entry signals from real indicator mathematics, scores each candidate strategy on a
 single-pass compounding curve, and persists the survivors to partitioned, idempotent
 Parquet output.
@@ -39,9 +39,9 @@ A backtest run is scoped to one **cell**: a single `(instrument, money managemen
 strategy)` pair. For each cell, the engine:
 
 1. **Fetches** indicators, daily candles, and long/short trade records from PostgreSQL.
-2. **Validates** the data against five fail-fast invariants (same instrument, same money
-   management strategy, same indicator type, timestamp alignment, non-emptiness). Bad
-   data never reaches the compute path.
+2. **Validates** the data against four fail-fast invariants (non-emptiness, same
+   instrument, same money management strategy, timestamp alignment). Bad data never
+   reaches the compute path.
 3. **Computes** indicator values over the candle series and derives **signal
    timestamps** from them — zero-crossings, threshold crossings, or line crossovers,
    depending on the indicator kind.
@@ -94,9 +94,9 @@ Stage notes:
 - **Idempotency first.** Before any computation, the engine diffs the database's
   indicators against the processed manifest and computes only the unprocessed
   remainder. A fully-processed cell is skipped without touching the compute path.
-- **Validation is fail-fast and ordered.** The five invariants run in a fixed order and
-  the first failure aborts the cell. The order is load-bearing: emptiness is checked
-  first because later checks read the first element of each dataset.
+- **Validation is fail-fast and ordered.** The four invariants run in a fixed order and
+  the first failure aborts the cell. Emptiness is checked first because the cross-dataset
+  checks pass vacuously on empty input.
 - **Signals are real.** Each indicator's values are computed from the candle series and
   converted to entry timestamps by the indicator's signal rule (see
   [Indicators and signal semantics](#indicators-and-signal-semantics)).
@@ -125,15 +125,14 @@ All timestamps are epoch seconds.
 
 ## Validation invariants
 
-Five invariants, checked in order, failing fast:
+Four invariants, checked in order, failing fast:
 
 | # | Invariant | Rule |
 |---|---|---|
 | 1 | Non-empty | All four datasets (indicators, candles, long trades, short trades) are non-empty. |
-| 2 | Same indicator type | Every indicator in the run shares one type. |
-| 3 | Same instrument | Every candle and trade references the same instrument. |
-| 4 | Same MMS | Every trade's money management strategy matches the run's expected MMS. |
-| 5 | Timestamp alignment | Long and short trade timestamps are identical sets, and both align with candle timestamps. |
+| 2 | Same instrument | Every candle and trade references the same instrument. |
+| 3 | Same MMS | Every trade's money management strategy matches the run's expected MMS. |
+| 4 | Timestamp alignment | Long and short trade timestamps are identical sets, and both are contained in the candle timestamps. |
 
 Violations are reported as typed errors carrying the specific invariant that failed.
 
@@ -172,7 +171,8 @@ annual_roi               = ((1 + global_roi/100)^(1/years) − 1) · 100
 annual_operation_count   = operation_count / years
 ```
 
-Zero counts and non-positive time spans return `0.0` rather than dividing by zero.
+Zero counts and non-positive time spans return `0.0` rather than dividing by zero. A total
+loss (accumulated value ≤ 0) gives an annual ROI of `0.0`, never NaN.
 
 ## Strategy filtering
 
@@ -182,13 +182,9 @@ Two stages, cheapest first:
    dropped *before* any strategy is built.
 2. **Quality stage** — candidate strategies must meet the draw-down and ROI bars.
 
-Default quality bar:
-
-| Bar | Default |
-|---|---|
-| Max draw down | ≤ 30 % |
-| Annual ROI | ≥ 5 % |
-| Annual operation count | ≥ 10 ops/year |
+The default bars (a draw-down ceiling, a minimum annual ROI, and a minimum annual
+operation count) are defined in code, as `GlobalStrategyFilter::default()`, and can be
+overridden per call. They are not repeated here, so they are maintained in one place.
 
 ## CLI reference
 
@@ -334,8 +330,9 @@ cargo test                                                 # no PostgreSQL or Do
 ```
 
 The test suite is unit tests plus file-based adapter tests under temp directories —
-it runs with no database and no containers. CI runs the same three gates on every
-push to `main` (toolchain pinned to match the Docker image), then builds and pushes
+it runs with no database and no containers. CI runs lint (formatting, clippy, rustdoc),
+tests, and cargo-deny on every push to `main` (toolchain pinned to match the Docker
+image), then builds and pushes
 linux/arm64 images on GitHub's arm64 runners: `latest` + short commit SHA (runtime)
 and `dev`. The images target Apple Silicon only.
 
@@ -347,22 +344,20 @@ Honest list — read before trusting the numbers:
    sorted by entry timestamp. Real trades have exit dates, and positions do not
    necessarily close in the order they were opened. Accounting for exit dates is a
    required change before any production use of ROI/draw-down figures.
-2. **MACD is not implemented.** MACD configurations are read from the database but
-   produce no strategies; runs continue without them.
-3. **Data management and strategy display live in the companion Python service.** The
+2. **Data management and strategy display live in the companion Python service.** The
    Rust engine is `bte`-only — all data CRUD and the iteration table are owned
    by [Backtesting-4.0](../Backtesting-4.0) and accessed there directly.
-4. **DB configuration is hardcoded per environment** (host, ports, credentials). Fine
+3. **DB configuration is hardcoded per environment** (host, ports, credentials). Fine
    for the Docker workflow; limiting if you want to point the engine at arbitrary
    PostgreSQL instances.
-5. **No HTTP API.** Deliberate (YAGNI) — CLI only until real API consumers exist.
-6. **One instrument, one MMS, one indicator type per run.** Enforced by validation —
+4. **No HTTP API.** Deliberate (YAGNI) — CLI only until real API consumers exist.
+5. **One instrument and one MMS per run.** Enforced by validation —
    this is a domain constraint, not an accident, but it shapes how you batch work.
-7. **Parquet write cost.** Appending to a partition rewrites the whole file, and
+6. **Parquet write cost.** Appending to a partition rewrites the whole file, and
    strategy ID assignment scans all partitions for the global max. Both are fine at
    current scale and will need rethinking if partition counts grow by orders of
    magnitude.
-8. **Command handlers are thin wrappers over tested logic; the wrappers themselves
+7. **Command handlers are thin wrappers over tested logic; the wrappers themselves
    have no direct tests.**
 
 ## Ecosystem

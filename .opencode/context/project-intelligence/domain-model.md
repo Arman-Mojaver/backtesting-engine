@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.13 | Updated: 2026-10-25 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.15 | Updated: 2026-11-02 -->
 
 # Domain Model — Backtesting Engine
 
@@ -20,16 +20,16 @@
 | **Indicator Type** | The category/kind of a technical indicator (e.g. `macd`, `rsi`). Not a domain-struct field: lives in the database `type` column, which the PG adapter reads to select the `IndicatorParameters` variant. | `type` DB column | `infrastructure::pg_adapter` |
 | **Indicator Output** | The computed result of an indicator over a candle series — `Oscillator`, `Threshold`, or `Crossover` — carrying timestamped values. Converted to a `SignalGroup` by signal semantics. | `IndicatorOutput` | `domain::signal` |
 | **Money Management Strategy (MMS)** | A strategy that governs position sizing and risk. Identified by `money_management_strategy_id`. All operation points in a run must use the same MMS. | `i32` field | `domain::operation_point`, `domain::strategy` |
-| **Take Profit (TP)** | The target price level (in pips/points) at which a trade is closed for profit. | `i32` field (`tp`) | `domain::operation_point` |
-| **Stop Loss (SL)** | The price level (in pips/points) at which a trade is closed to limit loss. | `i32` field (`sl`) | `domain::operation_point` |
+| **Take Profit (TP)** | Take-profit distance in integer price units, the same units as SL. Loaded from the source; not read by any computation yet (reserved for exit-date modeling). | `i32` field (`tp`) | `domain::operation_point` |
+| **Stop Loss (SL)** | Stop-loss distance in integer price units. Always positive: the PG adapter rejects `sl <= 0`, because the metrics divide by it. | `i32` field (`sl`) | `domain::operation_point` |
 | **Risk** | The fraction of capital risked on a single trade (e.g. `0.01` = 1%). | `f64` field | `domain::operation_point` |
-| **Result** | The outcome of a trade: `1` = win, `-1` = loss. | `i32` field | `domain::operation_point` |
+| **Result** | Realized outcome of a trade in the same integer units as SL: positive for a gain, negative for a loss. The per-trade return on the curve is `result / sl`. | `i32` field | `domain::operation_point` |
 | **Timestamp** | An integer epoch (seconds) identifying when a data point or trade occurred. Used to align operation points with resampled market data. | `i64` field | multiple |
 | **Strategy** | A backtested configuration: one indicator + a set of long/short operation point IDs + a money management strategy, annotated with performance metrics. Carries its `instrument`. | `Strategy` | `domain::strategy` |
 | **Annual ROI** | Annualized return on investment for a strategy. Computed by compounding the global ROI over the time span; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` (method) |
 | **Max Draw Down** | Largest peak-to-trough decline of the cumulative-return curve, as a percentage. Computed from operation points via compounding against a running cummax; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` |
 | **Annual Operation Count** | Number of trades per year, annualized from a total count over the time span. Computed from signal-group operation counts; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_operation_count` |
-| **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 30%, min annual ROI ≥ 5%. (Annual operation count ≥ 10 is enforced earlier, at the signal-group stage.) | `GlobalStrategyFilter` | `domain::strategy` |
+| **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 20%, min annual ROI ≥ 5%. (Annual operation count ≥ 10 is enforced earlier, at the signal-group stage.) | `GlobalStrategyFilter` | `domain::strategy` |
 | **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus a precomputed `operation_count`. Lives in the domain layer. | `SignalGroup` | `domain::signal_group` |
 | **Cell** | One `(instrument, mms_id)` pair — the unit of work for `create_loop`. Cells are computed in parallel and persisted as one Parquet partition each. | `(String, i32)` keys, `CellOutput` | `application::cell_output`, `engine::strategy::create_loop` |
 | **Parquet Strategy Repository** | Writes strategies to partitioned parquet files under `{base}/instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. Dedups fresh rows by `indicator_id` (idempotent partitions). | `ParquetStrategyRepository` | `infrastructure::strategy_adapter` |
@@ -51,9 +51,9 @@ A single trade record. Used for both long and short positions (distinguished by 
 OperationPoint {
     id:                          i32       — unique identifier
     instrument:                  String    — e.g. "EURUSD"
-    result:                      i32       — trade outcome (1 = win, -1 = loss)
-    tp:                          i32       — take profit level
-    sl:                          i32       — stop loss level
+    result:                      i32       — realized outcome, same units as sl (positive = gain)
+    tp:                          i32       — take-profit distance (reserved; not read yet)
+    sl:                          i32       — stop-loss distance (always > 0)
     risk:                        f64       — fraction of capital risked
     money_management_strategy_id: i32      — which MMS governs this trade
     timestamp:                   i64       — when the trade occurred (epoch seconds)
@@ -83,7 +83,7 @@ ResampledPointD1 {
     high:            f64       — highest price
     low:             f64       — lowest price
     close:           f64       — closing price
-    volume:          i32       — trade volume
+    volume:          i32       — volume as supplied by the source (used by CHO, Force, VROC)
     timestamp:       i64       — day identifier (epoch seconds)
 }
 ```
@@ -148,7 +148,7 @@ Strategy {
 ```
 
 ### GlobalStrategyFilter
-Default thresholds for `filter_strategies()`. `Default`: max_draw_down_max=30.0, min_annual_roi=5.0, min_operation_count=10.0.
+Default thresholds for `filter_strategies()`. `Default`: max_draw_down_max=20.0, min_annual_roi=5.0, min_operation_count=10.0.
 ```
 GlobalStrategyFilter { max_draw_down_max: f64, min_annual_roi: f64, min_operation_count: f64 }
 ```
@@ -191,11 +191,11 @@ Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` r
 |-----------|-------------|-------|
 | Rsi | Threshold | over close prices |
 | AwesomeOscillator, AcceleratorDecelerator, BearsPower, BullsPower, ChaikinOscillator, ChaikinVolatility, DetrendedPriceOscillator, ForceIndex, OsMa, Roc, Trix, Vroc | Oscillator | one file each in `domain/indicators/` |
-| Macd | — | **Unsupported**: returns `IndicatorError::UnsupportedIndicator`; the signal generator skips it (`filter_map`), the run continues |
+| Macd | Crossover | MACD line (fast MA minus slow MA, each EMA or SMA) crossed against its signal line `SMA(MACD, 9)` (`macd.rs`). The signal period is an engine constant, not a database parameter. |
 
-- `IndicatorError` has typed per-indicator period variants + `NotEnoughData` + `UnsupportedIndicator`.
+- `IndicatorError` has typed per-indicator period variants and `NotEnoughData`.
 - Period validation is uniform via the `validate_period!` macro (non-positive period → typed error).
-- Insufficient data yields an **empty series**, not an error (`empty_oscillator!` macro).
+- Insufficient data yields an **empty series**, not an error (`empty_oscillator!` macro; the MACD pair uses `empty_crossover!`).
 - Shared moving-average math lives in `domain/indicators/moving_averages.rs`.
 - `PriceField` (Open/High/Low/Close) selects which candle component an indicator consumes.
 
@@ -225,7 +225,7 @@ PG adapters expose no extra public read methods beyond the repository traits.
 | Unit | File | Purpose |
 |------|------|---------|
 | `fetch_source_data` | `application::source_data` | Connects to PG via `DbConfig::from_env`, fetches indicators/resampled/long/short for one (instrument, mms_id). Rich connection diagnostics on failure. |
-| `create_signal_groups` | `application::signal_generator` | Computes REAL indicator outputs (`create_indicator_output`) and converts them to `SignalGroup`s via signal semantics. Rayon `par_iter`; per-indicator memoization via `#[cached]` keyed `(indicator_id, instrument)`. Unsupported indicators are skipped, not aborted. |
+| `create_signal_groups` | `application::signal_generator` | Computes REAL indicator outputs (`create_indicator_output`) and converts them to `SignalGroup`s via signal semantics. Rayon `par_iter`; per-indicator memoization via `#[cached]` keyed `(indicator_id, instrument)`. Indicators that fail to compute are logged as warnings and skipped, not aborted. |
 | `create_strategies` / `create_strategy` | `application::strategy_generator` | Builds one `Strategy` per signal group, gathering referenced operation points and computing real metrics. Parallelized with **rayon** `par_iter()`. |
 | `run_strategies` | `application::strategy_runner` | The core use case: `validate_all` → `create_signal_groups` → `filter_signal_groups_by_annual_ops` → `create_strategies` → `filter_strategies`. |
 | `get_unprocessed` | `application::strategy_runner_utils` | Set-diff of all indicator IDs vs manifest-processed IDs. |
@@ -261,15 +261,14 @@ Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_
 
 ## Validation Rules (Domain Invariants)
 
-Before a backtest can run, the input data must satisfy **five invariants**, checked in order by `validate_all()`:
+Before a backtest can run, the input data must satisfy **four invariants**, checked in order by `validate_all()`:
 
 1. **Non-Empty Data** (`empty_validation`) — all four datasets non-empty.
-2. **Same Indicator Types** (`same_indicator_types_validation`) — all indicators share the same `type`.
-3. **Same Instrument** (`same_instrument_validation`) — every resampled/long/short point references the same instrument (itertools `all_equal()` over the chained iterators).
-4. **Same Money Management Strategy** (`same_mms_validation`) — every operation point's `money_management_strategy_id` matches the expected MMS ID parameter.
-5. **Timestamp Alignment** (`same_timestamp_validation`) — long and short timestamp sets are identical; both are subsets of resampled timestamps.
+2. **Same Instrument** (`same_instrument_validation`) — every resampled/long/short point references the same instrument (itertools `all_equal()` over the chained iterators).
+3. **Same Money Management Strategy** (`same_mms_validation`) — every operation point's `money_management_strategy_id` matches the expected MMS ID parameter.
+4. **Timestamp Alignment** (`same_timestamp_validation`) — long and short timestamp sets are identical; both are subsets of resampled timestamps.
 
-`combined_validation::validate_all()` runs all five in order, returning early on the first failure as a `CombinedValidationError` (Empty / IndicatorTypeMismatch / InstrumentMismatch / MoneyManagementStrategyMismatch / TimestampMismatch). Order is load-bearing: emptiness first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
+`combined_validation::validate_all()` runs all four in order, returning early on the first failure as a `CombinedValidationError` (Empty / InstrumentMismatch / MoneyManagementStrategyMismatch / TimestampMismatch). Order is load-bearing: emptiness first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
 
 ---
 
@@ -289,7 +288,7 @@ src/
 │   ├── indicator.rs            # Indicator + IndicatorParameters (14 variants) + IndicatorRepository
 │   ├── indicators/             # Indicator computation: 14 indicators + dispatch + macros + moving averages
 │   │   ├── mod.rs              # create_indicator_output() dispatch, PriceField, IndicatorError
-│   │   ├── macros.rs           # indicator_values!, validate_period!, empty_oscillator!
+│   │   ├── macros.rs           # indicator_values!, validate_period!, empty_oscillator!, empty_crossover!
 │   │   ├── moving_averages.rs  # shared MA math
 │   │   ├── rsi.rs, ao.rs, ac.rs, bears.rs, bulls.rs, cho.rs, chv.rs,
 │   │   ├── dpo.rs, force.rs, osma.rs, roc.rs, trix.rs, vroc.rs
@@ -305,11 +304,11 @@ src/
 │   ├── strategy.rs             # Strategy + GlobalStrategyFilter + filter_strategies()
 │   ├── annual_operation_count.rs  # annual_operation_count() metric
 │   ├── performance_metrics.rs  # performance_metrics() -> PerformanceMetrics (single pass) + annual_roi() method
-│   ├── validation/             # Domain invariant checks (5 rules + combined)
+│   ├── validation/             # Domain invariant checks (4 rules + combined)
 │   └── fixtures.rs             # Test data builders
 ├── engine/                     # Standalone Rust CLI engine (own binary)
 │   ├── mod.rs                  # EngineCommand enum, build_cli(), parse(), execute()
-│   └── strategy/               # bt-engine strategy commands
+│   └── strategy/               # bte strategy commands
 │       ├── mod.rs              # StrategyCommand enum (create, create_loop)
 │       ├── create.rs           # strategy create — single cell pipeline
 │       └── create_loop.rs      # strategy create_loop — all cells, parallel, idempotent
@@ -322,7 +321,7 @@ src/
 ├── config/                     # Environment + DB configuration
 │   └── environment.rs          # Environment, DbConfig, resolve_environment(), parquet_base_dir(), parquet_root_dir()
 ├── bin/
-│   └── bt-engine.rs            # bt-engine binary entry: engine::build_cli() → parse() → execute()
+│   └── bte.rs            # bte binary entry: engine::build_cli() → parse() → execute()
 └── lib.rs                      # Crate root — re-exports application, config, domain, engine, infrastructure
 ```
 
@@ -335,19 +334,19 @@ src/
 3. **Fail-fast combined validation**: `validate_all` short-circuits on the first error. Order matters: emptiness is checked first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
 4. **Fixtures module**: Test data lives in `domain::fixtures`, reusable across all test modules. (In-memory repos were removed 2026-08 — fixtures + tempfile cover the same need with less code.)
 5. **Ports-and-adapters**: Repository traits live in the domain; implementations live in infrastructure. The domain has zero dependencies on infrastructure.
-6. **Single-binary engine layout**: `bt-engine` (`src/bin/bt-engine.rs`) is the sole Rust CLI; it follows the `build -> parse -> execute` pattern and returns `anyhow::Result<()>`. The previous `ct` operator frontend (which forwarded engine commands via Docker exec and Python CLI commands via the `api` container) was removed in the commit that dropped `src/cli/` and `src/main.rs` — data CRUD and the iteration table are now reached exclusively in the companion Python service.
+6. **Single-binary engine layout**: `bte` (`src/bin/bte.rs`) is the sole Rust CLI; it follows the `build -> parse -> execute` pattern and returns `anyhow::Result<()>`. The previous `ct` operator frontend (which forwarded engine commands via Docker exec and Python CLI commands via the `api` container) was removed in the commit that dropped `src/cli/` and `src/main.rs` — data CRUD and the iteration table are now reached exclusively in the companion Python service.
 7. **Application layer**: `src/application/` orchestrates domain + infrastructure. Keeps `engine/` CLI handlers thin. One file per use case.
 8. **Metrics as pure domain functions**: `performance_metrics()` takes `&[&OperationPoint]` and returns `PerformanceMetrics` (`global_roi` + `max_draw_down`) computed in a single pass over the shared compounding curve, sorting its input chronologically itself (stable; ties keep input order). `annual_roi` is a method on `PerformanceMetrics`. No I/O — composable and unit-tested in isolation.
-9. **Two-stage filtering**: `filter_signal_groups_by_annual_ops()` prunes signal groups by annual operation count first (cheap), then `filter_strategies(strategies, &GlobalStrategyFilter)` prunes by max draw down + annual ROI (expensive, runs on fewer candidates). `GlobalStrategyFilter::default()` encodes the baseline quality bar (DD ≤ 30%, ROI ≥ 5%, ops ≥ 10/yr).
+9. **Two-stage filtering**: `filter_signal_groups_by_annual_ops()` prunes signal groups by annual operation count first (cheap), then `filter_strategies(strategies, &GlobalStrategyFilter)` prunes by max draw down + annual ROI (expensive, runs on fewer candidates). `GlobalStrategyFilter::default()` encodes the baseline quality bar (DD ≤ 20%, ROI ≥ 5%, ops ≥ 10/yr).
 10. **Parquet partitioning by (instrument, mms_id)**: Strategies are written as partitioned parquet files — `instrument=.../money_management_strategy_id=.../strategies.parquet`. Matches the single-instrument, single-MMS backtest constraint and enables efficient per-partition reads.
-11. **Typed indicator parameters**: `IndicatorParameters` is a 14-variant enum — the PG adapter hand-parses the JSON `parameters` column into the correct variant by `type`. No `serde` on the hot path.
+11. **Typed indicator parameters**: `IndicatorParameters` is a 14-variant enum — the PG adapter deserializes the JSON `parameters` column with `serde_json`, selecting the variant by the `type` column.
 12. **Real metrics in the generator**: `create_strategies()` computes `performance_metrics()` → `annual_roi()`, plus `annual_operation_count`, from each strategy's referenced operation points. Parallelized with **rayon** `par_iter()`.
 13. **`SignalGroup` lives in the domain**: `SignalGroup` embeds `indicator_id`, `instrument`, and a precomputed `operation_count`. The cache stores `Vec<SignalGroup>` — IDs travel with each group.
 14. **Timestamps are `i64`**: All timestamps are `i64` epoch seconds. The PG adapter casts `i32` DB columns to `i64` on read.
 15. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. IDs are assigned at parquet write time (global max across all partitions + 1). Keeps the domain free of persistence concerns.
 16. **Idempotent parquet partitions**: `write_partition` dedups fresh rows by `indicator_id` against existing rows — re-runs never duplicate strategies for the same indicator.
 17. **Processed manifest for idempotency**: `ParquetProcessedManifest` records completed (instrument, mms_id, indicator_id) triples; `create`/`create_loop` only compute the unprocessed remainder. Atomic writes (temp + rename).
-18. **Real signal generation**: `create_signal_groups()` computes actual indicator outputs (`create_indicator_output`) and derives signals via zero-cross / threshold / crossover semantics. MACD is explicitly unsupported and skipped, not aborted.
+18. **Real signal generation**: `create_signal_groups()` computes actual indicator outputs (`create_indicator_output`) and derives signals via zero-cross / threshold / crossover semantics. All 14 indicators, MACD included, compute real outputs.
 19. **Batch parallelism in `create_loop`**: All four source tables loaded once via nested `rayon::join`, indexed in memory; cells computed via `par_iter`; persistence assigns IDs once, writes partitions in parallel, commits the manifest once.
 
 ---

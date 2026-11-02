@@ -1,4 +1,4 @@
-<!-- Context: standards/rust-blueprint | Priority: high | Version: 1.1 | Updated: 2026-09-17 -->
+<!-- Context: standards/rust-blueprint | Priority: high | Version: 1.2 | Updated: 2026-11-01 -->
 
 # Production Rust Blueprint
 
@@ -207,6 +207,8 @@ pub enum ValidationError {
 ```
 
 > **Crate recommendation:** use [`thiserror`](https://docs.rs/thiserror) for library/domain errors (gives you `Display` + `Error` for free). Use [`anyhow`](https://docs.rs/anyhow) only in binary entry points (`main`, integration test harnesses) where you just want to propagate and display.
+
+> **Recorded deviation:** repository ports in `domain` return `anyhow::Result`. See the decisions-log entry "anyhow at Domain Ports" for the rationale and revisit triggers.
 
 ### Propagate with `?`, convert with `map_err`
 

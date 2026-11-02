@@ -12,7 +12,7 @@ all-features = true
 # choice (e.g. "MIT OR Apache-2.0"), one allowed option is enough.
 allow = [
     "Apache-2.0",
-    "BSD-3-Clause",  # brotli, snap, zstd (parquet compression codecs)
+    "BSD-3-Clause",  # zstd, zstd-safe, zstd-sys (the ZSTD parquet codec)
     "CC0-1.0",       # tiny-keccak
     "MIT",
     "Unicode-3.0",   # unicode-ident

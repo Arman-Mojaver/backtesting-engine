@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.12 | Updated: 2026-11-01 -->
+<!-- Context: project-intelligence/decisions | Priority: high | Version: 1.14 | Updated: 2026-11-02 -->
 
 # Decisions Log
 
@@ -1096,6 +1096,436 @@ The runtime image only ever runs on the owner's MacBook Pro (M2), but CI built i
 
 ---
 
+## Decision: anyhow at Domain Ports (Deviation from Blueprint §3)
+
+**Date**: 2026-11-01
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+Blueprint §3 says `thiserror` for domain errors and `anyhow` only in binary entry points. §10 lists `anyhow` for application errors, so the blueprint contradicts itself. The four repository ports in the domain (`LongOperationPointRepository`, `ShortOperationPointRepository`, `ResampledPointD1Repository`, `IndicatorRepository`) return `anyhow::Result`. Batch 3 converted every domain error enum to `thiserror` and deferred the ports.
+
+### Decision
+Repository ports keep returning `anyhow::Result`. Callers add context and propagate. No caller downcasts or matches on port error variants, and no typed port error enums are introduced.
+
+### Rationale
+Each port is an infrastructure-facing seam with one adapter (PostgreSQL). A typed error enum per port adds boilerplate with no caller that branches on it. Typed port errors become worth their cost when a second adapter exists, because each adapter then needs an error vocabulary that callers can match.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Typed `thiserror` enum per port, now | Callers can match failure modes | Four enums of boilerplate; no caller matches today | Over-engineering for one adapter |
+| Follow §3 literally (`thiserror` at ports, `anyhow` only in binaries) | Matches the blueprint text | Rewrites every port signature for no current consumer | Deferred until a revisit trigger fires |
+
+### Impact
+**Positive**: No port-level error ceremony for the single adapter; signatures stay small.
+**Negative**: Port failures are opaque to callers. A caller that must branch has to downcast the `anyhow` error.
+**Risk**: A second adapter ships without typed errors. The revisit trigger below guards against this.
+
+**Revisit when**: a second adapter is added, a caller must branch on port errors, or the crate is published.
+
+### Related
+- Blueprint: `.opencode/context/core/standards/rust-blueprint.md` §3 (crate recommendation) and §10 (crate table)
+- Code: `src/domain/operation_point.rs`, `src/domain/resampled_point.rs`, `src/domain/indicator.rs` (port traits)
+- Batch 3 PRD: `.opencode/.tmp/prd/2026-11-01-batch-3-structural-quality-typed-errors-tests.md` (typed port errors out of scope)
+
+---
+
+## Decision: Total-Loss Annualisation Guard (NaN Becomes 0.0)
+
+**Date**: 2026-11-01
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+An extreme loss sequence can push the accumulated value `1 + global_roi/100` to zero or below. `powf` on a negative base yields NaN. The persistence path converts `annual_roi * 100` with `round_f64_to_i128`, which maps NaN to 0. A total loss was therefore persisted as `0.00`, indistinguishable from a real zero.
+
+### Decision
+`PerformanceMetrics::annual_roi` returns `0.0` when the accumulated value is `<= 0`, before `powf`. This matches the existing degenerate-input convention: zero and negative spans already return `0.0`.
+
+### Rationale
+`0.0` is finite and sits below the 5 % ROI bar, so the quality stage drops the strategy. No NaN-derived value reaches the Parquet output.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Leave `powf` unguarded | No code change | NaN is persisted as `0.00` | Silent corruption of the output |
+| Fail the whole cell with an error | Makes the case visible | One pathological strategy aborts a batch | A total loss is a valid outcome, not a fault |
+| Return -100 % | Finite, and also dropped by the bar | A second sentinel next to the existing `0.0` convention | Inconsistent with the zero-span convention |
+
+### Impact
+**Positive**: `annual_roi` is always finite, and the behaviour is pinned by tests.
+**Negative**: A total-loss strategy reads as 0 % annual ROI, not -100 %.
+**Risk**: Low. The quality bar removes these strategies before output.
+
+### Related
+- Commit `84176b7` (guard and tests); `src/domain/performance_metrics.rs`
+- Batch 1 PRD: `.opencode/.tmp/prd/2026-11-01-batch-1-robustness-code-touchups.md`
+- Same batch: the import removal and per-cell borrow (commit `cd95311`) are mechanical and not recorded separately.
+- Not landed: the debug-only assert on the usize cast helper (PRD 1). Pending.
+
+---
+
+## Decision: Typed Domain Errors via thiserror
+
+**Date**: 2026-11-01
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+Seven error enums hand-rolled `Display` and `std::error::Error`, about 200 lines of mechanical match arms. Blueprint §3 names `thiserror` for exactly this case. The three per-invariant validation enums did not implement `Display` at all.
+
+### Decision
+Adopt `thiserror` with no features. All seven enums derive `Error` with `#[error(...)]` attributes. Every message is byte-identical to the previous text, and the three per-invariant enums gain a `Display` that mirrors the combined error's phrasing.
+
+### Rationale
+Message text lives once, at the variant. The existing message test tables stay verbatim as the proof that output did not change. The dependency is in the house style the blueprint already mandates.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep hand-rolled impls | No new dependency | Repetitive and error-prone; the blueprint's named anti-pattern | Mechanical boilerplate |
+| `anyhow` for domain errors | Simple propagation | Callers cannot match on variants | Domain errors must stay typed |
+
+### Impact
+**Positive**: The conversion commit removed 175 lines and added 81. Message text is defined once.
+**Negative**: One more proc-macro dependency (`thiserror` 2).
+**Risk**: Low. Message byte-equality is pinned by tests.
+
+### Related
+- Commit `32e913b`; `Cargo.toml` (`thiserror = "2"`)
+- Precedent: itertools adoption (2026-09-17, above)
+- Blueprint §3 (`thiserror` for domain errors)
+
+---
+
+## Decision: Pipeline Composition Tests over Existing Seams
+
+**Date**: 2026-11-01
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The use-case orchestrator (`run_strategies`) and the per-strategy builder (`create_strategy`) compose the whole pipeline. Every callee had tests, but the composition contract was unproven: validation runs, both filter stages apply, and signals resolve to trades.
+
+### Decision
+Test the composition through the seams that already exist. The orchestrator is tested over shared domain fixtures. The builder is tested as a pure function over hand-built timestamp maps, with hand-computed metric expectations. No new seams.
+
+### Rationale
+The highest existing seam covers the contract, so a dropped stage fails a test. New seams would add surface area without adding a capability.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| New trait-based test doubles | Fine-grained control | A new seam with no need | Existing seams already reach the contract |
+| Database-backed integration tests | Exercises real queries | Needs PostgreSQL; the suite runs without one | Breaks the no-database test policy |
+
+### Impact
+**Positive**: Dropping a filter stage or an unresolved-signal rule now fails a test.
+**Negative**: Fixtures must stay representative as the domain evolves.
+**Risk**: Low.
+
+### Related
+- Commit `0c82ee1`; `src/application/strategy_runner.rs`, `src/application/strategy_generator.rs`
+- Batch 3 PRD: `.opencode/.tmp/prd/2026-11-01-batch-3-structural-quality-typed-errors-tests.md`
+
+---
+
+## Decision: CI Triggers and Preflight Gate (Pending)
+
+**Date**: 2026-11-01
+**Status**: Pending
+**Owner**: Arman Mojaver
+
+### Context
+Lint and test sit behind a Docker Hub preflight login. An expired token gives zero code-quality feedback. The workflow runs only on pushes to `main`, so branches get no feedback before merge.
+
+### Decision
+Accepted, not yet implemented: remove the preflight job (the docker job already logs in on its own), add `pull_request` to the triggers, and gate image publishing to `main`. `deny` runs on pull requests because it needs no secrets. As of 2026-11-01, `.github/workflows/ci.yml` is unchanged: the preflight gate and push-only trigger are still in place.
+
+### Rationale
+Code-quality feedback should not depend on an unrelated credential, and branches should be gated before merge. Publishing stays exclusive to `main`. Accepted trade-off: a revoked token costs one lint and test cycle before failing at the docker login.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep the preflight gate | No workflow change | Lint and test are skipped entirely on a credential failure | Hides the quality signal it was meant to protect |
+| Keep push-only triggers | No workflow change | No gate before merge | Branch work gets no feedback |
+
+### Impact
+**Positive** (once implemented): Feedback on every branch and pull request; images still publish only from `main`.
+**Negative**: One wasted lint and test cycle on a revoked token.
+**Risk**: A wrong job condition could publish from a pull request. The publish-only-on-`main` condition must be verified when implemented.
+
+### Related
+- Batch 2 PRD: `.opencode/.tmp/prd/2026-11-01-batch-2-ci-tooling-hardening.md`
+- Current workflow: `.github/workflows/ci.yml` (its header DAG comment describes the current preflight gate)
+- Earlier decision: CI Workflow (2026-09-03)
+
+---
+
+## Decision: Local Make Targets Mirror CI
+
+**Date**: 2026-11-01
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+The Makefile `test` target omitted `--locked`, and the `ci` target ran its gates in a different order from the workflow.
+
+### Decision
+`make test` runs `cargo nextest run --locked`. `make ci` runs lint, then test, then deny, matching the pipeline it mirrors.
+
+### Rationale
+"Passes locally" should mean "passes CI", and the lockfile must be enforced everywhere.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Leave the Makefile independent | No churn | Drift between local and CI results | Defeats the purpose of `make ci` |
+
+### Impact
+**Positive**: Local lint, test, and deny gates match CI.
+**Negative**: None measurable.
+**Risk**: Drift remains. The rustdoc gate that CI runs (`cargo doc` with `-D warnings`) is not in `make lint` or `make ci`.
+
+### Related
+- Commit `187cc46`; `Makefile`
+- Batch 2 PRD: `.opencode/.tmp/prd/2026-11-01-batch-2-ci-tooling-hardening.md`
+
+---
+
+## Decision: Keep criterion as a Dev-Dependency
+
+**Date**: 2026-11-01
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+`criterion` is a dev-dependency with no in-tree benches: `autobenches` is off and `benches/` holds only a placeholder. It exists for ad-hoc `/bench` measurement sessions. Nothing in the repository said so, so it read as dead configuration.
+
+### Decision
+Keep `criterion` (with `html_reports`) and document its purpose in `Cargo.toml`, at the declaration.
+
+### Rationale
+`/bench` expects the dependency to be present. The dev-build compile cost is the accepted price of that workflow.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Remove it, and re-add on demand | Faster dev compiles | `/bench` breaks until it is re-added | `/bench` expects it present |
+
+### Impact
+**Positive**: Reviewers see the intent at the declaration.
+**Negative**: The dev-only compile cost stays.
+**Risk**: None.
+
+### Related
+- Commit `927da0c`; `Cargo.toml` (`[dev-dependencies]`); `benches/` (placeholder only)
+- Batch 2 PRD: `.opencode/.tmp/prd/2026-11-01-batch-2-ci-tooling-hardening.md`
+
+---
+
+## Decision: One PgStore Serves All Four Repository Ports
+
+**Date**: 2026-11-01
+**Status**: Decided (trait merge pending)
+**Owner**: Arman Mojaver
+
+### Context
+Four PostgreSQL adapter structs duplicated connection boilerplate. The single-cell `create` path opened four connections for four sequential reads. The domain also declares two operation-point traits with identical signatures.
+
+### Decision
+One `PgStore` holds a single connection and implements all four repository ports. `create` constructs it once. `create_loop` keeps four `PgStore` instances, one per table, because its loads run concurrently and `postgres::Client` is single-connection. A comment in `create_loop.rs` states why.
+
+**Pending:** merging the two operation-point traits (`LongOperationPointRepository`, `ShortOperationPointRepository`). Batch 4 PRD user story 2 asks for it, but its implementation decisions do not include it. Not executed.
+
+### Rationale
+Sequential work needs one connection. Concurrent work keeps its own connections.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| One connection for the batch path too | Fewer connections | The four loads would serialize | Loads run concurrently |
+| Keep four adapter structs | No restructuring | Duplicated boilerplate; four connections for single-cell | The copy-paste the PRD targets |
+
+### Impact
+**Positive**: Less boilerplate; single-cell `create` uses one connection.
+**Negative**: `PgStore` implements all four ports, so it is a larger type.
+**Risk**: Adapters have no database-backed tests by design; the change was verified by review.
+
+### Related
+- Commit `b4d40ac`; `src/infrastructure/pg_adapter.rs` (`PgStore`), `src/application/source_data.rs`, `src/engine/strategy/create_loop.rs`
+- Batch 4 PRD: `.opencode/.tmp/prd/2026-11-01-batch-4-optional-refinements-exit-date-metrics.md`
+
+---
+
+## Decision: PathBuf for Filesystem Paths; Batch 4 Menu Deferrals
+
+**Date**: 2026-11-01
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+Batch 4's optional menu (PRD 4) offered four refinements: a PathBuf migration (only alongside consolidation), a per-cell indicator clone, dispatch-test deduplication, and edition 2024.
+
+### Decision
+Ship the PathBuf migration across the environment, manifest, and adapter paths. Defer the other three:
+- Edition 2024: stay on edition 2021 under the exact-pin policy. Deliberate conservatism.
+- Per-cell indicator clone: measure before changing.
+- Dispatch-test deduplication: light touch only, when the test builders next change.
+
+### Rationale
+`PathBuf` removes string-based path handling without changing behaviour. The remaining items are either conservatism under the toolchain pin or changes that need measurement first.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Edition 2024 now | Newer language defaults | Moves the pinned toolchain's rules with no current need | Deferred under the exact-pin policy |
+| Clone avoidance now | Less allocation | Unmeasured benefit | Measure first |
+
+### Impact
+**Positive**: Typed paths in the migrated files.
+**Negative**: The edition stays on 2021.
+**Risk**: Low.
+
+### Related
+- Commit `a4bc3b9`; `Cargo.toml` (`edition = "2021"`)
+- Batch 4 PRD: `.opencode/.tmp/prd/2026-11-01-batch-4-optional-refinements-exit-date-metrics.md`
+
+---
+
+## Decision: Exit-Date Metrics Requirements Recorded, Implementation Deferred
+
+**Date**: 2026-11-01
+**Status**: Pending
+**Owner**: Arman Mojaver
+
+### Context
+ROI and max draw down compound trades in entry order. Real trades close at exit dates that are not in entry order, so the figures are approximate. The operation-point table's schema is owned by the companion Python service, so the fix needs cross-repository coordination.
+
+### Decision
+Record the requirements now, and implement them under a follow-up PRD after the companion schema is coordinated. Requirements: an exit-date column owned by the companion; the adapter reads it; `OperationPoint` gains the field; the compounding walk orders by exit; fixtures prove that entry-order and exit-order results differ. Open semantics for the follow-up: overlapping exposure, and whether the annual operation count counts per exit year.
+
+### Rationale
+Changing the adapter before the schema is coordinated risks a breaking window. The Parquet output schema is unaffected, so only the metric values change.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Implement now | Removes the approximation | Schema not coordinated; breaking-window risk | Coordinate first |
+| Accept entry-order approximations indefinitely | No work | Blocks production use of ROI and draw down | Living notes mark this as required before production use |
+
+### Impact
+**Positive**: Requirements are on record, and the limitation stays visible in the README and living notes.
+**Negative**: Metrics stay approximate until the follow-up ships.
+**Risk**: ROI and draw-down figures used for production decisions before the follow-up.
+
+### Related
+- Batch 4 PRD: `.opencode/.tmp/prd/2026-11-01-batch-4-optional-refinements-exit-date-metrics.md`
+- Living notes: Technical Debt (exit-date ordering), Active Projects (exit-date-aware metrics)
+- README: Known limitations, item 1
+
+---
+
+## Decision: Retain the Unused `tp` Field as the Exit-Date Anchor
+
+**Date**: 2026-11-01
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+`OperationPoint.tp` is loaded from the source table, but no computation reads it. Only the adapter and test fixtures touch it.
+
+### Decision
+Keep the field and record its purpose as the reserved anchor for exit-date modeling (see the domain model). No computation reads it today.
+
+### Rationale
+Exit-date modeling needs a take-profit reference. Removing the column now and re-adding it later would cross the same schema coordination the exit-date work needs anyway.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Remove the field now | Less unused data in the query | Re-adding later means another schema change | Exit-date work needs the schema change anyway |
+| Use `tp` in a computation now | Gives the field a reader | No current computation needs it | Not in scope |
+
+### Impact
+**Positive**: The field's purpose is on record here and in the domain model.
+**Negative**: A column is loaded and unused.
+**Risk**: Low.
+
+### Related
+- `src/domain/operation_point.rs` (the `tp` field); `src/infrastructure/pg_adapter.rs` (the query selects `tp`); `domain-model.md` (glossary: Take Profit)
+- Batch 5 PRD: `.opencode/.tmp/prd/2026-11-01-batch-5-documentation-truth-alignment.md`
+
+---
+
+## Decision: Remove the Same-Indicator-Type Invariant
+
+**Date**: 2026-10-12 (removed in `917e4eb`; rationale recorded 2026-11-02)
+**Status**: Decided
+**Owner**: Arman Mojaver
+
+### Context
+`validate_same_indicator_types` rejected any run whose indicators did not share one type. `run_strategies` validates the full indicator list the database returns, so a database holding two types failed every run.
+
+### Decision
+Remove the validator and its call, so one run may mix indicator types. The `type` field had already left the domain struct (`27b7fe7`, 2026-10-23); the type now lives only in the database.
+
+### Rationale
+Indicators used to run together by type. `create_loop` now runs different types together, and the processed manifest records which indicators are unprocessed regardless of type, so the per-type grouping no longer serves any purpose.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep the check | Each run is type-homogeneous | Any database holding two types fails every run | Mixed-type runs are now the intended mode |
+
+### Impact
+**Positive**: A database can hold any mix of indicator types, and idempotency stays per indicator.
+**Negative**: No type-level guard remains on a run.
+**Risk**: Low. The other validators in `src/domain/validation/` still run.
+
+### Related
+- Commits `917e4eb` (removal) and `27b7fe7` (type removed from the domain struct)
+- `src/application/strategy_runner.rs` (`run_strategies`); `src/engine/strategy/create_loop.rs`
+- Deprecated Decisions table: "Same-indicator-type validation"
+
+---
+
+## Decision: MACD Is a Crossover of the MACD Line and Its Signal Line
+
+**Date**: 2026-11-02
+**Status**: Decided (implemented in Batch 6)
+**Owner**: Arman Mojaver
+
+### Context
+MACD landed in `8c5f4e2` (2026-10-12) as an Oscillator: a zero-cross of the MACD line. The owner's intent is that MACD is a crossover. The `Crossover` signal kind had no producer. The database stores MACD parameters as `slow_type`, `slow_n`, `fast_type`, and `fast_n`; the companion schema rejects extra keys, so no signal period is stored.
+
+### Decision
+`macd::compute` returns a crossover pair. The long buffer is the MACD line; the short buffer is the signal line, `SMA(MACD, 9)`. Both buffers start at the first bar where the signal line exists. The signal period is an engine constant, 9: the MQL5 reference default (`Indicators/Examples/MACD.mq5`, `InpSignalSMA = 9`).
+
+### Rationale
+The crossover is the owner's intended semantics. The period comes from the reference source, and the database has no field that could carry a different one. Storing one would need a cross-repository schema change and a migration of existing rows.
+
+### Alternatives Considered
+| Alternative | Pros | Cons | Why Rejected? |
+|-------------|------|------|---------------|
+| Keep the Oscillator (zero-cross of the MACD line) | Already shipped and tested | Not the owner's intended semantics | Owner direction: MACD is a crossover |
+| Add `signal_n` to the companion schema and the Rust adapter | Signal period configurable per row | Cross-repository schema change and migration | Deferred; the constant covers the reference default |
+
+### Impact
+**Positive**: MACD signals follow the classic line-crossing definition and match the reference source's two buffers.
+**Negative**: The signal period cannot vary per row. Existing MACD-based strategies change; the Parquet schema does not.
+**Risk**: With `ema`/`ema` lines at 12 and 26, MACD's signals are exactly the zero-crosses of OsMA(12, 26, 9). The two indicators agree in that configuration rather than adding independent information.
+
+### Related
+- `src/domain/indicators/macd.rs` (`compute`, `SIGNAL_N`); `src/domain/indicators/mod.rs` (dispatch arm)
+- `src/domain/indicators/osma.rs` (same signal-line alignment)
+- Companion repository: `schemas/indicator/macd_schema.py` (`MacdParametersSchema`)
+- Batch 6 PRD: `.opencode/.tmp/prd/2026-11-01-batch-6-macd-crossover.md`
+
+---
+
 ## Deprecated Decisions
 
 | Decision | Date | Replaced By | Why |
@@ -1109,6 +1539,8 @@ The runtime image only ever runs on the owner's MacBook Pro (M2), but CI built i
 | `ct` Python-wrapping CLI binary | 2026-10-21 | Remove the `ct` Python-Wrapping CLI (2026-10-21) | Operator frontend had no unique capability; dragged Python forward path and Docker indirection into the engine |
 | `strategy metadata` command (item 3 of the Processed Manifest decision) | 2026-08-07 | Remove the `strategy metadata` Command (2026-10-25) | Read-only diagnostic with no other consumers; done/remaining stays derivable from the manifest ledger |
 | amd64 CI images (`ubuntu-latest`, no platform pin) | 2026-09-03 | Arm64-Only Runtime Image Tuned for Apple Silicon (2026-11-01) | Images run exclusively on Apple Silicon; native arm64 builds replace emulated amd64 |
+| MACD skipped, not aborted (item 4 of "Port Indicators to Rust + Real Signal Generation") | 2026-07-26 | MACD port (`8c5f4e2`, 2026-10-12) and MACD Is a Crossover (2026-11-02) | Porting MACD removed the `UnsupportedIndicator` path; MACD is now a crossover of its line and signal line |
+| Same-indicator-type validation (`validate_same_indicator_types`, from "Adopt `itertools`") | pre-2026-09-17 | Remove the Same-Indicator-Type Invariant (2026-10-12; recorded 2026-11-02) | Mixed-type runs are intended: `create_loop` runs types together and the processed manifest tracks each indicator regardless of type |
 
 ## Onboarding Checklist
 

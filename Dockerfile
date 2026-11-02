@@ -47,7 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends mold \
  && ln -sf /usr/bin/mold /usr/bin/ld.mold \
  && rm -rf /var/lib/apt/lists/*
 
-# M2 tuning (notes.md), done CI-safely: `-C target-cpu=native` is only correct
+# M2 tuning (see README, Building and installation), done CI-safely: `-C target-cpu=native` is only correct
 # on the Mac itself — on GitHub's arm64 runners it would tune for the runner's
 # Neoverse cores, and it is invalid when cross-compiling. `apple-m2` is the
 # explicit target (rustc 1.98.1 honors it; its feature set is identical to
