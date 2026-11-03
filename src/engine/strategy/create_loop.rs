@@ -10,7 +10,7 @@ use crate::application::cell_output::CellOutput;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::config::environment::{
-    parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig,
+    parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig, Environment,
 };
 use crate::domain::indicator::{Indicator, IndicatorRepository};
 use crate::domain::operation_point::{
@@ -30,9 +30,9 @@ struct SourceIndex {
 
 impl SourceIndex {
     /// Loads every table once and indexes the rows in memory.
-    fn load() -> anyhow::Result<Self> {
+    fn load(env: Environment) -> anyhow::Result<Self> {
         info!("Querying DB...");
-        let db_config = DbConfig::from_env(resolve_environment()?);
+        let db_config = DbConfig::from_env(env);
         let conn_string = db_config.connection_string();
 
         // One store (connection) per table: the four loads below run
@@ -200,12 +200,10 @@ const fn is_total_failure(summary: &BatchSummary) -> bool {
 pub fn execute() -> anyhow::Result<()> {
     let command_start = Instant::now();
     // 1. Load and index the source data, and read the processed manifest, each once.
-    let source = SourceIndex::load()?;
+    let env = resolve_environment()?;
+    let source = SourceIndex::load(env)?;
     let cells = source.cells();
-    let persistence = StrategyPersistence::new(
-        parquet_base_dir(resolve_environment()?),
-        parquet_root_dir(resolve_environment()?),
-    );
+    let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
     let processed_ids_per_cell = persistence.read_processed_ids_per_cell()?;
 
     info!("{} cells to process", cells.len());
