@@ -30,7 +30,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
             instrument,
             money_management_strategy_id,
         );
-        info!("Total command time: {:?}.", command_start.elapsed());
+        info!("Total command time: {:?}", command_start.elapsed());
         return Ok(());
     }
 
@@ -88,7 +88,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
         money_management_strategy_id,
         unprocessed_ids.len(),
     );
-    info!("Total command time: {:?}.", command_start.elapsed());
+    info!("Total command time: {:?}", command_start.elapsed());
 
     Ok(())
 }

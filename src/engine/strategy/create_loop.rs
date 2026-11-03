@@ -31,7 +31,7 @@ struct SourceIndex {
 impl SourceIndex {
     /// Loads every table once and indexes the rows in memory.
     fn load() -> anyhow::Result<Self> {
-        info!("Querying DB ...");
+        info!("Querying DB...");
         let db_config = DbConfig::from_env(resolve_environment()?);
         let conn_string = db_config.connection_string();
 
@@ -208,10 +208,10 @@ pub fn execute() -> anyhow::Result<()> {
     );
     let processed_ids_per_cell = persistence.read_processed_ids_per_cell()?;
 
-    info!("{} cells to process.", cells.len());
+    info!("{} cells to process", cells.len());
 
     // 2. Compute strategies in parallel.
-    info!("Computing strategies ...");
+    info!("Computing strategies...");
     let compute_start = Instant::now();
     let outcomes: Vec<CellOutcome> = cells
         .par_iter()
@@ -219,7 +219,7 @@ pub fn execute() -> anyhow::Result<()> {
         .collect();
     let summary = summarize_outcomes(&outcomes);
     info!(
-        "Compute done: {} computed, {} skipped (already processed), {} failed in {:?}.",
+        "Compute done: {} computed, {} skipped (already processed), {} failed in {:?}",
         summary.computed,
         summary.skipped,
         summary.failed,
@@ -237,13 +237,13 @@ pub fn execute() -> anyhow::Result<()> {
     let persist_start = Instant::now();
     persistence.persist_cells(computed)?;
     info!(
-        "Persist done: {} cells in {:?}.",
+        "Persist done: {} cells in {:?}",
         summary.computed,
         persist_start.elapsed()
     );
 
     info!(
-        "Done: {} computed, {} skipped (already processed), {} failed. Total command time: {:?}.",
+        "Done: {} computed, {} skipped (already processed), {} failed. Total command time: {:?}",
         summary.computed,
         summary.skipped,
         summary.failed,
