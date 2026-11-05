@@ -224,13 +224,12 @@ For each axis, note concrete findings only, each pointing to `file:line`. Skip a
     - the behavior to cover
     - why it matters (what bug it would catch)
     - a suggested test name, e.g. `macd_returns_none_when_series_shorter_than_slow_period`
-  - Point out where a property test or doctest would cover a class of cases better than examples would.
+  - Point out where a property test would cover a class of cases better than examples would. Prefer regular tests over doctests, because doctests count against the comment budget.
 - **Readability & simplicity**
   - naming in the domain language
   - function length
   - nesting depth (use early returns)
   - magic numbers
-  - comments that explain *what* instead of *why*
 - **Over-engineering**
   - layers, traits, generics, builders or config with only one user
   - abstractions written for futures that don't exist
@@ -251,10 +250,44 @@ For each axis, note concrete findings only, each pointing to `file:line`. Skip a
   - name vs. behavior
   - signature vs. what callers actually need
   - inconsistency with sibling modules
-- **Documentation**
-  - stale docs, comments or README sections about the target
-  - missing `///` on the public API
-  - missing `# Errors` / `# Panics` sections
+- **Comments & documentation**
+  - **Philosophy**
+    - Every comment is a failure: the code wasn't expressive enough to stand on its own.
+    - A comment may only explain *why*: a domain reason, a trade-off, a non-obvious constraint. It must never explain *how* or *what*.
+    - The fix for a comment is almost always better code, not a better comment.
+  - **Budget:** at most ~1 comment block per 100 lines of code.
+    - What counts:
+      - Consecutive comment lines count as one block.
+      - `//`, `///` and `//!` all count.
+    - What doesn't count, because these express intent in code:
+      - `#[expect(..., reason = "...")]`
+      - `.expect("...")` messages
+      - test names
+    - Report the target's comment count against its budget.
+  - **Flag comments that explain *how* or *what*.** Recommend deleting each one and expressing it in code instead:
+    - a better name for the function, variable or type
+    - extracting a well-named function (see single level of abstraction)
+    - a named constant instead of a magic number
+    - a newtype or enum that makes the rule part of the type
+    - a test whose name states the behavior
+  - **Flag comments that restate the code** (e.g. `/// Returns the price` on `fn price()`). Recommend deleting them.
+  - **Flag stale comments** that no longer match the code. Delete or fix. A wrong comment is worse than none.
+  - **Missing docs.** Only recommend a new comment when the *why* truly can't be expressed in code, for example:
+    - units
+    - a non-obvious invariant
+    - a domain or regulatory rule
+    - a deliberate trade-off
+    - when it panics or errors, if the type doesn't make it clear
+  - Do not recommend adding `///` to every public item or adding `# Errors` sections by default.
+  - **File-level docstring (`//!`).** A 4–8 line module docstring at the top of a file is acceptable only when it adds real value that the code can't give:
+    - the module's role in the architecture
+    - the key domain concept it models
+    - a non-obvious design choice that shapes the whole file
+    - Recommend one only when a reader opening the file would otherwise have to read several items to understand why it exists.
+    - If the file name, module path and code already make that clear, recommend none.
+    - Flag existing module docstrings that are longer than ~8 lines, describe *how*, list the file's contents, or just repeat the module name.
+    - It still counts as one block in the comment budget.
+  - Stale README or `.opencode/context` sections about the target still count as findings.
 - **Trade-offs**
   - Is each choice consistent with the trade-offs in `decisions-log.md`?
   - Any trade-off made silently that should be recorded?
@@ -282,6 +315,7 @@ The report is the only output. Format:
 
 - **Target:** what was reviewed and its boundary (one or two lines)
 - **Verdict:** one paragraph. What level it reads at today (beginner / mid / senior) and the biggest thing keeping it from senior.
+- **Comment budget:** `N comment blocks in M lines (budget: M/100)`, plus how many explain *how/what* vs. *why*.
 - **Findings, ranked.** Each one is a single commit-sized change:
   - Use one bullet per finding:
     - `[#] [beginner|mid|senior] [axis] file:line: problem → recommended fix (impact: H/M/L, effort: S/M/L)`
@@ -314,14 +348,15 @@ The report is the only output. Format:
 - **Senior bar checklist.** Mark each ✅ or ❌:
   - [ ] no look-ahead bias, off-by-one or warm-up errors in time-series logic
   - [ ] numeric handling is sound (NaN, float comparison, money precision) and results are deterministic
-  - [ ] no `unwrap`/`expect` without a justifying comment in non-test code
+  - [ ] no `unwrap` in non-test code; any `expect("...")` message states why it can't fail
   - [ ] errors are typed and carry context
   - [ ] each function reads at a single level of abstraction
   - [ ] crates are used through their own abstractions, with nothing hand-rolled that they provide and no unneeded crates or features
   - [ ] no needless allocation or clone on hot paths
   - [ ] names match the domain model
   - [ ] nothing is speculative, unused or duplicated
-  - [ ] the public API is documented and minimal, and follows the Rust API Guidelines
+  - [ ] the public API is minimal and follows the Rust API Guidelines
+  - [ ] comments explain only *why*, never *how*, and stay within budget (~1 block per 100 lines)
   - [ ] lifetimes and generics carry their weight (no needless explicit lifetimes, overly strict `'static` bounds, or generic bloat)
   - [ ] tests cover behavior, edge cases and error paths (no gaps)
   - [ ] logging is consistent and structured
