@@ -8,21 +8,29 @@ use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::config::environment::{parquet_base_dir, parquet_root_dir, resolve_environment};
-use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
 use crate::infrastructure::strategy_persistence::StrategyPersistence;
+
+fn read_processed_indicator_ids(
+    persistence: &StrategyPersistence,
+    instrument: &str,
+    money_management_strategy_id: i32,
+) -> anyhow::Result<HashSet<i32>> {
+    let mut processed_ids_per_cell = persistence.read_processed_ids_per_cell()?;
+    let cell = (instrument.to_string(), money_management_strategy_id);
+    Ok(processed_ids_per_cell.remove(&cell).unwrap_or_default())
+}
 
 pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
     let command_start = Instant::now();
     let env = resolve_environment()?;
+    let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
     info!("Fetching shared data for {instrument} (mms_id={money_management_strategy_id}) ...");
     let fetch_start = Instant::now();
     let data = fetch_source_data(instrument, money_management_strategy_id)?;
     info!("Source data fetched in {:?}", fetch_start.elapsed());
 
-    let manifest = ParquetProcessedManifest::new(parquet_root_dir(env));
-    let processed_rows = manifest.read(instrument, money_management_strategy_id)?;
-    let processed_ids: HashSet<i32> = processed_rows.iter().map(|r| r.indicator_id).collect();
-
+    let processed_ids =
+        read_processed_indicator_ids(&persistence, instrument, money_management_strategy_id)?;
     let all_indicator_ids: Vec<i32> = data.indicators.iter().map(|i| i.id).collect();
     let unprocessed_ids = get_unprocessed(&all_indicator_ids, &processed_ids);
     if unprocessed_ids.is_empty() {
@@ -66,7 +74,6 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
 
     let strategy_count = strategies.len();
     let indicator_count = unprocessed_ids.len();
-    let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
     info!(
         "Persisting {strategy_count} strategies and {indicator_count} processed indicator IDs ..."
     );

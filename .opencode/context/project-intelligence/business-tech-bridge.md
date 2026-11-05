@@ -70,7 +70,7 @@ Business Question                              Code Path
 "Which strategies pass the quality bar?"  →   filter_strategies(strategies, &GlobalStrategyFilter::default())
 "Create strategies for one cell?"         →   bte strategy create -m <mms_id> [-i <instrument>]
 "Create strategies for everything?"       →   bte strategy create_loop (load once → parallel cells → batch persist)
-"Which indicators are already processed?" →   ParquetProcessedManifest::read() / read_processed_ids_per_cell()
+"Which indicators are already processed?" →   StrategyPersistence::read_processed_ids_per_cell()
 ```
 
 ## Adding New Features — Where Things Go

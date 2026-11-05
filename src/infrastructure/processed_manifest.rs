@@ -70,14 +70,6 @@ impl ParquetProcessedManifest {
         read_parquet(&path)
     }
 
-    pub fn read(&self, instrument: &str, mms_id: i32) -> anyhow::Result<Vec<ProcessedRow>> {
-        Ok(self
-            .read_all()?
-            .into_iter()
-            .filter(|r| r.instrument == instrument && r.mms_id == mms_id)
-            .collect())
-    }
-
     pub fn append_all(
         &self,
         entries: &[(String, i32, Vec<i32>)],
@@ -219,6 +211,18 @@ mod tests {
         (instrument.to_string(), mms_id, indicator_ids.to_vec())
     }
 
+    fn read_cell(
+        manifest: &ParquetProcessedManifest,
+        instrument: &str,
+        mms_id: i32,
+    ) -> anyhow::Result<Vec<ProcessedRow>> {
+        Ok(manifest
+            .read_all()?
+            .into_iter()
+            .filter(|r| r.instrument == instrument && r.mms_id == mms_id)
+            .collect())
+    }
+
     fn new_manifest() -> (TempDir, ParquetProcessedManifest) {
         let tmp = TempDir::new().expect("tempdir");
         let manifest = ParquetProcessedManifest::new(tmp.path().to_path_buf());
@@ -240,7 +244,7 @@ mod tests {
             .append_all(&[entry("EURUSD", 390, &[2001, 2002])], ts)
             .expect("append");
 
-        let rows = manifest.read("EURUSD", 390).expect("read");
+        let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].instrument, "EURUSD");
         assert_eq!(rows[0].mms_id, 390);
@@ -260,7 +264,7 @@ mod tests {
             .append_all(&[entry("EURUSD", 390, &[2003])], 1700000001)
             .expect("second append");
 
-        let rows = manifest.read("EURUSD", 390).expect("read");
+        let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert_eq!(rows.len(), 3);
 
         let ids: Vec<i32> = rows.iter().map(|r| r.indicator_id).collect();
@@ -283,7 +287,7 @@ mod tests {
             .append_all(&[entry("EURUSD", 390, &[2001, 2003])], 1700000001)
             .expect("re-run append");
 
-        let rows = manifest.read("EURUSD", 390).expect("read");
+        let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert_eq!(rows.len(), 3);
 
         // 2001 should exist exactly once, with the new timestamp
@@ -313,8 +317,8 @@ mod tests {
             .append_all(&[entry("USDJPY", 400, &[3001])], 1700000001)
             .expect("USDJPY");
 
-        let eur_rows = manifest.read("EURUSD", 390).expect("read EURUSD");
-        let usd_rows = manifest.read("USDJPY", 400).expect("read USDJPY");
+        let eur_rows = read_cell(&manifest, "EURUSD", 390).expect("read EURUSD");
+        let usd_rows = read_cell(&manifest, "USDJPY", 400).expect("read USDJPY");
 
         assert_eq!(eur_rows.len(), 2);
         assert_eq!(usd_rows.len(), 1);
@@ -325,7 +329,7 @@ mod tests {
     fn empty_file_read_returns_empty() {
         let (_tmp, manifest) = new_manifest();
 
-        let rows = manifest.read("EURUSD", 390).expect("read");
+        let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert!(rows.is_empty());
     }
 
@@ -344,17 +348,17 @@ mod tests {
             .expect("USDJPY 390");
 
         // Read only EURUSD/390
-        let rows = manifest.read("EURUSD", 390).expect("read");
+        let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].indicator_id, 2001);
 
         // Read EURUSD/391
-        let rows = manifest.read("EURUSD", 391).expect("read");
+        let rows = read_cell(&manifest, "EURUSD", 391).expect("read");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].indicator_id, 2002);
 
         // Read USDJPY/390
-        let rows = manifest.read("USDJPY", 390).expect("read");
+        let rows = read_cell(&manifest, "USDJPY", 390).expect("read");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].indicator_id, 3001);
     }
@@ -372,7 +376,7 @@ mod tests {
             .append_all(&[entry("EURUSD", 390, &[])], 1700000001)
             .expect("empty append");
 
-        let rows = manifest.read("EURUSD", 390).expect("read");
+        let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].indicator_id, 2001);
         assert_eq!(rows[0].processed_at, 1700000000);
