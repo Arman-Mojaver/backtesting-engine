@@ -201,11 +201,6 @@ mod tests {
         assert_eq!(config.connection_string(), expected);
     }
 
-    // The former `application_layer_creates_env_explicitly` test was removed:
-    // it mutated process-global env vars (`set_var`/`remove_var`), which races
-    // with parallel test threads, and its coverage is fully subsumed by the
-    // parse tests above plus the `resolve_from_raw_*` tests below.
-
     #[test]
     fn resolve_from_raw_accepts_each_environment() {
         assert_eq!(
