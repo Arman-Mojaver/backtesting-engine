@@ -92,6 +92,20 @@ impl SourceIndex {
         cells.dedup();
         cells
     }
+
+    fn resampled_points(&self, instrument: &str) -> &[ResampledPointD1] {
+        self.resampled_by_instrument
+            .get(instrument)
+            .map_or(&[], Vec::as_slice)
+    }
+
+    fn long_operation_points(&self, cell: &(String, i32)) -> &[OperationPoint] {
+        self.long_by_cell.get(cell).map_or(&[], Vec::as_slice)
+    }
+
+    fn short_operation_points(&self, cell: &(String, i32)) -> &[OperationPoint] {
+        self.short_by_cell.get(cell).map_or(&[], Vec::as_slice)
+    }
 }
 
 enum CellOutcome {
@@ -107,15 +121,6 @@ fn compute_cell(
 ) -> CellOutcome {
     let (instrument, mms_id) = cell;
 
-    let resampled_points: &[ResampledPointD1] = source
-        .resampled_by_instrument
-        .get(instrument)
-        .map_or(&[], Vec::as_slice);
-    let long_operation_points: &[OperationPoint] =
-        source.long_by_cell.get(cell).map_or(&[], Vec::as_slice);
-    let short_operation_points: &[OperationPoint] =
-        source.short_by_cell.get(cell).map_or(&[], Vec::as_slice);
-
     let empty_processed_ids: HashSet<i32> = HashSet::new();
     let processed_ids = processed_ids_per_cell
         .get(cell)
@@ -127,9 +132,9 @@ fn compute_cell(
 
     let strategies = match run_strategies(
         &source.indicators,
-        resampled_points,
-        long_operation_points,
-        short_operation_points,
+        source.resampled_points(instrument),
+        source.long_operation_points(cell),
+        source.short_operation_points(cell),
         *mms_id,
         &unprocessed_indicator_ids,
     ) {
