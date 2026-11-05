@@ -31,16 +31,13 @@ struct SourceIndex {
 }
 
 impl SourceIndex {
-    /// Loads every table once and indexes the rows in memory.
     fn load(env: Environment) -> anyhow::Result<Self> {
         info!("Querying DB...");
         let db_config = DbConfig::from_env(env);
         let conn_string = db_config.connection_string();
 
         // One store (connection) per table: the four loads below run
-        // concurrently via nested rayon::join, and a sync postgres::Client
-        // is single-connection. The single-cell `create` path needs only
-        // one store for its sequential reads.
+        // concurrently, and a sync postgres::Client is single-connection.
         let connect =
             || PgStore::new(&conn_string).with_context(|| connection_diagnostics(&db_config));
         let indicator_store = connect()?;
