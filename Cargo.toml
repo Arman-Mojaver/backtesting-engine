@@ -29,7 +29,7 @@ panic = "abort"
 ignored = ["time"]
 
 [dependencies]
-clap = { version = "4.5", features = ["string", "derive"] }
+clap = "4.5"
 cached = "4"
 anyhow = "1.0"
 # Typed domain errors: derives Display + std::error::Error for error enums.
