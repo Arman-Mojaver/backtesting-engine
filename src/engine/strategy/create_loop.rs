@@ -284,6 +284,7 @@ fn fail_on_total_failure(summary: &BatchSummary) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::fixtures;
 
     fn computed_outcome(instrument: &str, mms_id: i32) -> CellOutcome {
         CellOutcome::Computed(CellOutput {
@@ -425,5 +426,99 @@ mod tests {
         let outcomes = vec![CellOutcome::AlreadyProcessed];
         let (_, summary) = split_outcomes(outcomes);
         assert!(fail_on_total_failure(&summary).is_ok());
+    }
+
+    fn eurusd_cell() -> (String, i32) {
+        ("EURUSD".to_string(), 1)
+    }
+
+    fn source_index(
+        indicators: Vec<Indicator>,
+        resampled_points: Vec<ResampledPointD1>,
+    ) -> SourceIndex {
+        SourceIndex {
+            indicator_ids: indicators.iter().map(|indicator| indicator.id).collect(),
+            indicators,
+            resampled_by_instrument: FxHashMap::from_iter([(
+                "EURUSD".to_string(),
+                resampled_points,
+            )]),
+            long_by_cell: FxHashMap::from_iter([(eurusd_cell(), fixtures::op_points_default())]),
+            short_by_cell: FxHashMap::from_iter([(eurusd_cell(), fixtures::op_points_default())]),
+        }
+    }
+
+    fn processed(indicator_ids: &[i32]) -> HashMap<(String, i32), HashSet<i32>> {
+        HashMap::from([(eurusd_cell(), indicator_ids.iter().copied().collect())])
+    }
+
+    #[test]
+    fn cells_are_sorted_union_of_long_and_short_without_duplicates() {
+        let cell = |instrument: &str, mms_id| ((instrument.to_string(), mms_id), Vec::new());
+        let source = SourceIndex {
+            indicators: Vec::new(),
+            indicator_ids: Vec::new(),
+            resampled_by_instrument: FxHashMap::default(),
+            long_by_cell: FxHashMap::from_iter([cell("USDJPY", 1), cell("EURUSD", 2)]),
+            short_by_cell: FxHashMap::from_iter([cell("EURUSD", 2), cell("EURUSD", 1)]),
+        };
+
+        assert_eq!(
+            source.cells(),
+            vec![
+                ("EURUSD".to_string(), 1),
+                ("EURUSD".to_string(), 2),
+                ("USDJPY".to_string(), 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn compute_cell_computes_only_unprocessed_indicators() {
+        let source = source_index(
+            fixtures::indicators_default(),
+            fixtures::resampled_points_default(),
+        );
+
+        let outcome = compute_cell(&source, &eurusd_cell(), &processed(&[1]));
+
+        let CellOutcome::Computed(output) = outcome else {
+            panic!("expected the cell to be computed");
+        };
+        assert_eq!((output.instrument.as_str(), output.mms_id), ("EURUSD", 1));
+        assert_eq!(output.computed_indicator_ids, vec![2]);
+    }
+
+    #[test]
+    fn compute_cell_skips_cell_whose_indicators_are_all_processed() {
+        let source = source_index(
+            fixtures::indicators_default(),
+            fixtures::resampled_points_default(),
+        );
+
+        let outcome = compute_cell(&source, &eurusd_cell(), &processed(&[1, 2]));
+
+        assert!(matches!(outcome, CellOutcome::AlreadyProcessed));
+    }
+
+    #[test]
+    fn compute_cell_reports_failed_cell_when_instrument_has_no_resampled_points() {
+        let source = source_index(fixtures::indicators_default(), Vec::new());
+
+        let outcome = compute_cell(&source, &eurusd_cell(), &HashMap::new());
+
+        let CellOutcome::Failed { instrument, mms_id } = outcome else {
+            panic!("expected the cell to fail");
+        };
+        assert_eq!((instrument.as_str(), mms_id), ("EURUSD", 1));
+    }
+
+    #[test]
+    fn compute_cell_with_no_indicators_is_already_processed() {
+        let source = source_index(Vec::new(), fixtures::resampled_points_default());
+
+        let outcome = compute_cell(&source, &eurusd_cell(), &HashMap::new());
+
+        assert!(matches!(outcome, CellOutcome::AlreadyProcessed));
     }
 }
