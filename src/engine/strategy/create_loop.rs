@@ -7,6 +7,7 @@ use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
 use crate::application::cell_output::CellOutput;
+use crate::application::source_data::connection_diagnostics;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::config::environment::{
@@ -39,14 +40,12 @@ impl SourceIndex {
         // concurrently via nested rayon::join, and a sync postgres::Client
         // is single-connection. The single-cell `create` path needs only
         // one store for its sequential reads.
-        let indicator_store =
-            PgStore::new(&conn_string).context("Failed to connect for indicators")?;
-        let resampled_store =
-            PgStore::new(&conn_string).context("Failed to connect for resampled points")?;
-        let long_store =
-            PgStore::new(&conn_string).context("Failed to connect for long operation points")?;
-        let short_store =
-            PgStore::new(&conn_string).context("Failed to connect for short operation points")?;
+        let connect =
+            || PgStore::new(&conn_string).with_context(|| connection_diagnostics(&db_config));
+        let indicator_store = connect()?;
+        let resampled_store = connect()?;
+        let long_store = connect()?;
+        let short_store = connect()?;
 
         let load_start = Instant::now();
         let (indicators, (resampled_by_instrument, (long_by_cell, short_by_cell))) = rayon::join(

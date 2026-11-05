@@ -58,7 +58,7 @@ pub fn fetch_source_data(
     })
 }
 
-fn connection_diagnostics(config: &DbConfig) -> String {
+pub fn connection_diagnostics(config: &DbConfig) -> String {
     format!(
         "Failed to connect to PostgreSQL\n  \
          Target database: {db}\n  \
