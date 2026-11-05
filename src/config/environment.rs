@@ -165,40 +165,24 @@ mod tests {
     }
 
     #[test]
-    fn dbconfig_from_env_returns_expected_host_and_port() {
-        let prod = DbConfig::from_env(Environment::Production);
-        assert_eq!(prod.host, "host.docker.internal");
-        assert_eq!(prod.port, 5432);
-
-        let dev = DbConfig::from_env(Environment::Development);
-        assert_eq!(dev.host, "host.docker.internal");
-        assert_eq!(dev.port, 54320);
-
-        let test = DbConfig::from_env(Environment::Testing);
-        assert_eq!(test.host, "host.docker.internal");
-        assert_eq!(test.port, 54321);
-    }
-
-    #[test]
-    fn dbconfig_from_env_returns_correct_config() {
-        let env = Environment::from_str("production").unwrap();
-        let config = DbConfig::from_env(env);
-        assert_eq!(config.database, "db-production");
-
-        let env = Environment::from_str("development").unwrap();
-        let config = DbConfig::from_env(env);
-        assert_eq!(config.database, "db-development");
-
-        let env = Environment::from_str("testing").unwrap();
-        let config = DbConfig::from_env(env);
-        assert_eq!(config.database, "db-testing");
-    }
-
-    #[test]
-    fn dbconfig_connection_string_generates_correct_string() {
-        let config = DbConfig::from_env(Environment::Production);
-        let expected = "postgresql://postgres:postgres@host.docker.internal:5432/db-production";
-        assert_eq!(config.connection_string(), expected);
+    fn dbconfig_connection_string_targets_each_environment() {
+        let cases = [
+            (
+                Environment::Production,
+                "postgresql://postgres:postgres@host.docker.internal:5432/db-production",
+            ),
+            (
+                Environment::Development,
+                "postgresql://postgres:postgres@host.docker.internal:54320/db-development",
+            ),
+            (
+                Environment::Testing,
+                "postgresql://postgres:postgres@host.docker.internal:54321/db-testing",
+            ),
+        ];
+        for (env, expected) in cases {
+            assert_eq!(DbConfig::from_env(env).connection_string(), expected);
+        }
     }
 
     #[test]
