@@ -346,7 +346,7 @@ impl IndicatorRepository for PgStore {
         fetch_rows(
             &self.conn,
             "indicator get_all",
-            "SELECT id, type, parameters::text FROM indicator",
+            "SELECT id, type, parameters::text FROM indicator ORDER BY id",
             &[],
             row_to_indicator,
         )
