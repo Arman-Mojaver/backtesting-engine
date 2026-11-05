@@ -46,17 +46,10 @@ pub struct InvalidEnvironmentError {
 const ENVIRONMENT_VARIABLE: &str = "ENVIRONMENT";
 
 /// Resolves the target environment from the `ENVIRONMENT` variable.
-///
-/// The crate's single resolution path: no other code may read the variable
-/// directly. Absent defaults to development; invalid (including non-UTF-8)
-/// fails fast so a typo can never silently target the development database
-/// and parquet tree.
 pub fn resolve_environment() -> Result<Environment, InvalidEnvironmentError> {
     resolve_from_raw(env::var(ENVIRONMENT_VARIABLE))
 }
 
-/// Takes the raw env-var result so the decision logic is testable without
-/// mutating process-global state.
 fn resolve_from_raw(raw: Result<String, VarError>) -> Result<Environment, InvalidEnvironmentError> {
     match raw {
         Ok(value) => value.parse(),
