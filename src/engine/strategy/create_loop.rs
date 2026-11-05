@@ -158,27 +158,25 @@ struct BatchSummary {
     failed_cells: Vec<(String, i32)>,
 }
 
-fn summarize_outcomes(outcomes: &[CellOutcome]) -> BatchSummary {
-    let failed_cells: Vec<(String, i32)> = outcomes
-        .iter()
-        .filter_map(|outcome| match outcome {
-            CellOutcome::Failed { instrument, mms_id } => Some((instrument.clone(), *mms_id)),
-            CellOutcome::Computed(_) | CellOutcome::AlreadyProcessed => None,
-        })
-        .collect();
+fn split_outcomes(outcomes: Vec<CellOutcome>) -> (Vec<CellOutput>, BatchSummary) {
+    let mut computed_cells = Vec::new();
+    let mut skipped: usize = 0;
+    let mut failed_cells = Vec::new();
+    for outcome in outcomes {
+        match outcome {
+            CellOutcome::Computed(cell_output) => computed_cells.push(cell_output),
+            CellOutcome::AlreadyProcessed => skipped = skipped.saturating_add(1),
+            CellOutcome::Failed { instrument, mms_id } => failed_cells.push((instrument, mms_id)),
+        }
+    }
 
-    BatchSummary {
-        computed: outcomes
-            .iter()
-            .filter(|outcome| matches!(outcome, CellOutcome::Computed(_)))
-            .count(),
-        skipped: outcomes
-            .iter()
-            .filter(|outcome| matches!(outcome, CellOutcome::AlreadyProcessed))
-            .count(),
+    let summary = BatchSummary {
+        computed: computed_cells.len(),
+        skipped,
         failed: failed_cells.len(),
         failed_cells,
-    }
+    };
+    (computed_cells, summary)
 }
 
 fn format_failed_cells(failed_cells: &[(String, i32)]) -> String {
@@ -216,7 +214,7 @@ pub fn execute() -> anyhow::Result<()> {
         .par_iter()
         .map(|cell| compute_cell(&source, cell, &processed_ids_per_cell))
         .collect();
-    let summary = summarize_outcomes(&outcomes);
+    let (computed, summary) = split_outcomes(outcomes);
     info!(
         "Compute done: {} computed, {} skipped (already processed), {} failed in {:?}",
         summary.computed,
@@ -226,13 +224,6 @@ pub fn execute() -> anyhow::Result<()> {
     );
 
     // 3. Persist the computed cells (assign IDs, write partitions in parallel, commit manifest).
-    let computed: Vec<CellOutput> = outcomes
-        .into_iter()
-        .filter_map(|outcome| match outcome {
-            CellOutcome::Computed(cell_output) => Some(cell_output),
-            CellOutcome::AlreadyProcessed | CellOutcome::Failed { .. } => None,
-        })
-        .collect();
     let persist_start = Instant::now();
     persistence
         .persist_cells(computed)
@@ -294,7 +285,7 @@ mod tests {
 
     #[test]
     fn empty_outcomes_produce_zero_counts() {
-        let summary = summarize_outcomes(&[]);
+        let (_, summary) = split_outcomes(Vec::new());
         assert_eq!(summary.computed, 0);
         assert_eq!(summary.skipped, 0);
         assert_eq!(summary.failed, 0);
@@ -308,7 +299,7 @@ mod tests {
             computed_outcome("EURUSD", 2),
             computed_outcome("USDJPY", 1),
         ];
-        let summary = summarize_outcomes(&outcomes);
+        let (_, summary) = split_outcomes(outcomes);
         assert_eq!(summary.computed, 3);
         assert_eq!(summary.skipped, 0);
         assert_eq!(summary.failed, 0);
@@ -318,7 +309,7 @@ mod tests {
     #[test]
     fn all_already_processed_counts_every_cell_as_skipped() {
         let outcomes = vec![CellOutcome::AlreadyProcessed, CellOutcome::AlreadyProcessed];
-        let summary = summarize_outcomes(&outcomes);
+        let (_, summary) = split_outcomes(outcomes);
         assert_eq!(summary.computed, 0);
         assert_eq!(summary.skipped, 2);
         assert_eq!(summary.failed, 0);
@@ -335,7 +326,7 @@ mod tests {
             CellOutcome::AlreadyProcessed,
             failed_outcome("USDJPY", 3),
         ];
-        let summary = summarize_outcomes(&outcomes);
+        let (_, summary) = split_outcomes(outcomes);
         assert_eq!(summary.computed, 2);
         assert_eq!(summary.skipped, 2);
         assert_eq!(summary.failed, 2);
@@ -348,10 +339,29 @@ mod tests {
             computed_outcome("EURUSD", 1),
             failed_outcome("USDJPY", 3),
         ];
-        let summary = summarize_outcomes(&outcomes);
+        let (_, summary) = split_outcomes(outcomes);
         assert_eq!(
             summary.failed_cells,
             vec![("EURUSD".to_string(), 7), ("USDJPY".to_string(), 3),]
+        );
+    }
+
+    #[test]
+    fn computed_cells_are_returned_in_outcome_order() {
+        let outcomes = vec![
+            computed_outcome("USDJPY", 2),
+            failed_outcome("GBPUSD", 1),
+            CellOutcome::AlreadyProcessed,
+            computed_outcome("EURUSD", 1),
+        ];
+        let (computed, _) = split_outcomes(outcomes);
+        let cells: Vec<(String, i32)> = computed
+            .into_iter()
+            .map(|cell_output| (cell_output.instrument, cell_output.mms_id))
+            .collect();
+        assert_eq!(
+            cells,
+            vec![("USDJPY".to_string(), 2), ("EURUSD".to_string(), 1)]
         );
     }
 
@@ -372,7 +382,7 @@ mod tests {
     #[test]
     fn every_cell_failed_is_total_failure() {
         let outcomes = vec![failed_outcome("EURUSD", 1), failed_outcome("USDJPY", 2)];
-        let summary = summarize_outcomes(&outcomes);
+        let (_, summary) = split_outcomes(outcomes);
         assert!(is_total_failure(&summary));
     }
 
@@ -381,21 +391,21 @@ mod tests {
         // Already-processed cells were never attempted; when every cell that
         // WAS attempted fails, the run made no progress: treat as systemic.
         let outcomes = vec![CellOutcome::AlreadyProcessed, failed_outcome("EURUSD", 1)];
-        let summary = summarize_outcomes(&outcomes);
+        let (_, summary) = split_outcomes(outcomes);
         assert!(is_total_failure(&summary));
     }
 
     #[test]
     fn partial_failure_is_not_total_failure() {
         let outcomes = vec![computed_outcome("EURUSD", 1), failed_outcome("USDJPY", 2)];
-        let summary = summarize_outcomes(&outcomes);
+        let (_, summary) = split_outcomes(outcomes);
         assert!(!is_total_failure(&summary));
     }
 
     #[test]
     fn all_already_processed_is_not_total_failure() {
         let outcomes = vec![CellOutcome::AlreadyProcessed];
-        let summary = summarize_outcomes(&outcomes);
+        let (_, summary) = split_outcomes(outcomes);
         assert!(!is_total_failure(&summary));
     }
 }
