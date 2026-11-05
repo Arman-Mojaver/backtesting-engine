@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use anyhow::{bail, Context};
+use itertools::Itertools;
 use log::{error, info};
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
@@ -192,7 +193,6 @@ fn format_failed_cells(failed_cells: &[(String, i32)]) -> String {
     failed_cells
         .iter()
         .map(|(instrument, mms_id)| format!("{instrument} (mms_id={mms_id})"))
-        .collect::<Vec<String>>()
         .join(", ")
 }
 
