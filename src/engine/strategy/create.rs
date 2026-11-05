@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
+use anyhow::Context;
 use log::info;
 
 use crate::application::cell_output::CellOutput;
@@ -15,7 +16,13 @@ fn read_processed_indicator_ids(
     instrument: &str,
     money_management_strategy_id: i32,
 ) -> anyhow::Result<HashSet<i32>> {
-    let mut processed_ids_per_cell = persistence.read_processed_ids_per_cell()?;
+    let mut processed_ids_per_cell = persistence
+        .read_processed_ids_per_cell()
+        .with_context(|| {
+            format!(
+                "failed to read processed manifest for {instrument} (mms_id={money_management_strategy_id})"
+            )
+        })?;
     let cell = (instrument.to_string(), money_management_strategy_id);
     Ok(processed_ids_per_cell.remove(&cell).unwrap_or_default())
 }
@@ -65,7 +72,10 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
         &data.short_operation_points,
         money_management_strategy_id,
         &unprocessed_ids,
-    )?;
+    )
+    .with_context(|| {
+        format!("failed to run strategies for {instrument} (mms_id={money_management_strategy_id})")
+    })?;
     info!(
         "run_strategies done in {:?}: {} strategies",
         run_start.elapsed(),
@@ -83,7 +93,10 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
         mms_id: money_management_strategy_id,
         strategies,
         computed_indicator_ids: unprocessed_ids,
-    }])?;
+    }])
+    .with_context(|| {
+        format!("failed to persist strategies for {instrument} (mms_id={money_management_strategy_id})")
+    })?;
     info!("Persist done in {:?}", persist_start.elapsed());
 
     info!(
