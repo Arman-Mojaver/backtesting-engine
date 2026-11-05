@@ -3,12 +3,13 @@ use std::time::Instant;
 
 use log::info;
 
+use crate::application::cell_output::CellOutput;
 use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::config::environment::{parquet_base_dir, parquet_root_dir, resolve_environment};
-use crate::infrastructure::processed_manifest::{unix_now_secs, ParquetProcessedManifest};
-use crate::infrastructure::strategy_adapter::ParquetStrategyRepository;
+use crate::infrastructure::processed_manifest::ParquetProcessedManifest;
+use crate::infrastructure::strategy_persistence::StrategyPersistence;
 
 pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
     let command_start = Instant::now();
@@ -63,31 +64,23 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
         strategies.len()
     );
 
-    let repo = ParquetStrategyRepository::new(parquet_base_dir(env));
-    info!("Writing {} strategies to parquet ...", strategies.len());
-    let write_start = Instant::now();
-    repo.write(instrument, money_management_strategy_id, &strategies)?;
-    info!("Parquet write done in {:?}", write_start.elapsed());
-
-    let processed_at = unix_now_secs()?;
-
+    let strategy_count = strategies.len();
+    let indicator_count = unprocessed_ids.len();
+    let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
     info!(
-        "Appending {} unprocessed indicator IDs to manifest ...",
-        unprocessed_ids.len(),
+        "Persisting {strategy_count} strategies and {indicator_count} processed indicator IDs ..."
     );
-    manifest.append(
-        instrument,
-        money_management_strategy_id,
-        &unprocessed_ids,
-        processed_at,
-    )?;
+    let persist_start = Instant::now();
+    persistence.persist_cells(vec![CellOutput {
+        instrument: instrument.to_string(),
+        mms_id: money_management_strategy_id,
+        strategies,
+        computed_indicator_ids: unprocessed_ids,
+    }])?;
+    info!("Persist done in {:?}", persist_start.elapsed());
 
     info!(
-        "Done. {} strategies for {} (mms_id={}). {} indicators marked as processed.",
-        strategies.len(),
-        instrument,
-        money_management_strategy_id,
-        unprocessed_ids.len(),
+        "Done. {strategy_count} strategies for {instrument} (mms_id={money_management_strategy_id}). {indicator_count} indicators marked as processed.",
     );
     info!("Total command time: {:?}", command_start.elapsed());
 

@@ -10,7 +10,7 @@ use anyhow::Context;
 use arrow::array::{AsArray, Int32Array, Int64Array, StringBuilder};
 use arrow::datatypes::{DataType, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
-use log::{info, warn};
+use log::info;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, ZstdLevel};
@@ -78,57 +78,6 @@ impl ParquetProcessedManifest {
             .collect())
     }
 
-    pub fn append(
-        &self,
-        instrument: &str,
-        mms_id: i32,
-        indicator_ids: &[i32],
-        processed_at: i64,
-    ) -> anyhow::Result<()> {
-        let path = self.path();
-        let mut rows = self.read_all()?;
-
-        let replaced_ids: Vec<i32> = rows
-            .iter()
-            .filter(|r| {
-                r.instrument == instrument
-                    && r.mms_id == mms_id
-                    && indicator_ids.contains(&r.indicator_id)
-            })
-            .map(|r| r.indicator_id)
-            .collect();
-
-        rows.retain(|r| {
-            !(r.instrument == instrument
-                && r.mms_id == mms_id
-                && indicator_ids.contains(&r.indicator_id))
-        });
-
-        if !replaced_ids.is_empty() {
-            warn!(
-                "Processed manifest: replacing {} existing row(s) for instrument={} mms_id={} (indicator_ids: {:?})",
-                replaced_ids.len(),
-                instrument,
-                mms_id,
-                replaced_ids
-            );
-        }
-
-        for &indicator_id in indicator_ids {
-            rows.push(ProcessedRow {
-                instrument: instrument.to_string(),
-                mms_id,
-                indicator_id,
-                processed_at,
-            });
-        }
-
-        let temp_path = temp_path_for(&path);
-        write_parquet(&temp_path, &rows)?;
-        fs::rename(&temp_path, &path)?;
-
-        Ok(())
-    }
     pub fn append_all(
         &self,
         entries: &[(String, i32, Vec<i32>)],
@@ -266,6 +215,10 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    fn entry(instrument: &str, mms_id: i32, indicator_ids: &[i32]) -> (String, i32, Vec<i32>) {
+        (instrument.to_string(), mms_id, indicator_ids.to_vec())
+    }
+
     fn new_manifest() -> (TempDir, ParquetProcessedManifest) {
         let tmp = TempDir::new().expect("tempdir");
         let manifest = ParquetProcessedManifest::new(tmp.path().to_path_buf());
@@ -284,7 +237,7 @@ mod tests {
         let ts = 1700000000;
 
         manifest
-            .append("EURUSD", 390, &[2001, 2002], ts)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], ts)
             .expect("append");
 
         let rows = manifest.read("EURUSD", 390).expect("read");
@@ -297,14 +250,14 @@ mod tests {
     }
 
     #[test]
-    fn append_new_rows_preserves_existing() {
+    fn append_all_new_rows_preserves_existing() {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
             .expect("first append");
         manifest
-            .append("EURUSD", 390, &[2003], 1700000001)
+            .append_all(&[entry("EURUSD", 390, &[2003])], 1700000001)
             .expect("second append");
 
         let rows = manifest.read("EURUSD", 390).expect("read");
@@ -317,17 +270,17 @@ mod tests {
     }
 
     #[test]
-    fn append_with_duplicate_indicator_ids_drops_old() {
+    fn append_all_with_duplicate_indicator_ids_drops_old() {
         let (_tmp, manifest) = new_manifest();
 
         // First run: process indicators 2001, 2002
         manifest
-            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
             .expect("first append");
 
         // Re-run with indicator 2001 + new 2003: old 2001 should be replaced
         manifest
-            .append("EURUSD", 390, &[2001, 2003], 1700000001)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2003])], 1700000001)
             .expect("re-run append");
 
         let rows = manifest.read("EURUSD", 390).expect("read");
@@ -350,14 +303,14 @@ mod tests {
     }
 
     #[test]
-    fn append_across_instruments_does_not_interfere() {
+    fn append_all_across_instruments_does_not_interfere() {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
             .expect("EURUSD");
         manifest
-            .append("USDJPY", 400, &[3001], 1700000001)
+            .append_all(&[entry("USDJPY", 400, &[3001])], 1700000001)
             .expect("USDJPY");
 
         let eur_rows = manifest.read("EURUSD", 390).expect("read EURUSD");
@@ -381,13 +334,13 @@ mod tests {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append("EURUSD", 390, &[2001], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001])], 1700000000)
             .expect("EURUSD 390");
         manifest
-            .append("EURUSD", 391, &[2002], 1700000000)
+            .append_all(&[entry("EURUSD", 391, &[2002])], 1700000000)
             .expect("EURUSD 391");
         manifest
-            .append("USDJPY", 390, &[3001], 1700000000)
+            .append_all(&[entry("USDJPY", 390, &[3001])], 1700000000)
             .expect("USDJPY 390");
 
         // Read only EURUSD/390
@@ -407,16 +360,16 @@ mod tests {
     }
 
     #[test]
-    fn append_with_empty_indicator_ids_noops() {
+    fn append_all_with_empty_indicator_ids_noops() {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append("EURUSD", 390, &[2001], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001])], 1700000000)
             .expect("first append");
 
         // Append with empty slice: nothing added, nothing removed
         manifest
-            .append("EURUSD", 390, &[], 1700000001)
+            .append_all(&[entry("EURUSD", 390, &[])], 1700000001)
             .expect("empty append");
 
         let rows = manifest.read("EURUSD", 390).expect("read");
@@ -430,10 +383,10 @@ mod tests {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
             .expect("first append");
         manifest
-            .append("EURUSD", 390, &[2003], 1700000001)
+            .append_all(&[entry("EURUSD", 390, &[2003])], 1700000001)
             .expect("second append");
 
         // Verify the manifest file exists
@@ -455,13 +408,13 @@ mod tests {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append("EURUSD", 390, &[2001, 2002], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
             .expect("EURUSD 390");
         manifest
-            .append("EURUSD", 391, &[2002], 1700000000)
+            .append_all(&[entry("EURUSD", 391, &[2002])], 1700000000)
             .expect("EURUSD 391");
         manifest
-            .append("USDJPY", 390, &[3001], 1700000000)
+            .append_all(&[entry("USDJPY", 390, &[3001])], 1700000000)
             .expect("USDJPY 390");
 
         let map = manifest.read_processed_ids_per_cell().expect("map");

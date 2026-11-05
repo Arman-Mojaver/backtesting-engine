@@ -44,6 +44,8 @@ impl StrategyPersistence {
     }
 
     pub fn persist_cells(&self, cells: Vec<CellOutput>) -> anyhow::Result<()> {
+        // strategy_id is persistence-assigned: new ids start from the global max
+        // across all partitions, so they stay unique across the whole tree.
         let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
         let mut dto_cells: Vec<CellOutputDto> = Vec::with_capacity(cells.len());
         for cell in cells {
@@ -81,6 +83,11 @@ impl StrategyPersistence {
 mod tests {
     use super::*;
     use crate::domain::strategy::Strategy;
+    use arrow::array::AsArray;
+    use arrow::datatypes::Int64Type;
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    use std::fs::File;
+    use std::path::Path;
     use tempfile::TempDir;
 
     fn strategy(instrument: &str, indicator_id: i32, mms_id: i32) -> Strategy {
@@ -94,6 +101,119 @@ mod tests {
             short_operation_point_ids: vec![],
             money_management_strategy_id: mms_id,
         }
+    }
+
+    fn cell(instrument: &str, mms_id: i32, indicator_ids: &[i32]) -> CellOutput {
+        CellOutput {
+            instrument: instrument.to_string(),
+            mms_id,
+            strategies: indicator_ids
+                .iter()
+                .map(|&indicator_id| strategy(instrument, indicator_id, mms_id))
+                .collect(),
+            computed_indicator_ids: indicator_ids.to_vec(),
+        }
+    }
+
+    fn strategy_ids(base: &Path, instrument: &str, mms_id: i32) -> Vec<i64> {
+        let path = base.join(format!(
+            "instrument={instrument}/money_management_strategy_id={mms_id}/strategies.parquet"
+        ));
+        let reader = ParquetRecordBatchReaderBuilder::try_new(File::open(path).unwrap())
+            .unwrap()
+            .build()
+            .unwrap();
+        reader
+            .flat_map(|batch| {
+                batch
+                    .unwrap()
+                    .column_by_name("strategy_id")
+                    .unwrap()
+                    .as_primitive::<Int64Type>()
+                    .values()
+                    .to_vec()
+            })
+            .collect()
+    }
+
+    fn new_persistence() -> (TempDir, PathBuf, StrategyPersistence) {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().to_path_buf();
+        let base = root.join("strategy");
+        let persistence = StrategyPersistence::new(base.clone(), root);
+        (tmp, base, persistence)
+    }
+
+    #[test]
+    fn first_persist_starts_ids_at_one() {
+        let (_tmp, base, persistence) = new_persistence();
+
+        persistence
+            .persist_cells(vec![cell("EURUSD", 390, &[2001, 2002])])
+            .unwrap();
+
+        assert_eq!(strategy_ids(&base, "EURUSD", 390), vec![1, 2]);
+    }
+
+    #[test]
+    fn ids_are_contiguous_within_a_cell() {
+        let (_tmp, base, persistence) = new_persistence();
+
+        persistence
+            .persist_cells(vec![cell("EURUSD", 1, &[0, 1, 2, 3, 4])])
+            .unwrap();
+
+        assert_eq!(strategy_ids(&base, "EURUSD", 1), vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn ids_continue_across_cells_in_one_batch() {
+        let (_tmp, base, persistence) = new_persistence();
+
+        persistence
+            .persist_cells(vec![
+                cell("EURUSD", 390, &[2001, 2002]),
+                cell("USDJPY", 400, &[2001, 2002]),
+            ])
+            .unwrap();
+
+        assert_eq!(strategy_ids(&base, "EURUSD", 390), vec![1, 2]);
+        assert_eq!(strategy_ids(&base, "USDJPY", 400), vec![3, 4]);
+    }
+
+    #[test]
+    fn later_persist_continues_from_global_max() {
+        let (_tmp, base, persistence) = new_persistence();
+
+        persistence
+            .persist_cells(vec![cell("EURUSD", 390, &[2001, 2002])])
+            .unwrap();
+        persistence
+            .persist_cells(vec![cell("EURUSD", 391, &[2001, 2002])])
+            .unwrap();
+        persistence
+            .persist_cells(vec![cell("USDJPY", 400, &[2001, 2002])])
+            .unwrap();
+
+        assert_eq!(strategy_ids(&base, "USDJPY", 400), vec![5, 6]);
+    }
+
+    #[test]
+    fn re_persisting_a_cell_keeps_original_ids() {
+        let (_tmp, base, persistence) = new_persistence();
+
+        persistence
+            .persist_cells(vec![cell("EURUSD", 390, &[2001, 2002])])
+            .unwrap();
+        persistence
+            .persist_cells(vec![cell("USDJPY", 400, &[2001, 2002])])
+            .unwrap();
+        persistence
+            .persist_cells(vec![cell("EURUSD", 390, &[2001, 2002])])
+            .unwrap();
+
+        assert_eq!(strategy_ids(&base, "EURUSD", 390), vec![1, 2]);
+        assert_eq!(strategy_ids(&base, "USDJPY", 400), vec![3, 4]);
     }
 
     #[test]

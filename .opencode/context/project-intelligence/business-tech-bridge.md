@@ -39,9 +39,9 @@
 | Run the full pipeline for one cell | `run_strategies()` | `src/application/strategy_runner.rs` | validate → signals → filter ops → strategies → filter DD/ROI |
 | Which indicators are already done? | `get_unprocessed()` | `src/application/strategy_runner_utils.rs` | Set-diff DB indicator IDs vs manifest |
 | One cell's compute result | `CellOutput` | `src/application/cell_output.rs` | instrument, mms_id, strategies, processed IDs |
-| Write strategies to parquet | `ParquetStrategyRepository::write()` / `write_rows()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD; idempotent by indicator_id; IDs assigned at write time |
+| Write strategies to parquet | `ParquetStrategyRepository::write_rows()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD; idempotent by indicator_id |
 | Record processed indicators | `ParquetProcessedManifest` | `src/infrastructure/processed_manifest.rs` | `processed.parquet` ledger; atomic writes; dedup per triple |
-| Batch commit (create_loop) | `StrategyPersistence::persist_cells()` | `src/infrastructure/strategy_persistence.rs` | Assign IDs once, write partitions in parallel, commit manifest once |
+| Commit computed cells (create, create_loop) | `StrategyPersistence::persist_cells()` | `src/infrastructure/strategy_persistence.rs` | Assign global IDs, write partitions in parallel, commit manifest once |
 | Logging | `logging::init()` | `src/infrastructure/logging.rs` | simplelog, RUST_LOG-driven |
 | Engine CLI module | Command tree for `bte` (the sole CLI) | `src/engine/mod.rs` | `EngineCommand` enum + `build_cli()`, `parse()`, `execute()` |
 | Engine strategy create | `bte strategy create -m <mms_id> [-i <instrument>]` | `src/engine/strategy/create.rs` | fetch → manifest diff → run_strategies → parquet → manifest append |
