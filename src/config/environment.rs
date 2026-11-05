@@ -12,6 +12,16 @@ pub enum Environment {
     Testing,
 }
 
+impl Environment {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Production => "production",
+            Self::Development => "development",
+            Self::Testing => "testing",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[error("invalid ENVIRONMENT value '{value}': expected 'production', 'development', or 'testing' (case-insensitive)")]
 pub struct InvalidEnvironmentError {
@@ -123,23 +133,11 @@ impl DbConfig {
 const PARQUET_FILES_PATH: &str = "/app/parquet_files";
 
 pub fn parquet_base_dir(env: Environment) -> PathBuf {
-    let subdirectory = match env {
-        Environment::Production => "production",
-        Environment::Development => "development",
-        Environment::Testing => "testing",
-    };
-    PathBuf::from(PARQUET_FILES_PATH)
-        .join(subdirectory)
-        .join("strategy")
+    parquet_root_dir(env).join("strategy")
 }
 
 pub fn parquet_root_dir(env: Environment) -> PathBuf {
-    let subdirectory = match env {
-        Environment::Production => "production",
-        Environment::Development => "development",
-        Environment::Testing => "testing",
-    };
-    PathBuf::from(PARQUET_FILES_PATH).join(subdirectory)
+    PathBuf::from(PARQUET_FILES_PATH).join(env.as_str())
 }
 
 #[cfg(test)]
