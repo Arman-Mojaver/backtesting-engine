@@ -154,8 +154,13 @@ fn compute_cell(
 struct BatchSummary {
     computed: usize,
     skipped: usize,
-    failed: usize,
     failed_cells: Vec<(String, i32)>,
+}
+
+impl BatchSummary {
+    const fn failed(&self) -> usize {
+        self.failed_cells.len()
+    }
 }
 
 fn split_outcomes(outcomes: Vec<CellOutcome>) -> (Vec<CellOutput>, BatchSummary) {
@@ -173,7 +178,6 @@ fn split_outcomes(outcomes: Vec<CellOutcome>) -> (Vec<CellOutput>, BatchSummary)
     let summary = BatchSummary {
         computed: computed_cells.len(),
         skipped,
-        failed: failed_cells.len(),
         failed_cells,
     };
     (computed_cells, summary)
@@ -191,7 +195,7 @@ fn format_failed_cells(failed_cells: &[(String, i32)]) -> String {
 // computed, the signature of a systemic outage (the DB going down mid-run)
 // rather than isolated per-cell failures.
 const fn is_total_failure(summary: &BatchSummary) -> bool {
-    summary.failed > 0 && summary.computed == 0
+    summary.failed() > 0 && summary.computed == 0
 }
 
 pub fn execute() -> anyhow::Result<()> {
@@ -219,7 +223,7 @@ pub fn execute() -> anyhow::Result<()> {
         "Compute done: {} computed, {} skipped (already processed), {} failed in {:?}",
         summary.computed,
         summary.skipped,
-        summary.failed,
+        summary.failed(),
         compute_start.elapsed()
     );
 
@@ -238,15 +242,15 @@ pub fn execute() -> anyhow::Result<()> {
         "Done: {} computed, {} skipped (already processed), {} failed. Total command time: {:?}",
         summary.computed,
         summary.skipped,
-        summary.failed,
+        summary.failed(),
         command_start.elapsed()
     );
 
-    if summary.failed > 0 {
+    if summary.failed() > 0 {
         let failed_cells = format_failed_cells(&summary.failed_cells);
         error!(
             "{} of {} cells failed and will be retried on the next run: {}",
-            summary.failed,
+            summary.failed(),
             cells.len(),
             failed_cells
         );
@@ -255,7 +259,7 @@ pub fn execute() -> anyhow::Result<()> {
     if is_total_failure(&summary) {
         bail!(
             "total failure: {} failed, {} skipped, 0 computed, no progress; likely systemic",
-            summary.failed,
+            summary.failed(),
             summary.skipped
         );
     }
@@ -288,7 +292,7 @@ mod tests {
         let (_, summary) = split_outcomes(Vec::new());
         assert_eq!(summary.computed, 0);
         assert_eq!(summary.skipped, 0);
-        assert_eq!(summary.failed, 0);
+        assert_eq!(summary.failed(), 0);
         assert!(summary.failed_cells.is_empty());
     }
 
@@ -302,7 +306,7 @@ mod tests {
         let (_, summary) = split_outcomes(outcomes);
         assert_eq!(summary.computed, 3);
         assert_eq!(summary.skipped, 0);
-        assert_eq!(summary.failed, 0);
+        assert_eq!(summary.failed(), 0);
         assert!(summary.failed_cells.is_empty());
     }
 
@@ -312,7 +316,7 @@ mod tests {
         let (_, summary) = split_outcomes(outcomes);
         assert_eq!(summary.computed, 0);
         assert_eq!(summary.skipped, 2);
-        assert_eq!(summary.failed, 0);
+        assert_eq!(summary.failed(), 0);
         assert!(summary.failed_cells.is_empty());
     }
 
@@ -329,7 +333,7 @@ mod tests {
         let (_, summary) = split_outcomes(outcomes);
         assert_eq!(summary.computed, 2);
         assert_eq!(summary.skipped, 2);
-        assert_eq!(summary.failed, 2);
+        assert_eq!(summary.failed(), 2);
     }
 
     #[test]
