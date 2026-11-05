@@ -248,38 +248,27 @@ mod tests {
     }
 
     #[test]
-    fn parquet_base_dir_development() {
-        let dir = parquet_base_dir(Environment::Development);
-        assert_eq!(dir, Path::new("/app/parquet_files/development/strategy"));
-    }
-
-    #[test]
-    fn parquet_base_dir_production() {
-        let dir = parquet_base_dir(Environment::Production);
-        assert_eq!(dir, Path::new("/app/parquet_files/production/strategy"));
-    }
-
-    #[test]
-    fn parquet_base_dir_testing() {
-        let dir = parquet_base_dir(Environment::Testing);
-        assert_eq!(dir, Path::new("/app/parquet_files/testing/strategy"));
-    }
-
-    #[test]
-    fn parquet_root_dir_development() {
-        let dir = parquet_root_dir(Environment::Development);
-        assert_eq!(dir, Path::new("/app/parquet_files/development"));
-    }
-
-    #[test]
-    fn parquet_root_dir_production() {
-        let dir = parquet_root_dir(Environment::Production);
-        assert_eq!(dir, Path::new("/app/parquet_files/production"));
-    }
-
-    #[test]
-    fn parquet_root_dir_testing() {
-        let dir = parquet_root_dir(Environment::Testing);
-        assert_eq!(dir, Path::new("/app/parquet_files/testing"));
+    fn parquet_dirs_are_scoped_per_environment() {
+        let cases = [
+            (
+                Environment::Production,
+                "/app/parquet_files/production",
+                "/app/parquet_files/production/strategy",
+            ),
+            (
+                Environment::Development,
+                "/app/parquet_files/development",
+                "/app/parquet_files/development/strategy",
+            ),
+            (
+                Environment::Testing,
+                "/app/parquet_files/testing",
+                "/app/parquet_files/testing/strategy",
+            ),
+        ];
+        for (env, root, base) in cases {
+            assert_eq!(parquet_root_dir(env), Path::new(root));
+            assert_eq!(parquet_base_dir(env), Path::new(base));
+        }
     }
 }
