@@ -97,3 +97,62 @@ fn read_processed_indicator_ids(
     let cell = (instrument.to_string(), money_management_strategy_id);
     Ok(processed_ids_per_cell.remove(&cell).unwrap_or_default())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn new_persistence() -> (TempDir, StrategyPersistence) {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().to_path_buf();
+        let persistence = StrategyPersistence::new(root.join("strategy"), root);
+        (tmp, persistence)
+    }
+
+    fn processed_cell(instrument: &str, mms_id: i32, indicator_ids: &[i32]) -> CellOutput {
+        CellOutput {
+            instrument: instrument.to_string(),
+            mms_id,
+            strategies: Vec::new(),
+            computed_indicator_ids: indicator_ids.to_vec(),
+        }
+    }
+
+    #[test]
+    fn read_processed_indicator_ids_is_empty_before_any_run() {
+        let (_tmp, persistence) = new_persistence();
+
+        let processed = read_processed_indicator_ids(&persistence, "EURUSD", 390).unwrap();
+
+        assert!(processed.is_empty());
+    }
+
+    #[test]
+    fn read_processed_indicator_ids_returns_only_the_requested_cell() {
+        let (_tmp, persistence) = new_persistence();
+        persistence
+            .persist_cells(vec![
+                processed_cell("EURUSD", 390, &[2001, 2002]),
+                processed_cell("EURUSD", 391, &[3001]),
+                processed_cell("USDJPY", 390, &[4001]),
+            ])
+            .unwrap();
+
+        let processed = read_processed_indicator_ids(&persistence, "EURUSD", 390).unwrap();
+
+        assert_eq!(processed, HashSet::from([2001, 2002]));
+    }
+
+    #[test]
+    fn read_processed_indicator_ids_is_empty_for_an_unseen_cell() {
+        let (_tmp, persistence) = new_persistence();
+        persistence
+            .persist_cells(vec![processed_cell("EURUSD", 390, &[2001])])
+            .unwrap();
+
+        let processed = read_processed_indicator_ids(&persistence, "GBPUSD", 390).unwrap();
+
+        assert!(processed.is_empty());
+    }
+}

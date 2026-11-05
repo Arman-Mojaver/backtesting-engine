@@ -16,7 +16,7 @@
 |------|--------|----------|------------|
 | Metrics assume operations close in entry order | ROI/max_draw_down walk operation points sorted by entry timestamp; real trades have exit dates and do not necessarily close in entry order — figures are approximate until fixed | **High** | Account for `exit_date` in the compounding curve before any production use (see `notes.md`) |
 | DbConfig is hardcoded per environment | Host (`host.docker.internal`), ports, and credentials cannot be overridden by env vars | Medium | Fine for the Docker workflow; add env overrides if the engine must target arbitrary PG instances |
-| Engine CLI handlers have no direct unit tests | `create.rs` / `create_loop.rs` handlers are thin but untested; the functions they call ARE tested | Low-Medium | Logic is pushed into tested application/infrastructure functions; add handler tests if handlers grow |
+| Engine CLI handlers are only partly unit-tested | `create.rs` tests its manifest lookup and `create_loop.rs` its outcome summary; the `execute` orchestration itself needs PostgreSQL and is untested | Low | Logic is pushed into tested application/infrastructure functions; add handler tests if handlers grow |
 | Parquet write cost at scale | Partition append = full file rewrite; `max_strategy_id()` scans all partitions | Low | Fine at current scale; rethink if partition counts grow by orders of magnitude |
 
 ### Technical Debt Details
@@ -34,7 +34,7 @@
 *Resolution*: `create_signal_groups()` now computes real indicator outputs via `create_indicator_output()` (14 indicators) and derives signals via zero-cross / threshold / crossover semantics in `domain/signal/`. All 14 indicators, MACD included, compute real outputs.
 
 **~~Engine module has no unit tests~~ (PARTIALLY RESOLVED)**
-*Resolution*: The logic the engine handlers call is now tested: `application` (signal_generator 6, strategy_runner_utils 5, strategy_generator 4, strategy_runner 4), `infrastructure` (strategy_adapter 13, processed_manifest 11, strategy_persistence 1, logging 8). The thin `engine/strategy/*.rs` handlers themselves remain untested — acceptable while they stay thin.
+*Resolution*: The logic the engine handlers call is now tested: `application` (signal_generator 6, strategy_runner_utils 5, strategy_generator 4, strategy_runner 4), `infrastructure` (strategy_adapter 9, processed_manifest 11, strategy_persistence 6, logging 8), `engine/strategy` (create 3, create_loop 11). Each handler's `execute` orchestration needs PostgreSQL and remains untested — acceptable while the handlers stay thin.
 
 **~~Missing HTTP API layer~~ (DEFERRED — deliberate)**
 *Status*: Deferred (YAGNI). Actix-web scaffold removed 2026-06-04. Re-add when API consumers exist.
