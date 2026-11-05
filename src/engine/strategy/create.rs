@@ -56,13 +56,10 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
     })?;
     let strategy_count = strategies.len();
     info!(
-        "run_strategies done in {:?}: {strategy_count} strategies",
+        "Strategies computed in {:?}: {strategy_count} strategies",
         run_start.elapsed()
     );
 
-    info!(
-        "Persisting {strategy_count} strategies and {unprocessed_count} processed indicator IDs ..."
-    );
     let persist_start = Instant::now();
     persistence.persist_cells(vec![CellOutput {
         instrument: instrument.to_string(),
@@ -73,7 +70,10 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
     .with_context(|| {
         format!("failed to persist strategies for {instrument} (mms_id={money_management_strategy_id})")
     })?;
-    info!("Persist done in {:?}", persist_start.elapsed());
+    info!(
+        "Persist done: {strategy_count} strategies and {unprocessed_count} processed indicator IDs in {:?}",
+        persist_start.elapsed()
+    );
 
     info!(
         "Done. {strategy_count} strategies for {instrument} (mms_id={money_management_strategy_id}). {unprocessed_count} indicators marked as processed.",
