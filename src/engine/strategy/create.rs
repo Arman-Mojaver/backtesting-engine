@@ -11,24 +11,14 @@ use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::config::environment::{parquet_base_dir, parquet_root_dir, resolve_environment};
 use crate::infrastructure::strategy_persistence::StrategyPersistence;
 
-fn read_processed_indicator_ids(
-    persistence: &StrategyPersistence,
-    instrument: &str,
-    money_management_strategy_id: i32,
-) -> anyhow::Result<HashSet<i32>> {
-    let mut processed_ids_per_cell = persistence
-        .read_processed_ids_per_cell()
-        .with_context(|| {
-            format!(
-                "failed to read processed manifest for {instrument} (mms_id={money_management_strategy_id})"
-            )
-        })?;
-    let cell = (instrument.to_string(), money_management_strategy_id);
-    Ok(processed_ids_per_cell.remove(&cell).unwrap_or_default())
-}
-
 pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
     let command_start = Instant::now();
+    create_strategies(money_management_strategy_id, instrument)?;
+    info!("Total command time: {:?}", command_start.elapsed());
+    Ok(())
+}
+
+fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
     let env = resolve_environment()?;
     let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
     info!("Fetching shared data for {instrument} (mms_id={money_management_strategy_id}) ...");
@@ -46,7 +36,6 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
         info!(
             "All {indicator_count} indicators already processed for {instrument} (mms_id={money_management_strategy_id}). Nothing to do."
         );
-        info!("Total command time: {:?}", command_start.elapsed());
         return Ok(());
     }
 
@@ -89,7 +78,22 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
     info!(
         "Done. {strategy_count} strategies for {instrument} (mms_id={money_management_strategy_id}). {unprocessed_count} indicators marked as processed.",
     );
-    info!("Total command time: {:?}", command_start.elapsed());
 
     Ok(())
+}
+
+fn read_processed_indicator_ids(
+    persistence: &StrategyPersistence,
+    instrument: &str,
+    money_management_strategy_id: i32,
+) -> anyhow::Result<HashSet<i32>> {
+    let mut processed_ids_per_cell = persistence
+        .read_processed_ids_per_cell()
+        .with_context(|| {
+            format!(
+                "failed to read processed manifest for {instrument} (mms_id={money_management_strategy_id})"
+            )
+        })?;
+    let cell = (instrument.to_string(), money_management_strategy_id);
+    Ok(processed_ids_per_cell.remove(&cell).unwrap_or_default())
 }
