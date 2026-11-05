@@ -80,41 +80,23 @@ pub struct DbConfig {
 }
 
 impl DbConfig {
-    pub fn production() -> Self {
-        Self {
-            host: "host.docker.internal".into(),
-            port: 5432,
-            user: "postgres".into(),
-            password: "postgres".into(),
-            database: "db-production".into(),
-        }
-    }
-
-    pub fn development() -> Self {
-        Self {
-            host: "host.docker.internal".into(),
-            port: 54320,
-            user: "postgres".into(),
-            password: "postgres".into(),
-            database: "db-development".into(),
-        }
-    }
-
-    pub fn testing() -> Self {
-        Self {
-            host: "host.docker.internal".into(),
-            port: 54321,
-            user: "postgres".into(),
-            password: "postgres".into(),
-            database: "db-testing".into(),
-        }
-    }
-
     pub fn from_env(env: Environment) -> Self {
-        match env {
-            Environment::Production => Self::production(),
-            Environment::Development => Self::development(),
-            Environment::Testing => Self::testing(),
+        let port = match env {
+            Environment::Production => 5432,
+            Environment::Development => 54320,
+            Environment::Testing => 54321,
+        };
+        let database = match env {
+            Environment::Production => "db-production",
+            Environment::Development => "db-development",
+            Environment::Testing => "db-testing",
+        };
+        Self {
+            host: "host.docker.internal".into(),
+            port,
+            user: "postgres".into(),
+            password: "postgres".into(),
+            database: database.into(),
         }
     }
 
@@ -183,16 +165,16 @@ mod tests {
     }
 
     #[test]
-    fn dbconfig_factory_methods_return_expected_values() {
-        let prod = DbConfig::production();
+    fn dbconfig_from_env_returns_expected_host_and_port() {
+        let prod = DbConfig::from_env(Environment::Production);
         assert_eq!(prod.host, "host.docker.internal");
         assert_eq!(prod.port, 5432);
 
-        let dev = DbConfig::development();
+        let dev = DbConfig::from_env(Environment::Development);
         assert_eq!(dev.host, "host.docker.internal");
         assert_eq!(dev.port, 54320);
 
-        let test = DbConfig::testing();
+        let test = DbConfig::from_env(Environment::Testing);
         assert_eq!(test.host, "host.docker.internal");
         assert_eq!(test.port, 54321);
     }
@@ -214,7 +196,7 @@ mod tests {
 
     #[test]
     fn dbconfig_connection_string_generates_correct_string() {
-        let config = DbConfig::production();
+        let config = DbConfig::from_env(Environment::Production);
         let expected = "postgresql://postgres:postgres@host.docker.internal:5432/db-production";
         assert_eq!(config.connection_string(), expected);
     }
