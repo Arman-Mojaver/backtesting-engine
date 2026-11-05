@@ -204,7 +204,9 @@ pub fn execute() -> anyhow::Result<()> {
     let source = SourceIndex::load(env)?;
     let cells = source.cells();
     let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
-    let processed_ids_per_cell = persistence.read_processed_ids_per_cell()?;
+    let processed_ids_per_cell = persistence
+        .read_processed_ids_per_cell()
+        .context("failed to read processed manifest")?;
 
     info!("{} cells to process", cells.len());
 
@@ -233,7 +235,9 @@ pub fn execute() -> anyhow::Result<()> {
         })
         .collect();
     let persist_start = Instant::now();
-    persistence.persist_cells(computed)?;
+    persistence
+        .persist_cells(computed)
+        .with_context(|| format!("failed to persist {} computed cells", summary.computed))?;
     info!(
         "Persist done: {} cells in {:?}",
         summary.computed,
