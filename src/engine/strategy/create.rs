@@ -54,7 +54,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
         &data.resampled_points,
         &data.long_operation_points,
         &data.short_operation_points,
-        data.money_management_strategy_id,
+        money_management_strategy_id,
         &unprocessed_ids,
     )?;
     info!(

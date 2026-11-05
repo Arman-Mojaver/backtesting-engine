@@ -10,7 +10,6 @@ use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repositor
 use crate::infrastructure::pg_adapter::PgStore;
 
 pub struct SourceData {
-    pub money_management_strategy_id: i32,
     pub indicators: Vec<Indicator>,
     pub resampled_points: Vec<ResampledPointD1>,
     pub long_operation_points: Vec<OperationPoint>,
@@ -52,7 +51,6 @@ pub fn fetch_source_data(
         .with_context(|| format!("failed to fetch short operation points for {instrument}"))?;
 
     Ok(SourceData {
-        money_management_strategy_id,
         indicators,
         resampled_points,
         long_operation_points,
