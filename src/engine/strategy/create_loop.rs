@@ -191,16 +191,8 @@ fn format_failed_cells(failed_cells: &[(String, i32)]) -> String {
         .join(", ")
 }
 
-// Exit-policy predicate: every cell that attempted work failed and none
-// computed, the signature of a systemic outage (the DB going down mid-run)
-// rather than isolated per-cell failures.
-const fn is_total_failure(summary: &BatchSummary) -> bool {
-    summary.failed() > 0 && summary.computed == 0
-}
-
 pub fn execute() -> anyhow::Result<()> {
     let command_start = Instant::now();
-    // 1. Load and index the source data, and read the processed manifest, each once.
     let env = resolve_environment()?;
     let source = SourceIndex::load(env)?;
     let cells = source.cells();
@@ -209,14 +201,24 @@ pub fn execute() -> anyhow::Result<()> {
         .read_processed_ids_per_cell()
         .context("failed to read processed manifest")?;
 
-    info!("{} cells to process", cells.len());
+    let (computed, summary) = compute_cells(&source, &cells, &processed_ids_per_cell);
+    persist_computed_cells(&persistence, computed)?;
 
-    // 2. Compute strategies in parallel.
+    report_run(&summary, cells.len(), command_start);
+    fail_on_total_failure(&summary)
+}
+
+fn compute_cells(
+    source: &SourceIndex,
+    cells: &[(String, i32)],
+    processed_ids_per_cell: &HashMap<(String, i32), HashSet<i32>>,
+) -> (Vec<CellOutput>, BatchSummary) {
+    info!("{} cells to process", cells.len());
     info!("Computing strategies...");
     let compute_start = Instant::now();
     let outcomes: Vec<CellOutcome> = cells
         .par_iter()
-        .map(|cell| compute_cell(&source, cell, &processed_ids_per_cell))
+        .map(|cell| compute_cell(source, cell, processed_ids_per_cell))
         .collect();
     let (computed, summary) = split_outcomes(outcomes);
     info!(
@@ -226,18 +228,26 @@ pub fn execute() -> anyhow::Result<()> {
         summary.failed(),
         compute_start.elapsed()
     );
+    (computed, summary)
+}
 
-    // 3. Persist the computed cells (assign IDs, write partitions in parallel, commit manifest).
+fn persist_computed_cells(
+    persistence: &StrategyPersistence,
+    computed: Vec<CellOutput>,
+) -> anyhow::Result<()> {
+    let cell_count = computed.len();
     let persist_start = Instant::now();
     persistence
         .persist_cells(computed)
-        .with_context(|| format!("failed to persist {} computed cells", summary.computed))?;
+        .with_context(|| format!("failed to persist {cell_count} computed cells"))?;
     info!(
-        "Persist done: {} cells in {:?}",
-        summary.computed,
+        "Persist done: {cell_count} cells in {:?}",
         persist_start.elapsed()
     );
+    Ok(())
+}
 
+fn report_run(summary: &BatchSummary, total_cells: usize, command_start: Instant) {
     info!(
         "Done: {} computed, {} skipped (already processed), {} failed. Total command time: {:?}",
         summary.computed,
@@ -247,23 +257,25 @@ pub fn execute() -> anyhow::Result<()> {
     );
 
     if summary.failed() > 0 {
-        let failed_cells = format_failed_cells(&summary.failed_cells);
         error!(
-            "{} of {} cells failed and will be retried on the next run: {}",
+            "{} of {total_cells} cells failed and will be retried on the next run: {}",
             summary.failed(),
-            cells.len(),
-            failed_cells
+            format_failed_cells(&summary.failed_cells)
         );
     }
+}
 
-    if is_total_failure(&summary) {
+// Every cell that attempted work failed and none computed: the signature of a
+// systemic outage (the DB going down mid-run) rather than isolated per-cell
+// failures, which are left for the next run to retry.
+fn fail_on_total_failure(summary: &BatchSummary) -> anyhow::Result<()> {
+    if summary.failed() > 0 && summary.computed == 0 {
         bail!(
             "total failure: {} failed, {} skipped, 0 computed, no progress; likely systemic",
             summary.failed(),
             summary.skipped
         );
     }
-
     Ok(())
 }
 
@@ -387,7 +399,7 @@ mod tests {
     fn every_cell_failed_is_total_failure() {
         let outcomes = vec![failed_outcome("EURUSD", 1), failed_outcome("USDJPY", 2)];
         let (_, summary) = split_outcomes(outcomes);
-        assert!(is_total_failure(&summary));
+        assert!(fail_on_total_failure(&summary).is_err());
     }
 
     #[test]
@@ -396,20 +408,20 @@ mod tests {
         // WAS attempted fails, the run made no progress: treat as systemic.
         let outcomes = vec![CellOutcome::AlreadyProcessed, failed_outcome("EURUSD", 1)];
         let (_, summary) = split_outcomes(outcomes);
-        assert!(is_total_failure(&summary));
+        assert!(fail_on_total_failure(&summary).is_err());
     }
 
     #[test]
     fn partial_failure_is_not_total_failure() {
         let outcomes = vec![computed_outcome("EURUSD", 1), failed_outcome("USDJPY", 2)];
         let (_, summary) = split_outcomes(outcomes);
-        assert!(!is_total_failure(&summary));
+        assert!(fail_on_total_failure(&summary).is_ok());
     }
 
     #[test]
     fn all_already_processed_is_not_total_failure() {
         let outcomes = vec![CellOutcome::AlreadyProcessed];
         let (_, summary) = split_outcomes(outcomes);
-        assert!(!is_total_failure(&summary));
+        assert!(fail_on_total_failure(&summary).is_ok());
     }
 }
