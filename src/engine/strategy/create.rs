@@ -40,29 +40,18 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
         read_processed_indicator_ids(&persistence, instrument, money_management_strategy_id)?;
     let all_indicator_ids: Vec<i32> = data.indicators.iter().map(|i| i.id).collect();
     let unprocessed_ids = get_unprocessed(&all_indicator_ids, &processed_ids);
+    let indicator_count = all_indicator_ids.len();
+    let unprocessed_count = unprocessed_ids.len();
     if unprocessed_ids.is_empty() {
         info!(
-            "All {} indicators already processed for {} (mms_id={}). Nothing to do.",
-            all_indicator_ids.len(),
-            instrument,
-            money_management_strategy_id,
+            "All {indicator_count} indicators already processed for {instrument} (mms_id={money_management_strategy_id}). Nothing to do."
         );
         info!("Total command time: {:?}", command_start.elapsed());
         return Ok(());
     }
 
     info!(
-        "{} indicators total, {} unprocessed for {} (mms_id={})",
-        all_indicator_ids.len(),
-        unprocessed_ids.len(),
-        instrument,
-        money_management_strategy_id,
-    );
-
-    info!(
-        "Running strategies for {} unprocessed indicators (mms_id={}) ...",
-        unprocessed_ids.len(),
-        money_management_strategy_id
+        "Running strategies for {unprocessed_count} unprocessed of {indicator_count} indicators for {instrument} (mms_id={money_management_strategy_id}) ..."
     );
     let run_start = Instant::now();
     let strategies = run_strategies(
@@ -76,16 +65,14 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
     .with_context(|| {
         format!("failed to run strategies for {instrument} (mms_id={money_management_strategy_id})")
     })?;
+    let strategy_count = strategies.len();
     info!(
-        "run_strategies done in {:?}: {} strategies",
-        run_start.elapsed(),
-        strategies.len()
+        "run_strategies done in {:?}: {strategy_count} strategies",
+        run_start.elapsed()
     );
 
-    let strategy_count = strategies.len();
-    let indicator_count = unprocessed_ids.len();
     info!(
-        "Persisting {strategy_count} strategies and {indicator_count} processed indicator IDs ..."
+        "Persisting {strategy_count} strategies and {unprocessed_count} processed indicator IDs ..."
     );
     let persist_start = Instant::now();
     persistence.persist_cells(vec![CellOutput {
@@ -100,7 +87,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
     info!("Persist done in {:?}", persist_start.elapsed());
 
     info!(
-        "Done. {strategy_count} strategies for {instrument} (mms_id={money_management_strategy_id}). {indicator_count} indicators marked as processed.",
+        "Done. {strategy_count} strategies for {instrument} (mms_id={money_management_strategy_id}). {unprocessed_count} indicators marked as processed.",
     );
     info!("Total command time: {:?}", command_start.elapsed());
 
