@@ -44,6 +44,10 @@ impl StrategyPersistence {
     }
 
     pub fn persist_cells(&self, cells: Vec<CellOutput>) -> anyhow::Result<()> {
+        if cells.is_empty() {
+            return Ok(());
+        }
+
         // strategy_id is persistence-assigned: new ids start from the global max
         // across all partitions, so they stay unique across the whole tree.
         let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
@@ -259,5 +263,16 @@ mod tests {
         let usd = processed.get(&("USDJPY".to_string(), 400)).unwrap();
         assert_eq!(usd.len(), 1);
         assert!(usd.contains(&3001));
+    }
+
+    #[test]
+    fn persist_cells_with_no_cells_writes_nothing() {
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path().to_path_buf();
+        let persistence = StrategyPersistence::new(root.join("strategy"), root.clone());
+
+        persistence.persist_cells(Vec::new()).unwrap();
+
+        assert!(std::fs::read_dir(&root).unwrap().next().is_none());
     }
 }
