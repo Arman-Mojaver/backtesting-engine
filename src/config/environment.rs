@@ -22,12 +22,6 @@ impl Environment {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("invalid ENVIRONMENT value '{value}': expected 'production', 'development', or 'testing' (case-insensitive)")]
-pub struct InvalidEnvironmentError {
-    value: String,
-}
-
 impl FromStr for Environment {
     type Err = InvalidEnvironmentError;
 
@@ -41,6 +35,12 @@ impl FromStr for Environment {
             }),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[error("invalid ENVIRONMENT value '{value}': expected 'production', 'development', or 'testing' (case-insensitive)")]
+pub struct InvalidEnvironmentError {
+    value: String,
 }
 
 const ENVIRONMENT_VARIABLE: &str = "ENVIRONMENT";
@@ -152,6 +152,28 @@ mod tests {
     fn environment_from_str_fails_on_invalid_values() {
         assert!("invalid".parse::<Environment>().is_err());
         assert!("".parse::<Environment>().is_err());
+    }
+
+    #[test]
+    fn environment_from_str_is_case_insensitive_for_all_variants() {
+        assert_eq!(
+            "PRODUCTION".parse::<Environment>().unwrap(),
+            Environment::Production
+        );
+        assert_eq!(
+            "DEVELOPMENT".parse::<Environment>().unwrap(),
+            Environment::Development
+        );
+        assert_eq!(
+            "TESTING".parse::<Environment>().unwrap(),
+            Environment::Testing
+        );
+    }
+
+    #[test]
+    fn environment_from_str_rejects_surrounding_whitespace() {
+        assert!(" production".parse::<Environment>().is_err());
+        assert!("production\n".parse::<Environment>().is_err());
     }
 
     #[test]
