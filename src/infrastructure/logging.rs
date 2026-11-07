@@ -131,6 +131,32 @@ mod tests {
     }
 
     #[test]
+    fn parse_level_accepts_off() {
+        assert_eq!(parse_level("off"), Some(LevelFilter::Off));
+    }
+
+    #[test]
+    fn parse_level_rejects_module_without_level() {
+        assert_eq!(parse_level("backtesting_engine"), None);
+    }
+
+    #[test]
+    fn open_log_file_reports_path_when_parent_is_a_file() {
+        let dir = tempfile::tempdir().expect("tempdir creation failed");
+        let blocker = dir.path().join("logs");
+        std::fs::write(&blocker, "").expect("blocker file creation failed");
+        let log_path = blocker.join("bte.log");
+
+        let error = open_log_file(&log_path).expect_err("parent is a file, open must fail");
+
+        let message = format!("{error:#}");
+        assert!(
+            message.contains(&blocker.display().to_string()),
+            "error should name the log directory, got: {message}"
+        );
+    }
+
+    #[test]
     fn open_log_file_creates_missing_parent_directory() {
         let dir = tempfile::tempdir().expect("tempdir creation failed");
         let log_path = dir.path().join("logs").join("bte.log");
