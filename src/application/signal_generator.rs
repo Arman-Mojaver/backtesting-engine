@@ -80,20 +80,22 @@ mod tests {
     use crate::domain::indicator::{Indicator, IndicatorParameters};
     use crate::domain::resampled_point::ResampledPointD1;
 
+    // Signal behavior is tested through the macro's uncached companion: the
+    // memo is process-wide, so cached calls would share entries across tests.
+
     #[test]
     fn rsi_indicator_produces_a_signal_group_stamped_with_its_id() {
         // 5 points (1,2,1,2,1), n=3 -> diffs [+1,-1,+1,-1], 2 RSI windows.
         // window [+1,-1,+1] -> rsi 67; window [-1,+1,-1] -> rsi 33.
         // Thresholds 70/30: 67 and 33 never cross 70 or 30 -> no signals.
         // So this verifies the path runs and returns a group with no signals.
-        let indicators = indicators_rsi_single();
+        let indicator = &indicators_rsi_single()[0];
         let points = resampled_points_for_rsi();
-        let result = create_signal_groups(&indicators, &points);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 1);
+        let group = create_signal_group_no_cache(indicator, &points).unwrap();
+        assert_eq!(group.indicator_id, 1);
         // RSI 67/33 sit between 30 and 70 -> no threshold crossing -> no signals.
-        assert!(result[0].long_signals.is_empty());
-        assert!(result[0].short_signals.is_empty());
+        assert!(group.long_signals.is_empty());
+        assert!(group.short_signals.is_empty());
     }
 
     #[test]
@@ -160,7 +162,7 @@ mod tests {
             100.0, 100.0,
         ];
         let points = points_from_closes(&closes);
-        let indicators = vec![Indicator {
+        let indicator = Indicator {
             id: 9001,
             parameters: IndicatorParameters::Macd {
                 slow_type: "sma".to_string(),
@@ -168,12 +170,11 @@ mod tests {
                 fast_type: "ema".to_string(),
                 fast_n: 1,
             },
-        }];
-        let result = create_signal_groups(&indicators, &points);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 9001);
-        assert_eq!(result[0].long_signals, vec![11000]);
-        assert!(result[0].short_signals.is_empty());
+        };
+        let group = create_signal_group_no_cache(&indicator, &points).unwrap();
+        assert_eq!(group.indicator_id, 9001);
+        assert_eq!(group.long_signals, vec![11000]);
+        assert!(group.short_signals.is_empty());
     }
 
     #[test]
@@ -188,7 +189,7 @@ mod tests {
             100.0, 100.0,
         ];
         let points = points_from_closes(&closes);
-        let indicators = vec![Indicator {
+        let indicator = Indicator {
             id: 9002,
             parameters: IndicatorParameters::Macd {
                 slow_type: "sma".to_string(),
@@ -196,12 +197,11 @@ mod tests {
                 fast_type: "ema".to_string(),
                 fast_n: 1,
             },
-        }];
-        let result = create_signal_groups(&indicators, &points);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 9002);
-        assert_eq!(result[0].short_signals, vec![11000]);
-        assert!(result[0].long_signals.is_empty());
+        };
+        let group = create_signal_group_no_cache(&indicator, &points).unwrap();
+        assert_eq!(group.indicator_id, 9002);
+        assert_eq!(group.short_signals, vec![11000]);
+        assert!(group.long_signals.is_empty());
     }
 
     #[test]
@@ -212,9 +212,9 @@ mod tests {
     }
 
     #[test]
-    fn all_invalid_yields_no_signal_groups() {
-        // Every indicator has an unknown moving-average type -> no groups.
-        let indicators = vec![Indicator {
+    fn invalid_indicator_yields_no_signal_group() {
+        // An unknown moving-average type is a configuration error.
+        let indicator = Indicator {
             id: 100,
             parameters: IndicatorParameters::Macd {
                 slow_type: "ema".to_string(),
@@ -222,10 +222,9 @@ mod tests {
                 fast_type: "wma".to_string(),
                 fast_n: 12,
             },
-        }];
+        };
         let points = resampled_points_for_rsi();
-        let result = create_signal_groups(&indicators, &points);
-        assert!(result.is_empty());
+        assert!(create_signal_group_no_cache(&indicator, &points).is_none());
     }
 
     #[test]
@@ -276,19 +275,18 @@ mod tests {
                 timestamp: 4000,
             },
         ];
-        let indicators = vec![Indicator {
+        let indicator = Indicator {
             id: 7001,
             parameters: IndicatorParameters::Rsi {
                 n: 2,
                 high_threshold: 70,
                 low_threshold: 30,
             },
-        }];
-        let result = create_signal_groups(&indicators, &points);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].indicator_id, 7001);
+        };
+        let group = create_signal_group_no_cache(&indicator, &points).unwrap();
+        assert_eq!(group.indicator_id, 7001);
         // RSI 0 -> 50 crosses above low threshold 30 -> long signal at ts 4000.
-        assert_eq!(result[0].long_signals, vec![4000]);
-        assert!(result[0].short_signals.is_empty());
+        assert_eq!(group.long_signals, vec![4000]);
+        assert!(group.short_signals.is_empty());
     }
 }
