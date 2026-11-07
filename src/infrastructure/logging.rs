@@ -16,10 +16,10 @@ use simplelog::{
 
 const DEFAULT_LOG_LEVEL: &str = "info";
 
-const LOG_FILE: &str = "logs/bte.log";
+pub const LOG_FILE: &str = "logs/bte.log";
 
-pub fn init() -> Result<()> {
-    let level = parse_level(std::env::var("RUST_LOG").ok().as_deref());
+pub fn init(rust_log: Option<&str>, log_file: &Path) -> Result<()> {
+    let level = parse_level(rust_log);
 
     let config = ConfigBuilder::new()
         .set_time_level(LevelFilter::Error)
@@ -30,7 +30,7 @@ pub fn init() -> Result<()> {
         ))
         .build();
 
-    let log_file = open_log_file(Path::new(LOG_FILE))?;
+    let log_file = open_log_file(log_file)?;
 
     CombinedLogger::init(vec![
         TermLogger::new(
@@ -173,18 +173,18 @@ mod tests {
 
     #[test]
     fn init_creates_missing_log_dir_and_writes_dated_lines() {
-        // A fresh working directory has no `logs/`; `init` must create it
-        // instead of failing. The global logger is only ever initialized
-        // here, so this is safe under both per-process nextest and
-        // single-process `cargo test`.
+        // The global logger is only ever initialized here, so this is safe
+        // under both per-process nextest and single-process `cargo test`.
         const MARKER: &str = "init-smoke-marker-9f17";
+        let dir = tempfile::tempdir().expect("tempdir creation failed");
+        let log_path = dir.path().join("logs").join("bte.log");
 
-        init().expect("init from a directory without logs/");
+        init(None, &log_path).expect("init should create the missing log directory");
         // The timestamp (and level/target) are configured to display at the
         // error level, so log at error for the smoke line.
         log::error!("{MARKER}");
 
-        let written = std::fs::read_to_string(LOG_FILE).expect("log file readable");
+        let written = std::fs::read_to_string(&log_path).expect("log file readable");
         let line = written
             .lines()
             .rev()
