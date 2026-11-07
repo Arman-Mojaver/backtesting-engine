@@ -135,7 +135,6 @@ mod tests {
     #[test]
     fn open_log_file_creates_missing_parent_directory() {
         let dir = tempfile::tempdir().expect("tempdir creation failed");
-        // Neither `<tmp>/logs/` nor the log file exists yet.
         let log_path = dir.path().join("logs").join("bte.log");
 
         let file = open_log_file(&log_path).expect("open should create the parent directory");
@@ -153,7 +152,6 @@ mod tests {
         use std::io::Write;
 
         let dir = tempfile::tempdir().expect("tempdir creation failed");
-        // Parent directory already exists; opening must not truncate it.
         let log_path = dir.path().join("bte.log");
 
         let mut first = open_log_file(&log_path).expect("initial open");
@@ -180,8 +178,6 @@ mod tests {
         let log_path = dir.path().join("logs").join("bte.log");
 
         init(None, &log_path).expect("init should create the missing log directory");
-        // The timestamp (and level/target) are configured to display at the
-        // error level, so log at error for the smoke line.
         log::error!("{MARKER}");
 
         let written = std::fs::read_to_string(&log_path).expect("log file readable");
@@ -193,8 +189,6 @@ mod tests {
         assert_has_dated_timestamp(line);
     }
 
-    /// Asserts the first two whitespace-separated tokens of `line` are a
-    /// `YYYY-MM-DD` date and an `HH:MM:SS` time-of-day.
     fn assert_has_dated_timestamp(line: &str) {
         let mut tokens = line.split_whitespace();
         let date = tokens.next().unwrap_or_default();
