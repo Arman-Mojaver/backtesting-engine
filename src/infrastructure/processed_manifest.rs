@@ -7,8 +7,10 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use arrow::array::{AsArray, Int32Array, Int64Array, StringBuilder};
-use arrow::datatypes::{DataType, Field, Int32Type, Int64Type, Schema};
+use arrow::array::{
+    ArrayRef, AsArray, Int32Array, Int64Array, PrimitiveArray, StringArray, StringBuilder,
+};
+use arrow::datatypes::{ArrowPrimitiveType, DataType, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
 use log::info;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -141,21 +143,10 @@ fn read_parquet(path: &Path) -> anyhow::Result<Vec<ProcessedRow>> {
 }
 
 fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<ProcessedRow>> {
-    let schema = batch.schema();
-    let col = |name: &str| -> anyhow::Result<usize> {
-        schema
-            .index_of(name)
-            .map_err(|e| anyhow::anyhow!("missing column {name}: {e}"))
-    };
-
-    let instruments = batch.column(col("instrument")?).as_string::<i32>();
-    let mms_ids = batch.column(col("mms_id")?).as_primitive::<Int32Type>();
-    let indicator_ids = batch
-        .column(col("indicator_id")?)
-        .as_primitive::<Int32Type>();
-    let processed_ats = batch
-        .column(col("processed_at")?)
-        .as_primitive::<Int64Type>();
+    let instruments = string_column(batch, "instrument")?;
+    let mms_ids = primitive_column::<Int32Type>(batch, "mms_id")?;
+    let indicator_ids = primitive_column::<Int32Type>(batch, "indicator_id")?;
+    let processed_ats = primitive_column::<Int64Type>(batch, "processed_at")?;
 
     let n = batch.num_rows();
     let mut out = Vec::with_capacity(n);
@@ -168,6 +159,27 @@ fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<ProcessedRow>> {
         });
     }
     Ok(out)
+}
+
+fn column<'a>(batch: &'a RecordBatch, name: &str) -> anyhow::Result<&'a ArrayRef> {
+    batch
+        .column_by_name(name)
+        .with_context(|| format!("manifest is missing column {name}"))
+}
+
+fn string_column<'a>(batch: &'a RecordBatch, name: &str) -> anyhow::Result<&'a StringArray> {
+    column(batch, name)?
+        .as_string_opt::<i32>()
+        .with_context(|| format!("manifest column {name} is not Utf8"))
+}
+
+fn primitive_column<'a, T: ArrowPrimitiveType>(
+    batch: &'a RecordBatch,
+    name: &str,
+) -> anyhow::Result<&'a PrimitiveArray<T>> {
+    column(batch, name)?
+        .as_primitive_opt::<T>()
+        .with_context(|| format!("manifest column {name} is not {}", T::DATA_TYPE))
 }
 
 fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
@@ -449,6 +461,65 @@ mod tests {
         assert_eq!(
             map.get(&("USDJPY".to_string(), 390)),
             Some(&HashSet::from([3001]))
+        );
+    }
+
+    fn utf8(values: &[&str]) -> ArrayRef {
+        Arc::new(StringArray::from(values.to_vec()))
+    }
+
+    fn int32(values: &[i32]) -> ArrayRef {
+        Arc::new(Int32Array::from(values.to_vec()))
+    }
+
+    fn int64(values: &[i64]) -> ArrayRef {
+        Arc::new(Int64Array::from(values.to_vec()))
+    }
+
+    fn write_raw_manifest(manifest: &ParquetProcessedManifest, columns: Vec<(&str, ArrayRef)>) {
+        let batch = RecordBatch::try_from_iter(columns).expect("batch");
+        let file = File::create(manifest.path()).expect("create");
+        let mut writer = ArrowWriter::try_new(file, batch.schema(), None).expect("writer");
+        writer.write(&batch).expect("write");
+        writer.close().expect("close");
+    }
+
+    #[test]
+    fn read_processed_ids_per_cell_errors_on_missing_column() {
+        let (_tmp, manifest) = new_manifest();
+        write_raw_manifest(
+            &manifest,
+            vec![
+                ("instrument", utf8(&["EURUSD"])),
+                ("mms_id", int32(&[390])),
+                ("processed_at", int64(&[1_700_000_000])),
+            ],
+        );
+
+        let err = manifest.read_processed_ids_per_cell().unwrap_err();
+        assert!(
+            format!("{err:#}").contains("missing column indicator_id"),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn read_processed_ids_per_cell_errors_on_wrong_column_type() {
+        let (_tmp, manifest) = new_manifest();
+        write_raw_manifest(
+            &manifest,
+            vec![
+                ("instrument", utf8(&["EURUSD"])),
+                ("mms_id", int64(&[390])),
+                ("indicator_id", int32(&[2001])),
+                ("processed_at", int64(&[1_700_000_000])),
+            ],
+        );
+
+        let err = manifest.read_processed_ids_per_cell().unwrap_err();
+        assert!(
+            format!("{err:#}").contains("column mms_id is not Int32"),
+            "{err:#}"
         );
     }
 
