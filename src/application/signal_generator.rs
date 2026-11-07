@@ -26,7 +26,11 @@ pub fn create_signal_groups(
     key = "(i32, String)",
     convert = r#"{ (indicator.id, resampled_points.first().map(|p| p.instrument.clone()).unwrap_or_default()) }"#,
     cache_none = true,
-    sync_writes = "by_key" // serialize first computation per key while distinct keys still compute concurrently.
+    // Dedupe concurrent first computations of a key. Locks are per bucket, not
+    // per key: every call (hit or miss) waits on its bucket while another key
+    // there computes, so use enough buckets to keep collisions rare.
+    sync_writes = "by_key",
+    sync_writes_buckets = 1024
 )]
 fn create_signal_group(
     indicator: &Indicator,
