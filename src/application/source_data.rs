@@ -31,31 +31,29 @@ pub fn fetch_source_data(
     let resampled_points = ResampledPointD1Repository::get_by_instrument(&store, instrument)
         .with_context(|| format!("failed to fetch resampled points for {instrument}"))?;
 
-    let long_operation_points: Vec<OperationPoint> =
-        LongOperationPointRepository::get_by_mms_id_and_instrument(
-            &store,
-            money_management_strategy_id,
-            instrument,
+    let long_operation_points = LongOperationPointRepository::get_by_mms_id_and_instrument(
+        &store,
+        money_management_strategy_id,
+        instrument,
+    )
+    .with_context(|| {
+        format!(
+            "failed to fetch long operation points for {instrument} \
+             (mms_id={money_management_strategy_id})"
         )
-        .with_context(|| {
-            format!(
-                "failed to fetch long operation points for {instrument} \
-                 (mms_id={money_management_strategy_id})"
-            )
-        })?;
+    })?;
 
-    let short_operation_points: Vec<OperationPoint> =
-        ShortOperationPointRepository::get_by_mms_id_and_instrument(
-            &store,
-            money_management_strategy_id,
-            instrument,
+    let short_operation_points = ShortOperationPointRepository::get_by_mms_id_and_instrument(
+        &store,
+        money_management_strategy_id,
+        instrument,
+    )
+    .with_context(|| {
+        format!(
+            "failed to fetch short operation points for {instrument} \
+             (mms_id={money_management_strategy_id})"
         )
-        .with_context(|| {
-            format!(
-                "failed to fetch short operation points for {instrument} \
-                 (mms_id={money_management_strategy_id})"
-            )
-        })?;
+    })?;
 
     Ok(SourceData {
         indicators,
