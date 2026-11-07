@@ -10,8 +10,8 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use log::LevelFilter;
 use simplelog::{
-    format_description, ColorChoice, CombinedLogger, ConfigBuilder, TermLogger, TerminalMode,
-    WriteLogger,
+    format_description, ColorChoice, CombinedLogger, Config, ConfigBuilder, TermLogger,
+    TerminalMode, WriteLogger,
 };
 
 const DEFAULT_LEVEL: LevelFilter = LevelFilter::Info;
@@ -20,16 +20,7 @@ pub const LOG_FILE: &str = "logs/bte.log";
 
 pub fn init(rust_log: Option<&str>, log_file: &Path) -> Result<()> {
     let level = parse_level(rust_log);
-
-    let config = ConfigBuilder::new()
-        .set_time_level(LevelFilter::Error)
-        .set_max_level(LevelFilter::Error)
-        .set_target_level(LevelFilter::Error)
-        .set_time_format_custom(format_description!(
-            "[year]-[month]-[day] [hour]:[minute]:[second]"
-        ))
-        .build();
-
+    let config = log_config();
     let log_file = open_log_file(log_file)?;
 
     CombinedLogger::init(vec![
@@ -44,6 +35,17 @@ pub fn init(rust_log: Option<&str>, log_file: &Path) -> Result<()> {
     .context("Failed to initialize logger")?;
 
     Ok(())
+}
+
+fn log_config() -> Config {
+    ConfigBuilder::new()
+        .set_time_level(LevelFilter::Error)
+        .set_max_level(LevelFilter::Error)
+        .set_target_level(LevelFilter::Error)
+        .set_time_format_custom(format_description!(
+            "[year]-[month]-[day] [hour]:[minute]:[second]"
+        ))
+        .build()
 }
 
 fn open_log_file(path: &Path) -> Result<File> {
