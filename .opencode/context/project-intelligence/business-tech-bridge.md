@@ -42,7 +42,7 @@
 | Write strategies to parquet | `ParquetStrategyRepository::write_rows()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD; idempotent by indicator_id |
 | Record processed indicators | `ParquetProcessedManifest` | `src/infrastructure/processed_manifest.rs` | `processed.parquet` ledger; atomic writes; dedup per triple |
 | Commit computed cells (create, create_loop) | `StrategyPersistence::persist_cells()` | `src/infrastructure/strategy_persistence.rs` | Assign global IDs, write partitions in parallel, commit manifest once |
-| Logging | `logging::init()` | `src/infrastructure/logging.rs` | simplelog, RUST_LOG-driven |
+| Logging | `logging::init(rust_log, log_file)` | `src/infrastructure/logging.rs` | simplelog; `bte` passes `RUST_LOG` and `LOG_FILE`; the most verbose `RUST_LOG` directive sets one global level |
 | Engine CLI module | Command tree for `bte` (the sole CLI) | `src/engine/mod.rs` | `EngineCommand` enum + `build_cli()`, `parse()`, `execute()` |
 | Engine strategy create | `bte strategy create -m <mms_id> [-i <instrument>]` | `src/engine/strategy/create.rs` | fetch → manifest diff → run_strategies → parquet → manifest append |
 | Engine strategy create_loop | `bte strategy create_loop` | `src/engine/strategy/create_loop.rs` | All cells: load once (rayon::join) → parallel compute → batch persist |

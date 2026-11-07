@@ -34,7 +34,7 @@
 *Resolution*: `create_signal_groups()` now computes real indicator outputs via `create_indicator_output()` (14 indicators) and derives signals via zero-cross / threshold / crossover semantics in `domain/signal/`. All 14 indicators, MACD included, compute real outputs.
 
 **~~Engine module has no unit tests~~ (PARTIALLY RESOLVED)**
-*Resolution*: The logic the engine handlers call is now tested: `application` (signal_generator 6, strategy_runner_utils 5, strategy_generator 4, strategy_runner 4), `infrastructure` (strategy_adapter 9, processed_manifest 11, strategy_persistence 6, logging 8), `engine/strategy` (create 3, create_loop 11). Each handler's `execute` orchestration needs PostgreSQL and remains untested — acceptable while the handlers stay thin.
+*Resolution*: The logic the engine handlers call is now tested: `application` (signal_generator 6, strategy_runner_utils 5, strategy_generator 4, strategy_runner 4), `infrastructure` (strategy_adapter 9, processed_manifest 11, strategy_persistence 6, logging 12), `engine/strategy` (create 3, create_loop 11). Each handler's `execute` orchestration needs PostgreSQL and remains untested — acceptable while the handlers stay thin.
 
 **~~Missing HTTP API layer~~ (DEFERRED — deliberate)**
 *Status*: Deferred (YAGNI). Actix-web scaffold removed 2026-06-04. Re-add when API consumers exist.
