@@ -177,4 +177,55 @@ mod tests {
         assert_eq!(strategy.max_draw_down, 0.0);
         assert_eq!(strategy.annual_operation_count, 0.0);
     }
+
+    #[test]
+    fn long_and_short_signals_at_shared_timestamp_resolve_to_their_own_side() {
+        let long_ops = vec![op_point(21, 30, 1000)];
+        let short_ops = vec![op_point(22, -20, 1000)];
+        let long_map = by_timestamp(&long_ops);
+        let short_map = by_timestamp(&short_ops);
+        let sg = group(4, vec![1000], vec![1000]);
+
+        let strategy = create_strategy(&sg, &long_map, &short_map, 1, 0, ONE_YEAR_SECS);
+
+        assert_eq!(strategy.long_operation_point_ids, vec![21]);
+        assert_eq!(strategy.short_operation_point_ids, vec![22]);
+    }
+
+    #[test]
+    fn create_strategies_returns_one_strategy_per_group_in_input_order() {
+        let long_ops = vec![op_point(31, 30, 1000)];
+        let short_ops = vec![op_point(32, -20, 1000)];
+        let operation_points = OperationPoints {
+            long_operation_points: &long_ops,
+            short_operation_points: &short_ops,
+        };
+        let indicator_ids: Vec<i32> = (1..=64).rev().collect();
+        let groups: Vec<SignalGroup> = indicator_ids
+            .iter()
+            .map(|&id| group(id, vec![1000], vec![]))
+            .collect();
+
+        let strategies = create_strategies(&groups, &operation_points, 1, 0, ONE_YEAR_SECS);
+
+        let result_ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
+        assert_eq!(result_ids, indicator_ids);
+        assert!(strategies
+            .iter()
+            .all(|s| s.long_operation_point_ids == vec![31]));
+    }
+
+    #[test]
+    fn create_strategies_with_no_groups_returns_empty() {
+        let long_ops = vec![op_point(31, 30, 1000)];
+        let short_ops = vec![op_point(32, -20, 1000)];
+        let operation_points = OperationPoints {
+            long_operation_points: &long_ops,
+            short_operation_points: &short_ops,
+        };
+
+        let strategies = create_strategies(&[], &operation_points, 1, 0, ONE_YEAR_SECS);
+
+        assert!(strategies.is_empty());
+    }
 }
