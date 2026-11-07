@@ -260,11 +260,12 @@ fn connection_diagnostics(config: &DbConfig) -> String {
          Target database: {db}\n  \
          Target host:     {host}:{port}\n  \
          Target user:     {user}\n  \
-         Check that:
-  - The database container is running (`docker ps`)
-  - The port is reachable from the engine container (try `psql -h {host} -p {port} -U {user} -d {db}`)
-  - The role \"{user}\" exists in the target database
-  - No local service is occupying port {port} on the host",
+         Check that:\n  \
+         - The database container is running (`docker ps`)\n  \
+         - The port is reachable from the engine container \
+           (try `psql -h {host} -p {port} -U {user} -d {db}`)\n  \
+         - The role \"{user}\" exists in the target database\n  \
+         - No local service is occupying port {port} on the host",
         db = config.database,
         host = config.host,
         port = config.port,
