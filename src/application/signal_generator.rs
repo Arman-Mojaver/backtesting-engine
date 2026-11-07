@@ -254,6 +254,39 @@ mod tests {
     }
 
     #[test]
+    fn empty_resampled_points_yield_no_signal_group() {
+        let indicator = &indicators_rsi_single()[0];
+        assert!(create_signal_group_no_cache(indicator, &[]).is_none());
+    }
+
+    #[test]
+    fn signal_groups_follow_indicator_order() {
+        // Shuffled ids, enough for rayon to split the work; unique to this
+        // test because the call goes through the memo.
+        let ids = [
+            9207, 9201, 9214, 9203, 9210, 9216, 9202, 9209, 9205, 9213, 9204, 9215, 9208, 9211,
+            9206, 9212,
+        ];
+        let indicators: Vec<Indicator> = ids
+            .iter()
+            .map(|&id| Indicator {
+                id,
+                parameters: IndicatorParameters::Rsi {
+                    n: 3,
+                    high_threshold: 70,
+                    low_threshold: 30,
+                },
+            })
+            .collect();
+        let points = resampled_points_for_rsi();
+
+        let result = create_signal_groups(&indicators, &points);
+
+        let result_ids: Vec<i32> = result.iter().map(|group| group.indicator_id).collect();
+        assert_eq!(result_ids, ids);
+    }
+
+    #[test]
     fn no_indicators_yields_no_signal_groups() {
         let points = resampled_points_for_rsi();
         let result = create_signal_groups(&[], &points);
