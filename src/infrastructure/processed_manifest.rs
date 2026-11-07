@@ -17,13 +17,10 @@ use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
 
-/// Per-call temp-file suffix: concurrent manifest writes never share
-/// a temp file, so their contents cannot interleave.
 static TEMP_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
 
-/// Temp path for an atomic write of `path`: unique per call (process
-/// id plus a counter) and in the same directory, so the rename stays
-/// on one filesystem.
+/// Unique per call so concurrent writes never share a temp file, and in
+/// the same directory as `path` so the rename stays on one filesystem.
 fn temp_path_for(path: &Path) -> PathBuf {
     let seq = TEMP_FILE_SEQ.fetch_add(1, Ordering::Relaxed);
     path.with_extension(format!("parquet.tmp-{}-{seq}", std::process::id()))
