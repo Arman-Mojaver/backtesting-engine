@@ -1,3 +1,5 @@
+use std::process::ExitCode;
+
 use backtesting_engine::engine;
 use backtesting_engine::infrastructure::logging;
 
@@ -6,8 +8,22 @@ use backtesting_engine::infrastructure::logging;
 #[global_allocator]
 static GLOBAL_ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-fn main() -> anyhow::Result<()> {
-    logging::init()?;
+fn main() -> ExitCode {
+    if let Err(e) = logging::init() {
+        eprintln!("Error: {e:#}");
+        return ExitCode::FAILURE;
+    }
+
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            log::error!("{e:#}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn run() -> anyhow::Result<()> {
     let cli = engine::build_cli();
     let matches = cli.get_matches();
 
