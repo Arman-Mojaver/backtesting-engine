@@ -273,6 +273,22 @@ mod tests {
     }
 
     #[test]
+    fn manifest_is_not_written_when_a_partition_write_fails() {
+        let (_tmp, base, persistence) = new_persistence();
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(base.join("instrument=EURUSD"), b"").unwrap();
+
+        let result = persistence.persist_cells(vec![
+            cell("EURUSD", 390, &[2001]),
+            cell("USDJPY", 400, &[3001]),
+        ]);
+
+        assert!(result.is_err());
+        let processed = persistence.read_processed_ids_per_cell().unwrap();
+        assert!(processed.is_empty());
+    }
+
+    #[test]
     fn persist_cells_with_no_cells_writes_nothing() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().to_path_buf();
