@@ -24,7 +24,6 @@ use crate::infrastructure::strategy_persistence::StrategyPersistence;
 
 struct SourceIndex {
     indicators: Vec<Indicator>,
-    indicator_ids: Vec<i32>,
     resampled_by_instrument: FxHashMap<String, Vec<ResampledPointD1>>,
     long_by_cell: FxHashMap<(String, i32), Vec<OperationPoint>>,
     short_by_cell: FxHashMap<(String, i32), Vec<OperationPoint>>,
@@ -64,11 +63,8 @@ impl SourceIndex {
         let short_by_cell = short_by_cell.context("failed to load short operation points")?;
         info!("Source data loaded in {:?}", load_start.elapsed());
 
-        let indicator_ids = indicators.iter().map(|indicator| indicator.id).collect();
-
         Ok(Self {
             indicators,
-            indicator_ids,
             resampled_by_instrument,
             long_by_cell,
             short_by_cell,
@@ -120,7 +116,7 @@ fn compute_cell(
     let processed_ids = processed_ids_per_cell
         .get(cell)
         .unwrap_or(&empty_processed_ids);
-    let unprocessed_indicator_ids = get_unprocessed(&source.indicator_ids, processed_ids);
+    let unprocessed_indicator_ids = get_unprocessed(&source.indicators, processed_ids);
     if unprocessed_indicator_ids.is_empty() {
         return CellOutcome::AlreadyProcessed;
     }
@@ -439,7 +435,6 @@ mod tests {
         resampled_points: Vec<ResampledPointD1>,
     ) -> SourceIndex {
         SourceIndex {
-            indicator_ids: indicators.iter().map(|indicator| indicator.id).collect(),
             indicators,
             resampled_by_instrument: FxHashMap::from_iter([(
                 "EURUSD".to_string(),
@@ -459,7 +454,6 @@ mod tests {
         let cell = |instrument: &str, mms_id| ((instrument.to_string(), mms_id), Vec::new());
         let source = SourceIndex {
             indicators: Vec::new(),
-            indicator_ids: Vec::new(),
             resampled_by_instrument: FxHashMap::default(),
             long_by_cell: FxHashMap::from_iter([cell("USDJPY", 1), cell("EURUSD", 2)]),
             short_by_cell: FxHashMap::from_iter([cell("EURUSD", 2), cell("EURUSD", 1)]),

@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 
-pub fn get_unprocessed(all_indicator_ids: &[i32], processed_ids: &HashSet<i32>) -> Vec<i32> {
-    all_indicator_ids
+use crate::domain::indicator::Indicator;
+
+pub fn get_unprocessed(indicators: &[Indicator], processed_ids: &HashSet<i32>) -> Vec<i32> {
+    indicators
         .iter()
-        .copied()
+        .map(|indicator| indicator.id)
         .filter(|id| !processed_ids.contains(id))
         .collect()
 }
@@ -11,6 +13,16 @@ pub fn get_unprocessed(all_indicator_ids: &[i32], processed_ids: &HashSet<i32>) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::indicator::IndicatorParameters;
+
+    fn indicators(ids: &[i32]) -> Vec<Indicator> {
+        ids.iter()
+            .map(|&id| Indicator {
+                id,
+                parameters: IndicatorParameters::AwesomeOscillator,
+            })
+            .collect()
+    }
 
     #[test]
     fn diff_processed_empty_both_returns_empty() {
@@ -20,7 +32,7 @@ mod tests {
 
     #[test]
     fn diff_processed_empty_processed_returns_all() {
-        let result = get_unprocessed(&[1, 2, 3], &HashSet::new());
+        let result = get_unprocessed(&indicators(&[1, 2, 3]), &HashSet::new());
         assert_eq!(result, vec![1, 2, 3]);
     }
 
@@ -29,7 +41,7 @@ mod tests {
         let mut processed = HashSet::new();
         processed.insert(1);
         processed.insert(2);
-        let result = get_unprocessed(&[1, 2], &processed);
+        let result = get_unprocessed(&indicators(&[1, 2]), &processed);
         assert!(result.is_empty());
     }
 
@@ -38,7 +50,7 @@ mod tests {
         let mut processed = HashSet::new();
         processed.insert(1);
         processed.insert(3);
-        let result = get_unprocessed(&[1, 2, 3, 4], &processed);
+        let result = get_unprocessed(&indicators(&[1, 2, 3, 4]), &processed);
         assert_eq!(result, vec![2, 4]);
     }
 
@@ -46,7 +58,7 @@ mod tests {
     fn diff_processed_no_overlap_returns_all() {
         let mut processed = HashSet::new();
         processed.insert(10);
-        let result = get_unprocessed(&[1, 2], &processed);
+        let result = get_unprocessed(&indicators(&[1, 2]), &processed);
         assert_eq!(result, vec![1, 2]);
     }
 }

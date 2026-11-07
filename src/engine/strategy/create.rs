@@ -31,9 +31,8 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
 
     let processed_ids =
         read_processed_indicator_ids(&persistence, instrument, money_management_strategy_id)?;
-    let all_indicator_ids: Vec<i32> = data.indicators.iter().map(|i| i.id).collect();
-    let unprocessed_ids = get_unprocessed(&all_indicator_ids, &processed_ids);
-    let indicator_count = all_indicator_ids.len();
+    let unprocessed_ids = get_unprocessed(&data.indicators, &processed_ids);
+    let indicator_count = data.indicators.len();
     let unprocessed_count = unprocessed_ids.len();
     if unprocessed_ids.is_empty() {
         info!(
