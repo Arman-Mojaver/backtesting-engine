@@ -2,6 +2,9 @@ use crate::domain::indicator::{Indicator, IndicatorParameters};
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
+const SECONDS_PER_DAY: i64 = 86_400;
+pub const ONE_YEAR_SECS: i64 = 365 * SECONDS_PER_DAY + SECONDS_PER_DAY / 4;
+
 // Operation Point fixtures
 
 pub const fn op_points_empty() -> Vec<OperationPoint> {

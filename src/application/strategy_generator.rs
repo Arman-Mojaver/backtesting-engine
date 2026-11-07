@@ -82,7 +82,7 @@ fn create_strategy(
 mod tests {
     use super::*;
 
-    const ONE_YEAR_SECS: i64 = 31_557_600; // 365.25 * 86400
+    use crate::domain::fixtures::ONE_YEAR_SECS;
 
     fn op_point(id: i32, result: i32, timestamp: i64) -> OperationPoint {
         OperationPoint {

@@ -29,8 +29,9 @@ pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_time
 mod tests {
     use super::*;
 
-    const ONE_YEAR_SECS: i64 = 31_557_600; // 365.25 * 86400
-    const TWO_YEARS_SECS: i64 = 63_115_200; // 2 * ONE_YEAR_SECS
+    use crate::domain::fixtures::ONE_YEAR_SECS;
+
+    const TWO_YEARS_SECS: i64 = 2 * ONE_YEAR_SECS;
 
     #[test]
     fn zero_count_returns_zero() {

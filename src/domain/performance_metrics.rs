@@ -420,10 +420,11 @@ mod tests {
     mod annual_roi {
         use super::*;
 
-        const ONE_YEAR_SECS: i64 = 31_557_600; // 365.25 * 86400
-        const HALF_YEAR_SECS: i64 = 15_778_800; // ONE_YEAR_SECS / 2
-        const QUARTER_YEAR_SECS: i64 = 7_889_400; // ONE_YEAR_SECS / 4
-        const THIRD_YEAR_SECS: i64 = 10_519_200; // ONE_YEAR_SECS / 3
+        use crate::domain::fixtures::ONE_YEAR_SECS;
+
+        const HALF_YEAR_SECS: i64 = ONE_YEAR_SECS / 2;
+        const QUARTER_YEAR_SECS: i64 = ONE_YEAR_SECS / 4;
+        const THIRD_YEAR_SECS: i64 = ONE_YEAR_SECS / 3;
 
         #[test]
         fn zero_span_returns_zero() {
