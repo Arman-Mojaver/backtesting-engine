@@ -104,7 +104,13 @@ impl ParquetProcessedManifest {
 
         let temp_path = temp_path_for(&path);
         write_parquet(&temp_path, &rows)?;
-        fs::rename(&temp_path, &path)?;
+        fs::rename(&temp_path, &path).with_context(|| {
+            format!(
+                "failed to rename {} to {}",
+                temp_path.display(),
+                path.display()
+            )
+        })?;
 
         Ok(())
     }
@@ -123,7 +129,8 @@ impl ParquetProcessedManifest {
 }
 
 fn read_parquet(path: &Path) -> anyhow::Result<Vec<ProcessedRow>> {
-    let file = File::open(path)?;
+    let file =
+        File::open(path).with_context(|| format!("failed to open manifest {}", path.display()))?;
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
     let mut reader = builder.build()?;
     let mut rows: Vec<ProcessedRow> = Vec::new();
@@ -194,7 +201,8 @@ fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
         .set_compression(Compression::ZSTD(ZstdLevel::default()))
         .build();
 
-    let file = File::create(path)?;
+    let file = File::create(path)
+        .with_context(|| format!("failed to create manifest {}", path.display()))?;
     let mut writer = ArrowWriter::try_new(file, schema, Some(props))?;
     writer.write(&batch)?;
     writer.close()?;
