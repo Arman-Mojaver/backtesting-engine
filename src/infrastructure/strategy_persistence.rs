@@ -56,7 +56,7 @@ impl StrategyPersistence {
         for cell in cells {
             let mut strategy_rows = Vec::with_capacity(cell.strategies.len());
             for strategy in cell.strategies {
-                strategy_rows.push(StrategyRow::from_strategy(&strategy, next_id));
+                strategy_rows.push(StrategyRow::from_strategy(strategy, next_id));
                 next_id = next_id.saturating_add(1);
             }
             dto_cells.push(CellOutputDto {

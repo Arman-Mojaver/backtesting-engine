@@ -33,15 +33,15 @@ pub struct StrategyRow {
 }
 
 impl StrategyRow {
-    pub fn from_strategy(s: &Strategy, id: i64) -> Self {
+    pub fn from_strategy(s: Strategy, id: i64) -> Self {
         Self {
             strategy_id: id,
             indicator_id: s.indicator_id,
             annual_roi: s.annual_roi,
             max_draw_down: s.max_draw_down,
             annual_operation_count: s.annual_operation_count,
-            long_operation_point_ids: s.long_operation_point_ids.clone(),
-            short_operation_point_ids: s.short_operation_point_ids.clone(),
+            long_operation_point_ids: s.long_operation_point_ids,
+            short_operation_point_ids: s.short_operation_point_ids,
             money_management_strategy_id: s.money_management_strategy_id,
         }
     }
@@ -355,6 +355,7 @@ mod tests {
     fn rows(strategies: &[Strategy], first_id: i64) -> Vec<StrategyRow> {
         strategies
             .iter()
+            .cloned()
             .zip(first_id..)
             .map(|(strategy, id)| StrategyRow::from_strategy(strategy, id))
             .collect()
