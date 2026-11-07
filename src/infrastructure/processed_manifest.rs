@@ -205,7 +205,10 @@ fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
         .with_context(|| format!("failed to create manifest {}", path.display()))?;
     let mut writer = ArrowWriter::try_new(file, schema, Some(props))?;
     writer.write(&batch)?;
-    writer.close()?;
+    writer
+        .into_inner()?
+        .sync_all()
+        .with_context(|| format!("failed to sync manifest {}", path.display()))?;
 
     Ok(())
 }
