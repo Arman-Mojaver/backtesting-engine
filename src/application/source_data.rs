@@ -9,6 +9,7 @@ use crate::domain::operation_point::{
 use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repository};
 use crate::infrastructure::pg_adapter::PgStore;
 
+#[derive(Debug)]
 pub struct SourceData {
     pub indicators: Vec<Indicator>,
     pub resampled_points: Vec<ResampledPointD1>,
