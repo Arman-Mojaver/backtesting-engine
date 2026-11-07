@@ -92,20 +92,16 @@ mod tests {
         // 5 points (1,2,1,2,1), n=3 -> diffs [+1,-1,+1,-1], 2 RSI windows.
         // window [+1,-1,+1] -> rsi 67; window [-1,+1,-1] -> rsi 33.
         // Thresholds 70/30: 67 and 33 never cross 70 or 30 -> no signals.
-        // So this verifies the path runs and returns a group with no signals.
         let indicator = &indicators_rsi_single()[0];
         let points = resampled_points_for_rsi();
         let group = create_signal_group_no_cache(indicator, &points).unwrap();
         assert_eq!(group.indicator_id, 1);
-        // RSI 67/33 sit between 30 and 70 -> no threshold crossing -> no signals.
         assert!(group.long_signals.is_empty());
         assert!(group.short_signals.is_empty());
     }
 
     #[test]
     fn invalid_indicator_is_skipped_not_aborted() {
-        // A MACD with an unknown moving-average type errors -> produces no
-        // group, but the RSI indicator still produces one.
         let indicators = vec![
             Indicator {
                 id: 100,
@@ -127,7 +123,6 @@ mod tests {
         ];
         let points = resampled_points_for_rsi();
         let result = create_signal_groups(&indicators, &points);
-        // Only the RSI indicator yields a group.
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].indicator_id, 2);
     }
@@ -290,7 +285,6 @@ mod tests {
         };
         let group = create_signal_group_no_cache(&indicator, &points).unwrap();
         assert_eq!(group.indicator_id, 7001);
-        // RSI 0 -> 50 crosses above low threshold 30 -> long signal at ts 4000.
         assert_eq!(group.long_signals, vec![4000]);
         assert!(group.short_signals.is_empty());
     }
