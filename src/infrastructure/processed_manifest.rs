@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -12,7 +13,7 @@ use arrow::array::{
 };
 use arrow::datatypes::{ArrowPrimitiveType, DataType, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
-use log::info;
+use log::{info, warn};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, ZstdLevel};
@@ -104,17 +105,7 @@ impl ParquetProcessedManifest {
             }
         }
 
-        let temp_path = temp_path_for(&path);
-        write_parquet(&temp_path, &rows)?;
-        fs::rename(&temp_path, &path).with_context(|| {
-            format!(
-                "failed to rename {} to {}",
-                temp_path.display(),
-                path.display()
-            )
-        })?;
-
-        Ok(())
+        write_atomically(&path, &rows)
     }
 
     pub fn read_processed_ids_per_cell(
@@ -127,6 +118,34 @@ impl ParquetProcessedManifest {
                 .insert(row.indicator_id);
         }
         Ok(map)
+    }
+}
+
+fn write_atomically(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
+    let temp_path = temp_path_for(path);
+    let result = write_parquet(&temp_path, rows).and_then(|()| {
+        fs::rename(&temp_path, path).with_context(|| {
+            format!(
+                "failed to rename {} to {}",
+                temp_path.display(),
+                path.display()
+            )
+        })
+    });
+    if result.is_err() {
+        remove_temp_file(&temp_path);
+    }
+    result
+}
+
+fn remove_temp_file(temp_path: &Path) {
+    match fs::remove_file(temp_path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == ErrorKind::NotFound => {}
+        Err(e) => warn!(
+            "failed to remove manifest temp file {}: {e}",
+            temp_path.display()
+        ),
     }
 }
 
@@ -424,6 +443,32 @@ mod tests {
         // name is unique per call, so assert the directory holds only the
         // manifest itself.
         let entries: Vec<String> = fs::read_dir(path.parent().expect("parent"))
+            .expect("read_dir")
+            .map(|e| e.expect("entry").file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(entries, vec!["processed.parquet"]);
+    }
+
+    #[test]
+    fn write_atomically_removes_temp_file_when_rename_fails() {
+        let tmp = TempDir::new().expect("tempdir");
+        let target = tmp.path().join("processed.parquet");
+        fs::create_dir(&target).expect("target dir");
+        fs::write(target.join("occupant"), b"").expect("occupant");
+        let rows = [ProcessedRow {
+            instrument: "EURUSD".to_string(),
+            mms_id: 390,
+            indicator_id: 2001,
+            processed_at: 1_700_000_000,
+        }];
+
+        let result = write_atomically(&target, &rows);
+
+        assert!(
+            result.is_err(),
+            "rename onto a non-empty directory must fail"
+        );
+        let entries: Vec<String> = fs::read_dir(tmp.path())
             .expect("read_dir")
             .map(|e| e.expect("entry").file_name().to_string_lossy().to_string())
             .collect();
