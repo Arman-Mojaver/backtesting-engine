@@ -70,12 +70,19 @@ fn parse_level(raw: Option<&str>) -> LevelFilter {
         _ => return LevelFilter::Info,
     };
 
-    let token = raw.split('=').next_back().unwrap_or(raw);
-
-    token.parse::<LevelFilter>().unwrap_or_else(|_| {
-        eprintln!("Unrecognised RUST_LOG value '{raw}', defaulting to {DEFAULT_LOG_LEVEL}");
-        LevelFilter::Info
-    })
+    raw.split(',')
+        .filter_map(|directive| {
+            directive
+                .split('=')
+                .next_back()?
+                .parse::<LevelFilter>()
+                .ok()
+        })
+        .max()
+        .unwrap_or_else(|| {
+            eprintln!("Unrecognised RUST_LOG value '{raw}', defaulting to {DEFAULT_LOG_LEVEL}");
+            LevelFilter::Info
+        })
 }
 
 #[cfg(test)]
@@ -101,6 +108,15 @@ mod tests {
     fn parse_level_module_targeted() {
         assert_eq!(
             parse_level(Some("backtesting_engine=debug")),
+            LevelFilter::Debug
+        );
+    }
+
+    #[test]
+    fn parse_level_picks_most_verbose_directive() {
+        assert_eq!(parse_level(Some("debug,postgres=warn")), LevelFilter::Debug);
+        assert_eq!(
+            parse_level(Some("info,backtesting_engine=debug")),
             LevelFilter::Debug
         );
     }
