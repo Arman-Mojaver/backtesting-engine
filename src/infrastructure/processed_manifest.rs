@@ -87,23 +87,22 @@ impl ParquetProcessedManifest {
             entries.iter().map(|(_, _, ids)| ids.len()).sum::<usize>(),
         );
 
+        let mut incoming: HashSet<(&str, i32, i32)> = HashSet::new();
+        let mut fresh_rows: Vec<ProcessedRow> = Vec::new();
         for (instrument, mms_id, indicator_ids) in entries {
-            let indicator_set: HashSet<i32> = indicator_ids.iter().copied().collect();
-            rows.retain(|r| {
-                !(r.instrument == *instrument
-                    && r.mms_id == *mms_id
-                    && indicator_set.contains(&r.indicator_id))
-            });
-
             for &indicator_id in indicator_ids {
-                rows.push(ProcessedRow {
-                    instrument: instrument.clone(),
-                    mms_id: *mms_id,
-                    indicator_id,
-                    processed_at,
-                });
+                if incoming.insert((instrument, *mms_id, indicator_id)) {
+                    fresh_rows.push(ProcessedRow {
+                        instrument: instrument.clone(),
+                        mms_id: *mms_id,
+                        indicator_id,
+                        processed_at,
+                    });
+                }
             }
         }
+        rows.retain(|r| !incoming.contains(&(r.instrument.as_str(), r.mms_id, r.indicator_id)));
+        rows.extend(fresh_rows);
 
         write_atomically(&path, &rows)
     }
@@ -365,6 +364,43 @@ mod tests {
         assert_eq!(eur_rows.len(), 2);
         assert_eq!(usd_rows.len(), 1);
         assert_eq!(usd_rows[0].indicator_id, 3001);
+    }
+
+    #[test]
+    fn append_all_with_multiple_entries_records_each_cell() {
+        let (_tmp, manifest) = new_manifest();
+        manifest
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1_700_000_000)
+            .expect("first append");
+
+        manifest
+            .append_all(
+                &[
+                    entry("EURUSD", 390, &[2002, 2003]),
+                    entry("USDJPY", 400, &[3001]),
+                    entry("EURUSD", 390, &[2003, 2004]),
+                ],
+                1_700_000_001,
+            )
+            .expect("batch append");
+
+        let eur: Vec<(i32, i64)> = read_cell(&manifest, "EURUSD", 390)
+            .expect("read EURUSD")
+            .iter()
+            .map(|r| (r.indicator_id, r.processed_at))
+            .collect();
+        assert_eq!(
+            eur,
+            vec![
+                (2001, 1_700_000_000),
+                (2002, 1_700_000_001),
+                (2003, 1_700_000_001),
+                (2004, 1_700_000_001),
+            ]
+        );
+        let usd = read_cell(&manifest, "USDJPY", 400).expect("read USDJPY");
+        assert_eq!(usd.len(), 1);
+        assert_eq!(usd[0].indicator_id, 3001);
     }
 
     #[test]
