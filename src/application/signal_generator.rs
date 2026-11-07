@@ -47,6 +47,9 @@ pub fn signal_group_cache_stats() -> SignalGroupCacheStats {
     // Dedupe concurrent first computations of a key. Locks are per bucket, not
     // per key: every call (hit or miss) waits on its bucket while another key
     // there computes, so use enough buckets to keep collisions rare.
+    // The bucket lock is held across the body, so the body must not use rayon:
+    // a worker waiting inside it can steal another call in the same bucket and
+    // deadlock on the lock it already holds.
     sync_writes = "by_key",
     sync_writes_buckets = 1024,
     // Hits take a shared read lock instead of the exclusive write lock.
