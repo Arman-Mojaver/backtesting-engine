@@ -77,7 +77,7 @@ fn create_signal_group(
     Some(indicator_output.create_signal_group(indicator.id))
 }
 
-fn instrument_of(resampled_points: &[ResampledPointD1]) -> &str {
+pub fn instrument_of(resampled_points: &[ResampledPointD1]) -> &str {
     resampled_points
         .first()
         .map_or("", |point| point.instrument.as_str())

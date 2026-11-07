@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use anyhow::Context;
 use log::debug;
 
-use crate::application::signal_generator::create_signal_groups;
+use crate::application::signal_generator::{create_signal_groups, instrument_of};
 use crate::application::strategy_generator::create_strategies;
 use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::{OperationPoint, OperationPoints};
@@ -47,8 +47,9 @@ pub fn run_strategies(
         start_timestamp,
         end_timestamp,
     );
+    let instrument = instrument_of(resampled_points);
     debug!(
-        "After annual operation count filter (min {}): {} signal groups",
+        "{instrument} (mms_id={money_management_strategy_id}): after annual operation count filter (min {}): {} signal groups",
         global_filter.min_operation_count,
         filtered_groups.len(),
     );
@@ -63,7 +64,7 @@ pub fn run_strategies(
 
     let strategies = filter_strategies(strategies, &global_filter);
     debug!(
-        "After strategy filter (min annual ROI {}, max drawdown {}): {} strategies",
+        "{instrument} (mms_id={money_management_strategy_id}): after strategy filter (min annual ROI {}, max drawdown {}): {} strategies",
         global_filter.min_annual_roi,
         global_filter.max_draw_down_max,
         strategies.len(),
