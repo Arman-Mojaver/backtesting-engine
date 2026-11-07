@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
+use anyhow::Context;
 use rayon::prelude::*;
 
 use crate::application::cell_output::CellOutput;
@@ -74,6 +75,12 @@ impl StrategyPersistence {
         dto_cells.into_par_iter().try_for_each(|c| {
             self.strategies
                 .write_rows(&c.instrument, c.mms_id, c.strategy_rows)
+                .with_context(|| {
+                    format!(
+                        "failed to write partition {} (mms_id={})",
+                        c.instrument, c.mms_id
+                    )
+                })
         })?;
 
         let processed_at = unix_now_secs()?;
