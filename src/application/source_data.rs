@@ -22,13 +22,12 @@ pub fn fetch_source_data(
 ) -> anyhow::Result<SourceData> {
     let env = resolve_environment()?;
     let config = DbConfig::from_env(env);
-    let conn_string = config.connection_string();
 
     info!("Connecting to {} ...", config.database);
 
     // One connection serves all four sequential reads; the batch path
     // (create_loop) opens one per table because its loads run in parallel.
-    let store = PgStore::new(&conn_string).with_context(|| connection_diagnostics(&config))?;
+    let store = PgStore::connect(&config)?;
 
     let indicators = IndicatorRepository::get_all(&store)?;
     let resampled_points = ResampledPointD1Repository::get_by_instrument(&store, instrument)
@@ -56,22 +55,4 @@ pub fn fetch_source_data(
         long_operation_points,
         short_operation_points,
     })
-}
-
-pub fn connection_diagnostics(config: &DbConfig) -> String {
-    format!(
-        "Failed to connect to PostgreSQL\n  \
-         Target database: {db}\n  \
-         Target host:     {host}:{port}\n  \
-         Target user:     {user}\n  \
-         Check that:
-  - The database container is running (`docker ps`)
-  - The port is reachable from the engine container (try `psql -h {host} -p {port} -U {user} -d {db}`)
-  - The role \"{user}\" exists in the target database
-  - No local service is occupying port {port} on the host",
-        db = config.database,
-        host = config.host,
-        port = config.port,
-        user = config.user,
-    )
 }

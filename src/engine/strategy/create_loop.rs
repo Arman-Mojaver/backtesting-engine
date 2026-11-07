@@ -9,7 +9,6 @@ use rustc_hash::FxHashMap;
 
 use crate::application::cell_output::CellOutput;
 use crate::application::signal_generator::signal_group_cache_stats;
-use crate::application::source_data::connection_diagnostics;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::config::environment::{
@@ -35,12 +34,10 @@ impl SourceIndex {
     fn load(env: Environment) -> anyhow::Result<Self> {
         info!("Querying DB...");
         let db_config = DbConfig::from_env(env);
-        let conn_string = db_config.connection_string();
 
         // One store (connection) per table: the four loads below run
         // concurrently, and a sync postgres::Client is single-connection.
-        let connect =
-            || PgStore::new(&conn_string).with_context(|| connection_diagnostics(&db_config));
+        let connect = || PgStore::connect(&db_config);
         let indicator_store = connect()?;
         let resampled_store = connect()?;
         let long_store = connect()?;

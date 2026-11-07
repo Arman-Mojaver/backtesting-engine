@@ -9,6 +9,7 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
+use crate::config::environment::DbConfig;
 use crate::domain::indicator::{Indicator, IndicatorParameters, IndicatorRepository};
 use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
@@ -208,10 +209,6 @@ fn row_to_indicator(row: &Row) -> anyhow::Result<Indicator> {
     Ok(Indicator { id, parameters })
 }
 
-fn connect(connection_string: &str) -> anyhow::Result<Client> {
-    Client::connect(connection_string, NoTls).map_err(anyhow::Error::from)
-}
-
 fn fetch_rows<T, F>(
     conn: &RefCell<Client>,
     label: &str,
@@ -248,12 +245,31 @@ pub struct PgStore {
 }
 
 impl PgStore {
-    pub fn new(connection_string: &str) -> anyhow::Result<Self> {
-        let conn = connect(connection_string)?;
+    pub fn connect(config: &DbConfig) -> anyhow::Result<Self> {
+        let conn = Client::connect(&config.connection_string(), NoTls)
+            .with_context(|| connection_diagnostics(config))?;
         Ok(Self {
             conn: RefCell::new(conn),
         })
     }
+}
+
+fn connection_diagnostics(config: &DbConfig) -> String {
+    format!(
+        "Failed to connect to PostgreSQL\n  \
+         Target database: {db}\n  \
+         Target host:     {host}:{port}\n  \
+         Target user:     {user}\n  \
+         Check that:
+  - The database container is running (`docker ps`)
+  - The port is reachable from the engine container (try `psql -h {host} -p {port} -U {user} -d {db}`)
+  - The role \"{user}\" exists in the target database
+  - No local service is occupying port {port} on the host",
+        db = config.database,
+        host = config.host,
+        port = config.port,
+        user = config.user,
+    )
 }
 
 impl LongOperationPointRepository for PgStore {
