@@ -33,7 +33,7 @@ fn temp_path_for(path: &Path) -> PathBuf {
 
 /// Current wall-clock time as Unix seconds, for stamping `processed_at`.
 /// Fails rather than falling back to epoch 0 if the clock is before 1970.
-pub(crate) fn unix_now_secs() -> anyhow::Result<i64> {
+pub fn unix_now_secs() -> anyhow::Result<i64> {
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("system clock is set before the Unix epoch")?
@@ -49,11 +49,11 @@ pub struct ManifestEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProcessedRow {
-    pub instrument: String,
-    pub mms_id: i32,
-    pub indicator_id: i32,
-    pub processed_at: i64,
+struct ProcessedRow {
+    instrument: String,
+    mms_id: i32,
+    indicator_id: i32,
+    processed_at: i64,
 }
 
 /// Ledger of the (instrument, mms_id, indicator_id) triples already
