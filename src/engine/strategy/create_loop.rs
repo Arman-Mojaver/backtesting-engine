@@ -8,6 +8,7 @@ use rayon::prelude::*;
 use rustc_hash::FxHashMap;
 
 use crate::application::cell_output::CellOutput;
+use crate::application::signal_generator::signal_group_cache_stats;
 use crate::application::source_data::connection_diagnostics;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
@@ -229,6 +230,11 @@ fn compute_cells(
         summary.skipped,
         summary.failed(),
         compute_start.elapsed()
+    );
+    let cache = signal_group_cache_stats();
+    info!(
+        "Signal group cache: {} hits, {} misses, {} entries",
+        cache.hits, cache.misses, cache.entries
     );
     (computed, summary)
 }

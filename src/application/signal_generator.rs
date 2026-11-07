@@ -1,6 +1,6 @@
 use rayon::prelude::*;
 
-use cached::cached;
+use cached::{cached, Cached};
 use log::warn;
 
 use crate::domain::indicator::Indicator;
@@ -19,10 +19,28 @@ pub fn create_signal_groups(
         .collect()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SignalGroupCacheStats {
+    pub hits: u64,
+    pub misses: u64,
+    pub entries: usize,
+}
+
+pub fn signal_group_cache_stats() -> SignalGroupCacheStats {
+    let cache = SIGNAL_GROUP_CACHE.read();
+    SignalGroupCacheStats {
+        // `UnboundCache` always tracks metrics, so these are never `None`.
+        hits: cache.cache_hits().unwrap_or_default(),
+        misses: cache.cache_misses().unwrap_or_default(),
+        entries: cache.cache_size(),
+    }
+}
+
 /// Memoized on `(indicator_id, instrument)`: parameters are immutable per
 /// id and an instrument's resampled points never change, so the identity is
 /// a stable key without hashing the large inputs.
 #[cached(
+    name = "SIGNAL_GROUP_CACHE",
     key = "(i32, String)",
     convert = r#"{ (indicator.id, resampled_points.first().map(|p| p.instrument.clone()).unwrap_or_default()) }"#,
     cache_none = true,
