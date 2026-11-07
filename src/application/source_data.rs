@@ -29,7 +29,7 @@ pub fn fetch_source_data(
     // (create_loop) opens one per table because its loads run in parallel.
     let store = PgStore::connect(&config)?;
 
-    let indicators = IndicatorRepository::get_all(&store)?;
+    let indicators = IndicatorRepository::get_all(&store).context("failed to fetch indicators")?;
     let resampled_points = ResampledPointD1Repository::get_by_instrument(&store, instrument)
         .with_context(|| format!("failed to fetch resampled points for {instrument}"))?;
 
@@ -39,7 +39,12 @@ pub fn fetch_source_data(
             money_management_strategy_id,
             instrument,
         )
-        .with_context(|| format!("failed to fetch long operation points for {instrument}"))?;
+        .with_context(|| {
+            format!(
+                "failed to fetch long operation points for {instrument} \
+                 (mms_id={money_management_strategy_id})"
+            )
+        })?;
 
     let short_operation_points: Vec<OperationPoint> =
         ShortOperationPointRepository::get_by_mms_id_and_instrument(
@@ -47,7 +52,12 @@ pub fn fetch_source_data(
             money_management_strategy_id,
             instrument,
         )
-        .with_context(|| format!("failed to fetch short operation points for {instrument}"))?;
+        .with_context(|| {
+            format!(
+                "failed to fetch short operation points for {instrument} \
+                 (mms_id={money_management_strategy_id})"
+            )
+        })?;
 
     Ok(SourceData {
         indicators,
