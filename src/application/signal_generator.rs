@@ -42,7 +42,7 @@ pub fn signal_group_cache_stats() -> SignalGroupCacheStats {
 #[cached(
     name = "SIGNAL_GROUP_CACHE",
     key = "(i32, String)",
-    convert = r#"{ (indicator.id, resampled_points.first().map(|p| p.instrument.clone()).unwrap_or_default()) }"#,
+    convert = r#"{ (indicator.id, instrument_of(resampled_points).to_owned()) }"#,
     cache_none = true,
     // Dedupe concurrent first computations of a key. Locks are per bucket, not
     // per key: every call (hit or miss) waits on its bucket while another key
@@ -60,9 +60,7 @@ fn create_signal_group(
         match create_indicator_output(&indicator.parameters, resampled_points) {
             Ok(output) => output,
             Err(error) => {
-                let instrument = resampled_points
-                    .first()
-                    .map_or("", |point| point.instrument.as_str());
+                let instrument = instrument_of(resampled_points);
                 // Skip, don't abort: one misconfigured row must not sink the
                 // others. The miss is memoized, so this warn fires once per
                 // bad indicator, not once per cell.
@@ -71,6 +69,12 @@ fn create_signal_group(
             }
         };
     Some(indicator_output.create_signal_group(indicator.id))
+}
+
+fn instrument_of(resampled_points: &[ResampledPointD1]) -> &str {
+    resampled_points
+        .first()
+        .map_or("", |point| point.instrument.as_str())
 }
 
 #[cfg(test)]
