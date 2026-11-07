@@ -14,7 +14,7 @@ use simplelog::{
     WriteLogger,
 };
 
-const DEFAULT_LOG_LEVEL: &str = "info";
+const DEFAULT_LEVEL: LevelFilter = LevelFilter::Info;
 
 pub const LOG_FILE: &str = "logs/bte.log";
 
@@ -67,7 +67,7 @@ fn open_log_file(path: &Path) -> Result<File> {
 fn parse_level(raw: Option<&str>) -> LevelFilter {
     let raw = match raw {
         Some(s) if !s.is_empty() => s,
-        _ => return LevelFilter::Info,
+        _ => return DEFAULT_LEVEL,
     };
 
     raw.split(',')
@@ -80,8 +80,8 @@ fn parse_level(raw: Option<&str>) -> LevelFilter {
         })
         .max()
         .unwrap_or_else(|| {
-            eprintln!("Unrecognised RUST_LOG value '{raw}', defaulting to {DEFAULT_LOG_LEVEL}");
-            LevelFilter::Info
+            eprintln!("Unrecognised RUST_LOG value '{raw}', defaulting to {DEFAULT_LEVEL}");
+            DEFAULT_LEVEL
         })
 }
 
