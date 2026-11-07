@@ -78,8 +78,7 @@ impl ParquetProcessedManifest {
         entries: &[(String, i32, Vec<i32>)],
         processed_at: i64,
     ) -> anyhow::Result<()> {
-        let path = self.path();
-        let mut rows = self.read_all()?;
+        let existing = self.read_all()?;
 
         info!(
             "Writing manifest: {} entries ({} total indicator IDs) ...",
@@ -87,24 +86,8 @@ impl ParquetProcessedManifest {
             entries.iter().map(|(_, _, ids)| ids.len()).sum::<usize>(),
         );
 
-        let mut incoming: HashSet<(&str, i32, i32)> = HashSet::new();
-        let mut fresh_rows: Vec<ProcessedRow> = Vec::new();
-        for (instrument, mms_id, indicator_ids) in entries {
-            for &indicator_id in indicator_ids {
-                if incoming.insert((instrument, *mms_id, indicator_id)) {
-                    fresh_rows.push(ProcessedRow {
-                        instrument: instrument.clone(),
-                        mms_id: *mms_id,
-                        indicator_id,
-                        processed_at,
-                    });
-                }
-            }
-        }
-        rows.retain(|r| !incoming.contains(&(r.instrument.as_str(), r.mms_id, r.indicator_id)));
-        rows.extend(fresh_rows);
-
-        write_atomically(&path, &rows)
+        let rows = merge_entries(existing, entries, processed_at);
+        write_atomically(&self.path(), &rows)
     }
 
     pub fn read_processed_ids_per_cell(
@@ -118,6 +101,30 @@ impl ParquetProcessedManifest {
         }
         Ok(map)
     }
+}
+
+fn merge_entries(
+    mut rows: Vec<ProcessedRow>,
+    entries: &[(String, i32, Vec<i32>)],
+    processed_at: i64,
+) -> Vec<ProcessedRow> {
+    let mut incoming: HashSet<(&str, i32, i32)> = HashSet::new();
+    let mut fresh_rows: Vec<ProcessedRow> = Vec::new();
+    for (instrument, mms_id, indicator_ids) in entries {
+        for &indicator_id in indicator_ids {
+            if incoming.insert((instrument, *mms_id, indicator_id)) {
+                fresh_rows.push(ProcessedRow {
+                    instrument: instrument.clone(),
+                    mms_id: *mms_id,
+                    indicator_id,
+                    processed_at,
+                });
+            }
+        }
+    }
+    rows.retain(|r| !incoming.contains(&(r.instrument.as_str(), r.mms_id, r.indicator_id)));
+    rows.extend(fresh_rows);
+    rows
 }
 
 fn write_atomically(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
