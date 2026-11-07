@@ -111,15 +111,24 @@ mod tests {
         points.iter().map(|p| (p.timestamp, p)).collect()
     }
 
-    #[test]
-    fn signals_resolve_to_matching_operation_points_in_signal_order() {
+    // Sorted trades +30 (ts 1000), -20 (ts 2000), +30 (ts 3000) with
+    // risk 0.02 / sl 20 compound 1.03 -> 1.0094 -> 1.0403: global ROI
+    // 4.03 and max draw down 2.0 (the 1.03 -> 1.0094 dip). The span is
+    // exactly one year, so annual ROI equals global ROI and the annual
+    // operation count is 3 / 1 = 3.
+    fn three_trade_strategy() -> Strategy {
         let long_ops = vec![op_point(11, 30, 1000), op_point(13, 30, 3000)];
         let short_ops = vec![op_point(12, -20, 2000)];
         let long_map = by_timestamp(&long_ops);
         let short_map = by_timestamp(&short_ops);
         let sg = group(7, vec![1000, 3000], vec![2000]);
 
-        let strategy = create_strategy(&sg, &long_map, &short_map, 1, 1000, 1000 + ONE_YEAR_SECS);
+        create_strategy(&sg, &long_map, &short_map, 1, 1000, 1000 + ONE_YEAR_SECS)
+    }
+
+    #[test]
+    fn signals_resolve_to_matching_operation_points_in_signal_order() {
+        let strategy = three_trade_strategy();
 
         assert_eq!(strategy.indicator_id, 7);
         assert_eq!(strategy.instrument, "EURUSD");
@@ -130,18 +139,7 @@ mod tests {
 
     #[test]
     fn metrics_wire_through_from_the_resolved_operations() {
-        // Sorted trades +30 (ts 1000), -20 (ts 2000), +30 (ts 3000) with
-        // risk 0.02 / sl 20 compound 1.03 -> 1.0094 -> 1.0403: global ROI
-        // 4.03 and max draw down 2.0 (the 1.03 -> 1.0094 dip). The span is
-        // exactly one year, so annual ROI equals global ROI and the annual
-        // operation count is 3 / 1 = 3.
-        let long_ops = vec![op_point(11, 30, 1000), op_point(13, 30, 3000)];
-        let short_ops = vec![op_point(12, -20, 2000)];
-        let long_map = by_timestamp(&long_ops);
-        let short_map = by_timestamp(&short_ops);
-        let sg = group(7, vec![1000, 3000], vec![2000]);
-
-        let strategy = create_strategy(&sg, &long_map, &short_map, 1, 1000, 1000 + ONE_YEAR_SECS);
+        let strategy = three_trade_strategy();
 
         assert_eq!(strategy.annual_roi, 4.03);
         assert_eq!(strategy.max_draw_down, 2.0);
