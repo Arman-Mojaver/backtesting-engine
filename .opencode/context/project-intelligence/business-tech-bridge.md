@@ -35,7 +35,7 @@
 | Parquet base directory | `parquet_base_dir(env)` / `parquet_root_dir(env)` | `src/config/environment.rs` | `/app/parquet_files/{env}/strategy` and `/app/parquet_files/{env}` |
 | Fetch strategy inputs from DB | `fetch_source_data(query)` | `src/application/source_data.rs` | `(instrument, mms_id)` → `SourceData` |
 | Generate signal groups from indicators | `create_signals` → **`create_signal_groups`** | `src/application/signal_generator.rs` | REAL indicator outputs → signal semantics; rayon + `#[cached]` keyed `(indicator_id, instrument)` |
-| Build strategies from signal groups | `create_strategies()` / `create_strategy()` | `src/application/strategy_generator.rs` | One strategy per signal group; computes real metrics; rayon-parallelized |
+| Build strategies from signal groups | `create_strategies()` | `src/application/strategy_generator.rs` | One strategy per signal group; computes real metrics; rayon-parallelized |
 | Run the full pipeline for one cell | `run_strategies()` | `src/application/strategy_runner.rs` | validate → signals → filter ops → strategies → filter DD/ROI |
 | Which indicators are already done? | `get_unprocessed()` | `src/application/strategy_runner_utils.rs` | Set-diff DB indicator IDs vs manifest |
 | One cell's compute result | `CellOutput` | `src/application/cell_output.rs` | instrument, mms_id, strategies, processed IDs |

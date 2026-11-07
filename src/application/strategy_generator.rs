@@ -33,7 +33,7 @@ pub fn create_strategies(
         .collect()
 }
 
-pub fn create_strategy(
+fn create_strategy(
     signal_group: &SignalGroup,
     long_map: &FxHashMap<i64, &OperationPoint>,
     short_map: &FxHashMap<i64, &OperationPoint>,
