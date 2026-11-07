@@ -1,5 +1,5 @@
 use anyhow::Context;
-use log::info;
+use log::debug;
 
 use crate::config::environment::DbConfig;
 use crate::domain::indicator::{Indicator, IndicatorRepository};
@@ -21,7 +21,7 @@ pub fn fetch_source_data(
     instrument: &str,
     money_management_strategy_id: i32,
 ) -> anyhow::Result<SourceData> {
-    info!("Connecting to {} ...", db_config.database);
+    debug!("connecting to {}", db_config.database);
 
     // One connection serves all four sequential reads; the batch path
     // (create_loop) opens one per table because its loads run in parallel.
