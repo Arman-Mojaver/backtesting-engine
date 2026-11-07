@@ -69,10 +69,11 @@ impl ParquetProcessedManifest {
 
     fn read_all(&self) -> anyhow::Result<Vec<ProcessedRow>> {
         let path = self.path();
-        if !path.exists() {
-            return Ok(Vec::new());
+        match File::open(&path) {
+            Ok(file) => read_parquet(file),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(Vec::new()),
+            Err(e) => Err(e).with_context(|| format!("failed to open manifest {}", path.display())),
         }
-        read_parquet(&path)
     }
 
     pub fn append_all(&self, entries: &[ManifestEntry], processed_at: i64) -> anyhow::Result<()> {
@@ -153,9 +154,7 @@ fn remove_temp_file(temp_path: &Path) {
     }
 }
 
-fn read_parquet(path: &Path) -> anyhow::Result<Vec<ProcessedRow>> {
-    let file =
-        File::open(path).with_context(|| format!("failed to open manifest {}", path.display()))?;
+fn read_parquet(file: File) -> anyhow::Result<Vec<ProcessedRow>> {
     let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
     let mut reader = builder.build()?;
     let mut rows: Vec<ProcessedRow> = Vec::new();
@@ -411,6 +410,20 @@ mod tests {
 
         let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn read_processed_ids_per_cell_errors_when_manifest_cannot_be_opened() {
+        let tmp = TempDir::new().expect("tempdir");
+        let not_a_dir = tmp.path().join("root");
+        fs::write(&not_a_dir, b"").expect("file");
+        let manifest = ParquetProcessedManifest::new(not_a_dir);
+
+        let err = manifest.read_processed_ids_per_cell().unwrap_err();
+        assert!(
+            format!("{err:#}").contains("failed to open manifest"),
+            "{err:#}"
+        );
     }
 
     #[test]
