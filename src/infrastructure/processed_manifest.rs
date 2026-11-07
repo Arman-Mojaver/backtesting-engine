@@ -8,9 +8,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use arrow::array::{
-    ArrayRef, AsArray, Int32Array, Int64Array, PrimitiveArray, StringArray, StringBuilder,
-};
+use arrow::array::{ArrayRef, AsArray, Int32Array, Int64Array, PrimitiveArray, StringArray};
 use arrow::datatypes::{ArrowPrimitiveType, DataType, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
 use log::{info, warn};
@@ -218,11 +216,7 @@ fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
         Field::new("processed_at", DataType::Int64, false),
     ]));
 
-    let mut instrument_builder = StringBuilder::new();
-    for r in rows {
-        instrument_builder.append_value(&r.instrument);
-    }
-
+    let instruments = StringArray::from_iter_values(rows.iter().map(|r| r.instrument.as_str()));
     let mms_ids: Int32Array = rows.iter().map(|r| r.mms_id).collect();
     let indicator_ids: Int32Array = rows.iter().map(|r| r.indicator_id).collect();
     let processed_ats: Int64Array = rows.iter().map(|r| r.processed_at).collect();
@@ -230,7 +224,7 @@ fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
     let batch = RecordBatch::try_new(
         schema.clone(),
         vec![
-            Arc::new(instrument_builder.finish()),
+            Arc::new(instruments),
             Arc::new(mms_ids),
             Arc::new(indicator_ids),
             Arc::new(processed_ats),
