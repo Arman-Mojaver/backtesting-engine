@@ -37,14 +37,8 @@ pub fn run_strategies(
         .start_end_timestamps()
         .ok_or_else(|| anyhow::anyhow!("long operation points should never be empty"))?;
 
-    let unprocessed_set: HashSet<i32> = unprocessed_ids.iter().copied().collect();
-    let indicators_for_compute: Vec<Indicator> = indicators
-        .iter()
-        .filter(|indicator| unprocessed_set.contains(&indicator.id))
-        .cloned()
-        .collect();
-
-    let signal_groups = create_signal_groups(&indicators_for_compute, resampled_points);
+    let unprocessed_indicators = unprocessed_indicators(indicators, unprocessed_ids);
+    let signal_groups = create_signal_groups(&unprocessed_indicators, resampled_points);
 
     let global_filter = GlobalStrategyFilter::default();
     let filtered_groups = filter_signal_groups_by_annual_ops(
@@ -76,6 +70,15 @@ pub fn run_strategies(
     );
 
     Ok(strategies)
+}
+
+fn unprocessed_indicators(indicators: &[Indicator], unprocessed_ids: &[i32]) -> Vec<Indicator> {
+    let unprocessed_ids: HashSet<i32> = unprocessed_ids.iter().copied().collect();
+    indicators
+        .iter()
+        .filter(|indicator| unprocessed_ids.contains(&indicator.id))
+        .cloned()
+        .collect()
 }
 
 #[cfg(test)]
