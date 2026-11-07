@@ -180,17 +180,28 @@ mod tests {
         ]
     }
 
+    fn all_indicator_ids() -> Vec<i32> {
+        pipeline_indicators().iter().map(|i| i.id).collect()
+    }
+
+    fn run_pipeline(
+        money_management_strategy_id: i32,
+        unprocessed_ids: &[i32],
+    ) -> anyhow::Result<Vec<Strategy>> {
+        run_strategies(
+            &pipeline_indicators(),
+            &pipeline_resampled_points(),
+            &pipeline_long_ops(),
+            &pipeline_short_ops(),
+            money_management_strategy_id,
+            unprocessed_ids,
+        )
+    }
+
     #[test]
     fn full_pipeline_applies_validation_and_both_filter_stages() {
-        let indicators = pipeline_indicators();
-        let resampled = pipeline_resampled_points();
-        let long_ops = pipeline_long_ops();
-        let short_ops = pipeline_short_ops();
-        let all_ids: Vec<i32> = indicators.iter().map(|i| i.id).collect();
-
         let strategies =
-            run_strategies(&indicators, &resampled, &long_ops, &short_ops, 1, &all_ids)
-                .expect("valid inputs must pass validation");
+            run_pipeline(1, &all_indicator_ids()).expect("valid inputs must pass validation");
 
         // Stage 1 dropped indicator 8 (no signals); stage 2 dropped
         // indicator 9 (no resolved trades -> ROI 0 < 5); 7 and 10 survive.
@@ -211,23 +222,9 @@ mod tests {
 
     #[test]
     fn processed_indicators_are_excluded_before_compute() {
-        let indicators = pipeline_indicators();
-        let resampled = pipeline_resampled_points();
-        let long_ops = pipeline_long_ops();
-        let short_ops = pipeline_short_ops();
-
         // Indicator 10 passes both filter stages in the full run above;
         // marking it processed must exclude it before any compute.
-        let unprocessed = vec![7, 8, 9];
-        let strategies = run_strategies(
-            &indicators,
-            &resampled,
-            &long_ops,
-            &short_ops,
-            1,
-            &unprocessed,
-        )
-        .expect("valid inputs must pass validation");
+        let strategies = run_pipeline(1, &[7, 8, 9]).expect("valid inputs must pass validation");
 
         let ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
         assert_eq!(ids, vec![7]);
@@ -235,36 +232,18 @@ mod tests {
 
     #[test]
     fn all_indicators_processed_yields_no_strategies() {
-        let indicators = pipeline_indicators();
-        let resampled = pipeline_resampled_points();
-        let long_ops = pipeline_long_ops();
-        let short_ops = pipeline_short_ops();
-
-        let strategies = run_strategies(
-            &indicators,
-            &resampled,
-            &long_ops,
-            &short_ops,
-            1,
-            &[], // idempotent re-run: everything already processed
-        )
-        .expect("valid inputs must pass validation");
+        // idempotent re-run: everything already processed
+        let strategies = run_pipeline(1, &[]).expect("valid inputs must pass validation");
 
         assert!(strategies.is_empty());
     }
 
     #[test]
     fn validation_failure_surfaces_the_invariant_and_context() {
-        let indicators = pipeline_indicators();
-        let resampled = pipeline_resampled_points();
-        let long_ops = pipeline_long_ops();
-        let short_ops = pipeline_short_ops();
-        let all_ids: Vec<i32> = indicators.iter().map(|i| i.id).collect();
-
         // Every fixture operation point carries mms_id 1; expecting 2 must
         // fail validation with the context and the invariant named.
-        let err = run_strategies(&indicators, &resampled, &long_ops, &short_ops, 2, &all_ids)
-            .expect_err("mms mismatch must fail validation");
+        let err =
+            run_pipeline(2, &all_indicator_ids()).expect_err("mms mismatch must fail validation");
         let chain = format!("{err:#}");
         assert!(chain.contains("Validation failed"));
         assert!(chain.contains("money management strategy id"));
