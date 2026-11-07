@@ -94,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_level_bare_levels() {
+    fn parse_level_accepts_bare_level_names() {
         assert_eq!(parse_level("error"), Some(LevelFilter::Error));
         assert_eq!(parse_level("warn"), Some(LevelFilter::Warn));
         assert_eq!(parse_level("info"), Some(LevelFilter::Info));
@@ -103,7 +103,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_level_module_targeted() {
+    fn parse_level_uses_level_of_module_directive() {
         assert_eq!(
             parse_level("backtesting_engine=debug"),
             Some(LevelFilter::Debug)
