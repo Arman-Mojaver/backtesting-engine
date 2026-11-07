@@ -253,8 +253,8 @@ Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_
 
 ### Processed Manifest
 `{root_dir}/processed.parquet` — schema: `instrument` (Utf8), `mms_id` (Int32), `indicator_id` (Int32), `processed_at` (Int64).
-- `read(instrument, mms_id)`, `read_processed_ids_per_cell()`, `append(...)`, `append_all(entries, processed_at)`.
-- Dedups on the (instrument, mms_id, indicator_id) triple; atomic writes (temp file + rename).
+- `read_processed_ids_per_cell()`, `append_all(&[ManifestEntry], processed_at)`.
+- Dedups on the (instrument, mms_id, indicator_id) triple; atomic writes (temp file + fsync + rename; temp file removed on failure).
 - Consumed by `strategy create` (skip processed) and `create_loop` (per-cell skip).
 
 ---
