@@ -279,48 +279,7 @@ mod tests {
         //   window [-1,-1] -> gain 0, loss 2 -> rs 0 -> rsi 0 (ts 3000)
         //   window [-1,+1] -> gain 1, loss 1 -> rs 1 -> rsi 50 (ts 4000)
         // Thresholds 70/30: prev rsi 0 < low 30, curr rsi 50 > low 30 -> long.
-        let points = vec![
-            ResampledPointD1 {
-                id: 1,
-                instrument: "EURUSD".into(),
-                open: 5.0,
-                high: 5.1,
-                low: 4.9,
-                close: 5.0,
-                volume: 1000,
-                timestamp: 1000,
-            },
-            ResampledPointD1 {
-                id: 2,
-                instrument: "EURUSD".into(),
-                open: 4.0,
-                high: 4.1,
-                low: 3.9,
-                close: 4.0,
-                volume: 1000,
-                timestamp: 2000,
-            },
-            ResampledPointD1 {
-                id: 3,
-                instrument: "EURUSD".into(),
-                open: 3.0,
-                high: 3.1,
-                low: 2.9,
-                close: 3.0,
-                volume: 1000,
-                timestamp: 3000,
-            },
-            ResampledPointD1 {
-                id: 4,
-                instrument: "EURUSD".into(),
-                open: 4.0,
-                high: 4.1,
-                low: 3.9,
-                close: 4.0,
-                volume: 1000,
-                timestamp: 4000,
-            },
-        ];
+        let points = points_from_closes(&[5.0, 4.0, 3.0, 4.0]);
         let indicator = Indicator {
             id: 7001,
             parameters: IndicatorParameters::Rsi {
