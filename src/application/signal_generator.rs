@@ -30,7 +30,9 @@ pub fn create_signal_groups(
     // per key: every call (hit or miss) waits on its bucket while another key
     // there computes, so use enough buckets to keep collisions rare.
     sync_writes = "by_key",
-    sync_writes_buckets = 1024
+    sync_writes_buckets = 1024,
+    // Hits take a shared read lock instead of the exclusive write lock.
+    unsync_reads = true
 )]
 fn create_signal_group(
     indicator: &Indicator,
