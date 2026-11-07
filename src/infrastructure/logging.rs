@@ -19,7 +19,9 @@ const DEFAULT_LEVEL: LevelFilter = LevelFilter::Info;
 pub const LOG_FILE: &str = "logs/bte.log";
 
 pub fn init(rust_log: Option<&str>, log_file: &Path) -> Result<()> {
-    let level = parse_level(rust_log);
+    let rust_log = rust_log.unwrap_or_default();
+    let parsed_level = parse_level(rust_log);
+    let level = parsed_level.unwrap_or(DEFAULT_LEVEL);
     let config = log_config();
     let log_file = open_log_file(log_file)?;
 
@@ -33,6 +35,10 @@ pub fn init(rust_log: Option<&str>, log_file: &Path) -> Result<()> {
         WriteLogger::new(level, config, log_file),
     ])
     .context("Failed to initialize logger")?;
+
+    if parsed_level.is_none() && !rust_log.is_empty() {
+        log::warn!("Unrecognised RUST_LOG value '{rust_log}', defaulting to {DEFAULT_LEVEL}");
+    }
 
     Ok(())
 }
@@ -66,12 +72,7 @@ fn open_log_file(path: &Path) -> Result<File> {
         })
 }
 
-fn parse_level(raw: Option<&str>) -> LevelFilter {
-    let raw = match raw {
-        Some(s) if !s.is_empty() => s,
-        _ => return DEFAULT_LEVEL,
-    };
-
+fn parse_level(raw: &str) -> Option<LevelFilter> {
     raw.split(',')
         .filter_map(|directive| {
             directive
@@ -81,10 +82,6 @@ fn parse_level(raw: Option<&str>) -> LevelFilter {
                 .ok()
         })
         .max()
-        .unwrap_or_else(|| {
-            eprintln!("Unrecognised RUST_LOG value '{raw}', defaulting to {DEFAULT_LEVEL}");
-            DEFAULT_LEVEL
-        })
 }
 
 #[cfg(test)]
@@ -92,46 +89,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_level_defaults_to_info() {
-        assert_eq!(parse_level(None), LevelFilter::Info);
-        assert_eq!(parse_level(Some("")), LevelFilter::Info);
+    fn parse_level_rejects_empty() {
+        assert_eq!(parse_level(""), None);
     }
 
     #[test]
     fn parse_level_bare_levels() {
-        assert_eq!(parse_level(Some("error")), LevelFilter::Error);
-        assert_eq!(parse_level(Some("warn")), LevelFilter::Warn);
-        assert_eq!(parse_level(Some("info")), LevelFilter::Info);
-        assert_eq!(parse_level(Some("debug")), LevelFilter::Debug);
-        assert_eq!(parse_level(Some("trace")), LevelFilter::Trace);
+        assert_eq!(parse_level("error"), Some(LevelFilter::Error));
+        assert_eq!(parse_level("warn"), Some(LevelFilter::Warn));
+        assert_eq!(parse_level("info"), Some(LevelFilter::Info));
+        assert_eq!(parse_level("debug"), Some(LevelFilter::Debug));
+        assert_eq!(parse_level("trace"), Some(LevelFilter::Trace));
     }
 
     #[test]
     fn parse_level_module_targeted() {
         assert_eq!(
-            parse_level(Some("backtesting_engine=debug")),
-            LevelFilter::Debug
+            parse_level("backtesting_engine=debug"),
+            Some(LevelFilter::Debug)
         );
     }
 
     #[test]
     fn parse_level_picks_most_verbose_directive() {
-        assert_eq!(parse_level(Some("debug,postgres=warn")), LevelFilter::Debug);
+        assert_eq!(parse_level("debug,postgres=warn"), Some(LevelFilter::Debug));
         assert_eq!(
-            parse_level(Some("info,backtesting_engine=debug")),
-            LevelFilter::Debug
+            parse_level("info,backtesting_engine=debug"),
+            Some(LevelFilter::Debug)
         );
     }
 
     #[test]
     fn parse_level_case_insensitive() {
-        assert_eq!(parse_level(Some("INFO")), LevelFilter::Info);
-        assert_eq!(parse_level(Some("Debug")), LevelFilter::Debug);
+        assert_eq!(parse_level("INFO"), Some(LevelFilter::Info));
+        assert_eq!(parse_level("Debug"), Some(LevelFilter::Debug));
     }
 
     #[test]
-    fn parse_level_garbage_falls_back_to_info() {
-        assert_eq!(parse_level(Some("nonsense")), LevelFilter::Info);
+    fn parse_level_rejects_garbage() {
+        assert_eq!(parse_level("nonsense"), None);
     }
 
     #[test]
