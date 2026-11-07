@@ -194,22 +194,24 @@ mod tests {
     }
 
     #[test]
-    fn init_creates_missing_log_dir_and_writes_dated_lines() {
+    fn init_creates_missing_log_dir_and_logs_unrecognised_rust_log() {
         // The global logger is only ever initialized here, so this is safe
         // under both per-process nextest and single-process `cargo test`.
-        const MARKER: &str = "init-smoke-marker-9f17";
+        const UNRECOGNISED: &str = "init-smoke-unknown-level";
         let dir = tempfile::tempdir().expect("tempdir creation failed");
         let log_path = dir.path().join("logs").join("bte.log");
 
-        init(None, &log_path).expect("init should create the missing log directory");
-        log::error!("{MARKER}");
+        init(Some(UNRECOGNISED), &log_path).expect("init should create the missing log directory");
 
         let written = std::fs::read_to_string(&log_path).expect("log file readable");
         let line = written
             .lines()
-            .rev()
-            .find(|l| l.contains(MARKER))
-            .expect("marker line should have been written");
+            .find(|l| l.contains(UNRECOGNISED))
+            .expect("unrecognised RUST_LOG warning should be in the log file");
+        assert!(
+            line.contains("[WARN]") && line.contains("defaulting to INFO"),
+            "warning should report the fallback level, got: {line}"
+        );
         assert_has_dated_timestamp(line);
     }
 
