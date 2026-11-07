@@ -3,6 +3,7 @@ mod create_loop;
 
 use clap::{value_parser, Arg, ArgMatches, Command};
 
+pub(super) const STRATEGY: &str = "strategy";
 const CREATE: &str = "create";
 const CREATE_LOOP: &str = "create_loop";
 const MMS_ID: &str = "money_management_strategy_id";
@@ -29,8 +30,8 @@ impl StrategyCommand {
     }
 }
 
-pub fn build_strategy_cli() -> Command {
-    Command::new("strategy")
+pub fn build_cli() -> Command {
+    Command::new(STRATEGY)
         .about("Strategy operations")
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -59,7 +60,7 @@ pub fn build_strategy_cli() -> Command {
         )
 }
 
-pub fn parse_strategy(m: &ArgMatches) -> anyhow::Result<StrategyCommand> {
+pub fn parse(m: &ArgMatches) -> anyhow::Result<StrategyCommand> {
     match m.subcommand() {
         Some((CREATE, sub_m)) => Ok(StrategyCommand::Create {
             money_management_strategy_id: required_arg(sub_m, MMS_ID)?,
