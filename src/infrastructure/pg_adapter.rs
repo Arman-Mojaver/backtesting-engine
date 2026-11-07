@@ -532,4 +532,30 @@ mod tests {
     fn non_object_parameters_are_rejected() {
         assert!(map_parameters("vroc", "12").is_err());
     }
+
+    fn db_config() -> DbConfig {
+        DbConfig {
+            host: "db.example".into(),
+            port: 6543,
+            user: "engine_role".into(),
+            password: "s3cret-pw".into(),
+            database: "db-staging".into(),
+        }
+    }
+
+    #[test]
+    fn connection_diagnostics_names_target_database_host_port_and_user() {
+        let diagnostics = connection_diagnostics(&db_config());
+
+        assert!(diagnostics.contains("Target database: db-staging"));
+        assert!(diagnostics.contains("Target host:     db.example:6543"));
+        assert!(diagnostics.contains("Target user:     engine_role"));
+    }
+
+    #[test]
+    fn connection_diagnostics_does_not_leak_password() {
+        let diagnostics = connection_diagnostics(&db_config());
+
+        assert!(!diagnostics.contains("s3cret-pw"));
+    }
 }
