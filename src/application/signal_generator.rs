@@ -205,6 +205,48 @@ mod tests {
     }
 
     #[test]
+    fn same_indicator_on_different_instruments_yields_distinct_groups() {
+        // Goes through the memo on purpose, with an id no other cached test
+        // uses: a key without the instrument would return EURUSD's group for
+        // GBPUSD.
+        let indicators = vec![Indicator {
+            id: 9101,
+            parameters: IndicatorParameters::Macd {
+                slow_type: "sma".to_string(),
+                slow_n: 2,
+                fast_type: "ema".to_string(),
+                fast_n: 1,
+            },
+        }];
+        let dip = [
+            100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 82.0, 100.0, 100.0,
+            100.0, 100.0,
+        ];
+        let spike = [
+            100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 118.0, 100.0, 100.0,
+            100.0, 100.0,
+        ];
+        let eurusd = points_from_closes(&dip);
+        let gbpusd: Vec<ResampledPointD1> = points_from_closes(&spike)
+            .into_iter()
+            .map(|point| ResampledPointD1 {
+                instrument: "GBPUSD".into(),
+                ..point
+            })
+            .collect();
+
+        let eurusd_groups = create_signal_groups(&indicators, &eurusd);
+        let gbpusd_groups = create_signal_groups(&indicators, &gbpusd);
+
+        assert_eq!(eurusd_groups.len(), 1);
+        assert_eq!(eurusd_groups[0].instrument, "EURUSD");
+        assert_eq!(eurusd_groups[0].long_signals, vec![11000]);
+        assert_eq!(gbpusd_groups.len(), 1);
+        assert_eq!(gbpusd_groups[0].instrument, "GBPUSD");
+        assert_eq!(gbpusd_groups[0].short_signals, vec![11000]);
+    }
+
+    #[test]
     fn no_indicators_yields_no_signal_groups() {
         let points = resampled_points_for_rsi();
         let result = create_signal_groups(&[], &points);
