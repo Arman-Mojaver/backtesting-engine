@@ -106,15 +106,7 @@ mod tests {
     #[test]
     fn invalid_indicator_is_skipped_not_aborted() {
         let indicators = vec![
-            Indicator {
-                id: 100,
-                parameters: IndicatorParameters::Macd {
-                    slow_type: "ema".to_string(),
-                    slow_n: 26,
-                    fast_type: "wma".to_string(),
-                    fast_n: 12,
-                },
-            },
+            invalid_macd(100),
             Indicator {
                 id: 2,
                 parameters: IndicatorParameters::Rsi {
@@ -128,6 +120,19 @@ mod tests {
         let result = create_signal_groups(&indicators, &points);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].indicator_id, 2);
+    }
+
+    /// A MACD whose fast line uses an unsupported moving-average type ("wma").
+    fn invalid_macd(id: i32) -> Indicator {
+        Indicator {
+            id,
+            parameters: IndicatorParameters::Macd {
+                slow_type: "ema".to_string(),
+                slow_n: 26,
+                fast_type: "wma".to_string(),
+                fast_n: 12,
+            },
+        }
     }
 
     /// Build points from an explicit close series, ts = (i + 1) * 1000.
@@ -257,16 +262,7 @@ mod tests {
 
     #[test]
     fn invalid_indicator_yields_no_signal_group() {
-        // An unknown moving-average type is a configuration error.
-        let indicator = Indicator {
-            id: 100,
-            parameters: IndicatorParameters::Macd {
-                slow_type: "ema".to_string(),
-                slow_n: 26,
-                fast_type: "wma".to_string(),
-                fast_n: 12,
-            },
-        };
+        let indicator = invalid_macd(100);
         let points = resampled_points_for_rsi();
         assert!(create_signal_group_no_cache(&indicator, &points).is_none());
     }
