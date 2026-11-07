@@ -64,7 +64,10 @@ fn create_signal_group(
                 // Skip, don't abort: one misconfigured row must not sink the
                 // others. The miss is memoized, so this warn fires once per
                 // bad indicator, not once per cell.
-                warn!("indicator {} ({instrument}) skipped: {error}", indicator.id);
+                warn!(
+                    "indicator skipped: {error}; id={}, instrument={instrument}",
+                    indicator.id
+                );
                 return None;
             }
         };
