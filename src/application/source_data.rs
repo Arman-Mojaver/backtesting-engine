@@ -1,7 +1,7 @@
 use anyhow::Context;
 use log::info;
 
-use crate::config::environment::{resolve_environment, DbConfig};
+use crate::config::environment::DbConfig;
 use crate::domain::indicator::{Indicator, IndicatorRepository};
 use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
@@ -17,17 +17,15 @@ pub struct SourceData {
 }
 
 pub fn fetch_source_data(
+    db_config: &DbConfig,
     instrument: &str,
     money_management_strategy_id: i32,
 ) -> anyhow::Result<SourceData> {
-    let env = resolve_environment()?;
-    let config = DbConfig::from_env(env);
-
-    info!("Connecting to {} ...", config.database);
+    info!("Connecting to {} ...", db_config.database);
 
     // One connection serves all four sequential reads; the batch path
     // (create_loop) opens one per table because its loads run in parallel.
-    let store = PgStore::connect(&config)?;
+    let store = PgStore::connect(db_config)?;
 
     let indicators = IndicatorRepository::get_all(&store).context("failed to fetch indicators")?;
     let resampled_points = ResampledPointD1Repository::get_by_instrument(&store, instrument)

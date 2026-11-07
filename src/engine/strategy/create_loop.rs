@@ -12,7 +12,7 @@ use crate::application::signal_generator::signal_group_cache_stats;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::get_unprocessed;
 use crate::config::environment::{
-    parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig, Environment,
+    parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig,
 };
 use crate::domain::indicator::{Indicator, IndicatorRepository};
 use crate::domain::operation_point::{
@@ -31,13 +31,12 @@ struct SourceIndex {
 }
 
 impl SourceIndex {
-    fn load(env: Environment) -> anyhow::Result<Self> {
+    fn load(db_config: &DbConfig) -> anyhow::Result<Self> {
         info!("Querying DB...");
-        let db_config = DbConfig::from_env(env);
 
         // One store (connection) per table: the four loads below run
         // concurrently, and a sync postgres::Client is single-connection.
-        let connect = || PgStore::connect(&db_config);
+        let connect = || PgStore::connect(db_config);
         let indicator_store = connect()?;
         let resampled_store = connect()?;
         let long_store = connect()?;
@@ -194,7 +193,7 @@ fn format_failed_cells(failed_cells: &[(String, i32)]) -> String {
 pub fn execute() -> anyhow::Result<()> {
     let command_start = Instant::now();
     let env = resolve_environment()?;
-    let source = SourceIndex::load(env)?;
+    let source = SourceIndex::load(&DbConfig::from_env(env))?;
     let cells = source.cells();
     let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
     let processed_ids_per_cell = persistence
