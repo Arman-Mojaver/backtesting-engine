@@ -42,6 +42,13 @@ pub(crate) fn unix_now_secs() -> anyhow::Result<i64> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManifestEntry {
+    pub instrument: String,
+    pub mms_id: i32,
+    pub indicator_ids: Vec<i32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcessedRow {
     pub instrument: String,
     pub mms_id: i32,
@@ -73,17 +80,13 @@ impl ParquetProcessedManifest {
         read_parquet(&path)
     }
 
-    pub fn append_all(
-        &self,
-        entries: &[(String, i32, Vec<i32>)],
-        processed_at: i64,
-    ) -> anyhow::Result<()> {
+    pub fn append_all(&self, entries: &[ManifestEntry], processed_at: i64) -> anyhow::Result<()> {
         let existing = self.read_all()?;
 
         info!(
             "Writing manifest: {} entries ({} total indicator IDs) ...",
             entries.len(),
-            entries.iter().map(|(_, _, ids)| ids.len()).sum::<usize>(),
+            entries.iter().map(|e| e.indicator_ids.len()).sum::<usize>(),
         );
 
         let rows = merge_entries(existing, entries, processed_at);
@@ -105,17 +108,17 @@ impl ParquetProcessedManifest {
 
 fn merge_entries(
     mut rows: Vec<ProcessedRow>,
-    entries: &[(String, i32, Vec<i32>)],
+    entries: &[ManifestEntry],
     processed_at: i64,
 ) -> Vec<ProcessedRow> {
     let mut incoming: HashSet<(&str, i32, i32)> = HashSet::new();
     let mut fresh_rows: Vec<ProcessedRow> = Vec::new();
-    for (instrument, mms_id, indicator_ids) in entries {
-        for &indicator_id in indicator_ids {
-            if incoming.insert((instrument, *mms_id, indicator_id)) {
+    for entry in entries {
+        for &indicator_id in &entry.indicator_ids {
+            if incoming.insert((&entry.instrument, entry.mms_id, indicator_id)) {
                 fresh_rows.push(ProcessedRow {
-                    instrument: instrument.clone(),
-                    mms_id: *mms_id,
+                    instrument: entry.instrument.clone(),
+                    mms_id: entry.mms_id,
                     indicator_id,
                     processed_at,
                 });
@@ -255,8 +258,12 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn entry(instrument: &str, mms_id: i32, indicator_ids: &[i32]) -> (String, i32, Vec<i32>) {
-        (instrument.to_string(), mms_id, indicator_ids.to_vec())
+    fn entry(instrument: &str, mms_id: i32, indicator_ids: &[i32]) -> ManifestEntry {
+        ManifestEntry {
+            instrument: instrument.to_string(),
+            mms_id,
+            indicator_ids: indicator_ids.to_vec(),
+        }
     }
 
     fn read_cell(

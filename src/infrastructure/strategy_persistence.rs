@@ -5,7 +5,9 @@ use anyhow::Context;
 use rayon::prelude::*;
 
 use crate::application::cell_output::CellOutput;
-use crate::infrastructure::processed_manifest::{unix_now_secs, ParquetProcessedManifest};
+use crate::infrastructure::processed_manifest::{
+    unix_now_secs, ManifestEntry, ParquetProcessedManifest,
+};
 use crate::infrastructure::strategy_adapter::{ParquetStrategyRepository, StrategyRow};
 
 pub struct CellOutputDto {
@@ -16,12 +18,12 @@ pub struct CellOutputDto {
 }
 
 impl CellOutputDto {
-    pub(crate) fn manifest_entry(&self) -> (String, i32, Vec<i32>) {
-        (
-            self.instrument.clone(),
-            self.mms_id,
-            self.processed_indicator_ids.clone(),
-        )
+    pub fn manifest_entry(&self) -> ManifestEntry {
+        ManifestEntry {
+            instrument: self.instrument.clone(),
+            mms_id: self.mms_id,
+            indicator_ids: self.processed_indicator_ids.clone(),
+        }
     }
 }
 
@@ -67,7 +69,7 @@ impl StrategyPersistence {
             });
         }
 
-        let manifest_entries: Vec<(String, i32, Vec<i32>)> = dto_cells
+        let manifest_entries: Vec<ManifestEntry> = dto_cells
             .iter()
             .map(CellOutputDto::manifest_entry)
             .collect();
