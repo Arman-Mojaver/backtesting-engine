@@ -729,6 +729,7 @@ Adopt the `log` facade with `simplelog` (term + file writers, `RUST_LOG`-driven 
 ### Rationale
 - `log` facade keeps the domain free of any logging backend (infrastructure owns `logging::init()`)
 - `RUST_LOG` gives operators per-module level control without rebuilds
+  - *Correction (2026-11-07)*: never implemented. `RUST_LOG` sets one global level; with several directives the most verbose wins. Per-module filtering was judged over-engineering for a single-crate binary.
 - File writer feeds the container's log tail; timestamps make batch runs auditable
 
 ### Alternatives Considered
