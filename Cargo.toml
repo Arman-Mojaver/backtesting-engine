@@ -30,7 +30,8 @@ ignored = ["time"]
 
 [dependencies]
 clap = "4.5"
-cached = "4"
+# Only the `#[cached]` macro over the default `UnboundCache`; no timed stores.
+cached = { version = "4", default-features = false, features = ["proc_macro"] }
 anyhow = "1.0"
 # Typed domain errors: derives Display + std::error::Error for error enums.
 thiserror = "2"
