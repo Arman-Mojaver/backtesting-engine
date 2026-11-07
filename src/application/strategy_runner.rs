@@ -27,7 +27,7 @@ pub fn run_strategies(
         resampled_points,
         money_management_strategy_id,
     )
-    .context("Validation failed")?;
+    .context("input validation failed")?;
 
     let operation_points = OperationPoints {
         long_operation_points,
@@ -232,7 +232,6 @@ mod tests {
 
     #[test]
     fn all_indicators_processed_yields_no_strategies() {
-        // idempotent re-run: everything already processed
         let strategies = run_pipeline(1, &[]).expect("valid inputs must pass validation");
 
         assert!(strategies.is_empty());
@@ -240,12 +239,10 @@ mod tests {
 
     #[test]
     fn validation_failure_surfaces_the_invariant_and_context() {
-        // Every fixture operation point carries mms_id 1; expecting 2 must
-        // fail validation with the context and the invariant named.
         let err =
             run_pipeline(2, &all_indicator_ids()).expect_err("mms mismatch must fail validation");
         let chain = format!("{err:#}");
-        assert!(chain.contains("Validation failed"));
+        assert!(chain.contains("input validation failed"));
         assert!(chain.contains("money management strategy id"));
     }
 }
