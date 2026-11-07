@@ -147,6 +147,11 @@ mod tests {
         ]
     }
 
+    const PASSES_BOTH_STAGES: i32 = 7;
+    const DROPPED_FOR_INACTIVITY: i32 = 8;
+    const DROPPED_FOR_LOW_ROI: i32 = 9;
+    const DUPLICATE_OF_PASSES_BOTH_STAGES: i32 = 10;
+
     fn rsi(id: i32, high: i32, low: i32) -> Indicator {
         Indicator {
             id,
@@ -160,23 +165,13 @@ mod tests {
 
     fn pipeline_indicators() -> Vec<Indicator> {
         vec![
-            // 7: RSI(3) 60/40 — long signals at bars 5, 9, .., 25 and
-            // short signals at bars 7, 11, .., 27 (12 signals/year). Only
-            // the bar-5 and bar-21 longs resolve: two +30 trades compounding
-            // 1.03 -> 1.0609 over exactly one year -> ROI 6.09, DD 0.
-            rsi(7, 60, 40),
-            // 8: RSI(3) 70/30 — values 33/67 never cross either threshold:
-            // dropped at the activity stage before any strategy is built.
-            rsi(8, 70, 30),
-            // 9: ROC(5) — 11 signals (passes the 10/year activity bar) but
-            // none land on an operation-point timestamp: ROI 0 fails the
-            // quality bar -> dropped at the second stage.
+            rsi(PASSES_BOTH_STAGES, 60, 40),
+            rsi(DROPPED_FOR_INACTIVITY, 70, 30),
             Indicator {
-                id: 9,
+                id: DROPPED_FOR_LOW_ROI,
                 parameters: IndicatorParameters::Roc { period: 5 },
             },
-            // 10: identical parameters to 7 — also passes both stages.
-            rsi(10, 60, 40),
+            rsi(DUPLICATE_OF_PASSES_BOTH_STAGES, 60, 40),
         ]
     }
 
@@ -203,10 +198,11 @@ mod tests {
         let strategies =
             run_pipeline(1, &all_indicator_ids()).expect("valid inputs must pass validation");
 
-        // Stage 1 dropped indicator 8 (no signals); stage 2 dropped
-        // indicator 9 (no resolved trades -> ROI 0 < 5); 7 and 10 survive.
         let ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
-        assert_eq!(ids, vec![7, 10]);
+        assert_eq!(
+            ids,
+            vec![PASSES_BOTH_STAGES, DUPLICATE_OF_PASSES_BOTH_STAGES]
+        );
 
         let s = &strategies[0];
         assert_eq!(s.instrument, "EURUSD");
@@ -222,12 +218,16 @@ mod tests {
 
     #[test]
     fn processed_indicators_are_excluded_before_compute() {
-        // Indicator 10 passes both filter stages in the full run above;
-        // marking it processed must exclude it before any compute.
-        let strategies = run_pipeline(1, &[7, 8, 9]).expect("valid inputs must pass validation");
+        let unprocessed_ids = [
+            PASSES_BOTH_STAGES,
+            DROPPED_FOR_INACTIVITY,
+            DROPPED_FOR_LOW_ROI,
+        ];
+        let strategies =
+            run_pipeline(1, &unprocessed_ids).expect("valid inputs must pass validation");
 
         let ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
-        assert_eq!(ids, vec![7]);
+        assert_eq!(ids, vec![PASSES_BOTH_STAGES]);
     }
 
     #[test]
