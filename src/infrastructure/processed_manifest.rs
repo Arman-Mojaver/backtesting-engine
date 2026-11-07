@@ -249,6 +249,9 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    const FIRST_RUN_AT: i64 = 1_700_000_000;
+    const SECOND_RUN_AT: i64 = 1_700_000_001;
+
     fn entry(instrument: &str, mms_id: i32, indicator_ids: &[i32]) -> ManifestEntry {
         ManifestEntry {
             instrument: instrument.to_string(),
@@ -284,10 +287,9 @@ mod tests {
     #[test]
     fn write_and_read_back() {
         let (_tmp, manifest) = new_manifest();
-        let ts = 1700000000;
 
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], ts)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], FIRST_RUN_AT)
             .expect("append");
 
         let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
@@ -295,7 +297,7 @@ mod tests {
         assert_eq!(rows[0].instrument, "EURUSD");
         assert_eq!(rows[0].mms_id, 390);
         assert_eq!(rows[0].indicator_id, 2001);
-        assert_eq!(rows[0].processed_at, ts);
+        assert_eq!(rows[0].processed_at, FIRST_RUN_AT);
         assert_eq!(rows[1].indicator_id, 2002);
     }
 
@@ -304,10 +306,10 @@ mod tests {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], FIRST_RUN_AT)
             .expect("first append");
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2003])], 1700000001)
+            .append_all(&[entry("EURUSD", 390, &[2003])], SECOND_RUN_AT)
             .expect("second append");
 
         let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
@@ -323,33 +325,28 @@ mod tests {
     fn append_all_with_duplicate_indicator_ids_drops_old() {
         let (_tmp, manifest) = new_manifest();
 
-        // First run: process indicators 2001, 2002
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], FIRST_RUN_AT)
             .expect("first append");
 
-        // Re-run with indicator 2001 + new 2003: old 2001 should be replaced
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001, 2003])], 1700000001)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2003])], SECOND_RUN_AT)
             .expect("re-run append");
 
         let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert_eq!(rows.len(), 3);
 
-        // 2001 should exist exactly once, with the new timestamp
         let row_2001: Vec<&ProcessedRow> = rows.iter().filter(|r| r.indicator_id == 2001).collect();
         assert_eq!(row_2001.len(), 1);
-        assert_eq!(row_2001[0].processed_at, 1700000001);
+        assert_eq!(row_2001[0].processed_at, SECOND_RUN_AT);
 
-        // 2002 should still be there with old timestamp
         let row_2002: Vec<&ProcessedRow> = rows.iter().filter(|r| r.indicator_id == 2002).collect();
         assert_eq!(row_2002.len(), 1);
-        assert_eq!(row_2002[0].processed_at, 1700000000);
+        assert_eq!(row_2002[0].processed_at, FIRST_RUN_AT);
 
-        // 2003 should exist with new timestamp
         let row_2003: Vec<&ProcessedRow> = rows.iter().filter(|r| r.indicator_id == 2003).collect();
         assert_eq!(row_2003.len(), 1);
-        assert_eq!(row_2003[0].processed_at, 1700000001);
+        assert_eq!(row_2003[0].processed_at, SECOND_RUN_AT);
     }
 
     #[test]
@@ -357,10 +354,10 @@ mod tests {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], FIRST_RUN_AT)
             .expect("EURUSD");
         manifest
-            .append_all(&[entry("USDJPY", 400, &[3001])], 1700000001)
+            .append_all(&[entry("USDJPY", 400, &[3001])], SECOND_RUN_AT)
             .expect("USDJPY");
 
         let eur_rows = read_cell(&manifest, "EURUSD", 390).expect("read EURUSD");
@@ -375,7 +372,7 @@ mod tests {
     fn append_all_with_multiple_entries_records_each_cell() {
         let (_tmp, manifest) = new_manifest();
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1_700_000_000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], FIRST_RUN_AT)
             .expect("first append");
 
         manifest
@@ -385,7 +382,7 @@ mod tests {
                     entry("USDJPY", 400, &[3001]),
                     entry("EURUSD", 390, &[2003, 2004]),
                 ],
-                1_700_000_001,
+                SECOND_RUN_AT,
             )
             .expect("batch append");
 
@@ -397,10 +394,10 @@ mod tests {
         assert_eq!(
             eur,
             vec![
-                (2001, 1_700_000_000),
-                (2002, 1_700_000_001),
-                (2003, 1_700_000_001),
-                (2004, 1_700_000_001),
+                (2001, FIRST_RUN_AT),
+                (2002, SECOND_RUN_AT),
+                (2003, SECOND_RUN_AT),
+                (2004, SECOND_RUN_AT),
             ]
         );
         let usd = read_cell(&manifest, "USDJPY", 400).expect("read USDJPY");
@@ -421,26 +418,23 @@ mod tests {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001])], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001])], FIRST_RUN_AT)
             .expect("EURUSD 390");
         manifest
-            .append_all(&[entry("EURUSD", 391, &[2002])], 1700000000)
+            .append_all(&[entry("EURUSD", 391, &[2002])], FIRST_RUN_AT)
             .expect("EURUSD 391");
         manifest
-            .append_all(&[entry("USDJPY", 390, &[3001])], 1700000000)
+            .append_all(&[entry("USDJPY", 390, &[3001])], FIRST_RUN_AT)
             .expect("USDJPY 390");
 
-        // Read only EURUSD/390
         let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].indicator_id, 2001);
 
-        // Read EURUSD/391
         let rows = read_cell(&manifest, "EURUSD", 391).expect("read");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].indicator_id, 2002);
 
-        // Read USDJPY/390
         let rows = read_cell(&manifest, "USDJPY", 390).expect("read");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].indicator_id, 3001);
@@ -451,18 +445,17 @@ mod tests {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001])], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001])], FIRST_RUN_AT)
             .expect("first append");
 
-        // Append with empty slice: nothing added, nothing removed
         manifest
-            .append_all(&[entry("EURUSD", 390, &[])], 1700000001)
+            .append_all(&[entry("EURUSD", 390, &[])], SECOND_RUN_AT)
             .expect("empty append");
 
         let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].indicator_id, 2001);
-        assert_eq!(rows[0].processed_at, 1700000000);
+        assert_eq!(rows[0].processed_at, FIRST_RUN_AT);
     }
 
     #[test]
@@ -470,19 +463,15 @@ mod tests {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], FIRST_RUN_AT)
             .expect("first append");
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2003])], 1700000001)
+            .append_all(&[entry("EURUSD", 390, &[2003])], SECOND_RUN_AT)
             .expect("second append");
 
-        // Verify the manifest file exists
         let path = manifest.path();
         assert!(path.exists(), "processed.parquet should exist");
 
-        // Verify no temp file remains after the atomic rename: the temp
-        // name is unique per call, so assert the directory holds only the
-        // manifest itself.
         let entries: Vec<String> = fs::read_dir(path.parent().expect("parent"))
             .expect("read_dir")
             .map(|e| e.expect("entry").file_name().to_string_lossy().to_string())
@@ -500,7 +489,7 @@ mod tests {
             instrument: "EURUSD".to_string(),
             mms_id: 390,
             indicator_id: 2001,
-            processed_at: 1_700_000_000,
+            processed_at: FIRST_RUN_AT,
         }];
 
         let result = write_atomically(&target, &rows);
@@ -521,20 +510,17 @@ mod tests {
         let (_tmp, manifest) = new_manifest();
 
         manifest
-            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], 1700000000)
+            .append_all(&[entry("EURUSD", 390, &[2001, 2002])], FIRST_RUN_AT)
             .expect("EURUSD 390");
         manifest
-            .append_all(&[entry("EURUSD", 391, &[2002])], 1700000000)
+            .append_all(&[entry("EURUSD", 391, &[2002])], FIRST_RUN_AT)
             .expect("EURUSD 391");
         manifest
-            .append_all(&[entry("USDJPY", 390, &[3001])], 1700000000)
+            .append_all(&[entry("USDJPY", 390, &[3001])], FIRST_RUN_AT)
             .expect("USDJPY 390");
 
         let map = manifest.read_processed_ids_per_cell().expect("map");
 
-        // One entry per distinct (instrument, mms_id) cell, each carrying the
-        // cell's full processed-indicator-id set, unfiltered by any external
-        // cell universe, so manifest-only cells reach the report builder.
         assert_eq!(map.len(), 3);
         assert_eq!(
             map.get(&("EURUSD".to_string(), 390)),
@@ -578,7 +564,7 @@ mod tests {
             vec![
                 ("instrument", utf8(&["EURUSD"])),
                 ("mms_id", int32(&[390])),
-                ("processed_at", int64(&[1_700_000_000])),
+                ("processed_at", int64(&[FIRST_RUN_AT])),
             ],
         );
 
@@ -598,7 +584,7 @@ mod tests {
                 ("instrument", utf8(&["EURUSD"])),
                 ("mms_id", int64(&[390])),
                 ("indicator_id", int32(&[2001])),
-                ("processed_at", int64(&[1_700_000_000])),
+                ("processed_at", int64(&[FIRST_RUN_AT])),
             ],
         );
 
