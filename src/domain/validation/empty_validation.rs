@@ -35,7 +35,7 @@ mod tests {
     };
 
     #[test]
-    fn test_all_empty() {
+    fn reports_long_operation_points_first_when_all_empty() {
         assert_eq!(
             validate_empty_entities(
                 &indicators_empty(),
@@ -48,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn test_long_empty_only() {
+    fn rejects_empty_long_operation_points() {
         assert_eq!(
             validate_empty_entities(
                 &indicators_default(),
@@ -61,7 +61,7 @@ mod tests {
     }
 
     #[test]
-    fn test_short_empty_only() {
+    fn rejects_empty_short_operation_points() {
         assert_eq!(
             validate_empty_entities(
                 &indicators_default(),
@@ -74,7 +74,7 @@ mod tests {
     }
 
     #[test]
-    fn test_indicators_empty_only() {
+    fn rejects_empty_indicators() {
         assert_eq!(
             validate_empty_entities(
                 &indicators_empty(),
@@ -87,7 +87,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resampled_empty_only() {
+    fn rejects_empty_resampled_points() {
         assert_eq!(
             validate_empty_entities(
                 &indicators_default(),
@@ -100,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn test_all_have_data() {
+    fn accepts_non_empty_inputs() {
         assert_eq!(
             validate_empty_entities(
                 &indicators_default(),

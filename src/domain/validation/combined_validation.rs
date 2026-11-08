@@ -49,7 +49,7 @@ mod tests {
     use crate::domain::fixtures::*;
 
     #[test]
-    fn test_all_valid() {
+    fn accepts_consistent_inputs() {
         let long = op_points_default();
         let short = op_points_default();
         let indicators = indicators_default();
@@ -62,7 +62,7 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_long_fails() {
+    fn rejects_empty_long_operation_points() {
         let long = op_points_empty();
         let short = op_points_default();
         let indicators = indicators_default();
@@ -75,7 +75,7 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_short_fails() {
+    fn rejects_empty_short_operation_points() {
         let long = op_points_default();
         let short = op_points_empty();
         let indicators = indicators_default();
@@ -88,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    fn test_instrument_mismatch() {
+    fn rejects_instrument_mismatch() {
         let long = op_points_default();
         let short = op_points_default();
         let indicators = indicators_default();
@@ -104,7 +104,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mms_id_mismatch() {
+    fn rejects_unexpected_mms_id() {
         let long = op_points_default();
         let short = op_points_default();
         let indicators = indicators_default();
@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn test_timestamp_mismatch() {
+    fn rejects_long_short_timestamp_mismatch() {
         let long = op_points_ts_123();
         let short = op_points_ts_124();
         let indicators = indicators_default();

@@ -39,7 +39,7 @@ mod tests {
     }
 
     #[test]
-    fn test_all_equal() {
+    fn accepts_points_sharing_one_instrument() {
         let resampled = resampled_points_default();
         let long = op_points_default();
         let short = op_points_default();
@@ -48,7 +48,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resampled_different() {
+    fn rejects_resampled_points_on_other_instrument() {
         let resampled = resampled_points_usdcad();
         let long = op_points_default();
         let short = op_points_default();
@@ -60,7 +60,7 @@ mod tests {
     }
 
     #[test]
-    fn test_long_different() {
+    fn rejects_long_points_on_other_instrument() {
         let resampled = resampled_points_default();
         let long = op_points_default_usdcad();
         let short = op_points_default();
@@ -72,7 +72,7 @@ mod tests {
     }
 
     #[test]
-    fn test_short_different() {
+    fn rejects_short_points_on_other_instrument() {
         let resampled = resampled_points_default();
         let long = op_points_default();
         let short = op_points_default_usdcad();
@@ -84,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resampled_partial_mismatch() {
+    fn rejects_single_resampled_point_on_other_instrument() {
         let resampled = resampled_points_partial_mismatch();
         let long = op_points_default();
         let short = op_points_default();
@@ -96,7 +96,7 @@ mod tests {
     }
 
     #[test]
-    fn test_long_partial_mismatch() {
+    fn rejects_single_long_point_on_other_instrument() {
         let resampled = resampled_points_default();
         let long = op_points_partial_mismatch();
         let short = op_points_default();
@@ -108,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn test_short_partial_mismatch() {
+    fn rejects_single_short_point_on_other_instrument() {
         let resampled = resampled_points_default();
         let long = op_points_default();
         let short = op_points_partial_mismatch();

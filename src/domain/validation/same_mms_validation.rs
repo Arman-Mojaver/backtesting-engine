@@ -33,7 +33,7 @@ mod tests {
     }
 
     #[test]
-    fn test_all_equal() {
+    fn accepts_points_with_expected_mms_id() {
         let long = op_points_default();
         let short = op_points_default();
 
@@ -44,7 +44,7 @@ mod tests {
     }
 
     #[test]
-    fn test_expected_id_different() {
+    fn rejects_points_when_expected_mms_id_differs() {
         let long = op_points_default();
         let short = op_points_default();
 
@@ -55,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn test_long_mismatch() {
+    fn rejects_long_points_with_other_mms_id() {
         let long = op_points_mms_id_2();
         let short = op_points_default();
 
@@ -66,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn test_short_mismatch() {
+    fn rejects_short_points_with_other_mms_id() {
         let long = op_points_default();
         let short = op_points_mms_id_2();
 
@@ -77,7 +77,7 @@ mod tests {
     }
 
     #[test]
-    fn test_long_partial_mismatch() {
+    fn rejects_single_long_point_with_other_mms_id() {
         let long = op_points_mms_partial_mismatch();
         let short = op_points_default();
 
@@ -88,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    fn test_short_partial_mismatch() {
+    fn rejects_single_short_point_with_other_mms_id() {
         let long = op_points_default();
         let short = op_points_mms_partial_mismatch();
 

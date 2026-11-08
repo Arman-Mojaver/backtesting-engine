@@ -40,7 +40,7 @@ mod tests {
     use crate::domain::fixtures::*;
 
     #[test]
-    fn test_all_equal() {
+    fn accepts_identical_timestamps_everywhere() {
         let resampled = resampled_points_ts_123();
         let long = op_points_ts_123();
         let short = op_points_ts_123();
@@ -52,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn test_all_long_and_short_are_subset_of_resampled() {
+    fn accepts_operation_timestamps_within_resampled() {
         let resampled = resampled_points_ts_123();
         let long = op_points_ts_123();
         let short = op_points_ts_123();
@@ -64,7 +64,7 @@ mod tests {
     }
 
     #[test]
-    fn test_long_differs_short() {
+    fn rejects_long_and_short_with_different_timestamps() {
         let resampled = resampled_points_ts_123();
         let long = op_points_ts_123();
         let short = op_points_ts_124();
@@ -76,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    fn test_long_is_not_subset_of_resampled() {
+    fn rejects_timestamp_missing_from_resampled() {
         let resampled = resampled_points_ts_123();
         let long = op_points_ts_124();
         let short = op_points_ts_124();
@@ -88,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    fn test_short_has_timestamp_missing_from_long() {
+    fn rejects_short_timestamp_missing_from_long() {
         let resampled = resampled_points_ts_123();
         let long = op_points_ts_123();
         let short = op_points_ts_124();
