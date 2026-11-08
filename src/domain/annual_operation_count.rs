@@ -1,14 +1,13 @@
 use crate::domain::cast;
 
-const SECONDS_PER_DAY: f64 = 86400.0;
-const DAYS_PER_YEAR: f64 = 365.25;
+const SECONDS_PER_YEAR: f64 = 365.25 * 86_400.0;
 
 pub fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
-    let days = cast::i64_to_f64(end_timestamp.saturating_sub(start_timestamp)) / SECONDS_PER_DAY;
-    if days <= 0.0 {
+    let seconds = end_timestamp.saturating_sub(start_timestamp);
+    if seconds <= 0 {
         return 0.0;
     }
-    days / DAYS_PER_YEAR
+    cast::i64_to_f64(seconds) / SECONDS_PER_YEAR
 }
 
 pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_timestamp: i64) -> f64 {
