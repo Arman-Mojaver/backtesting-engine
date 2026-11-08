@@ -179,27 +179,20 @@ pub const fn indicators_empty() -> Vec<Indicator> {
     Vec::new()
 }
 
+fn ema_macd(id: i32) -> Indicator {
+    Indicator {
+        id,
+        parameters: IndicatorParameters::Macd {
+            slow_type: "ema".to_string(),
+            slow_n: 26,
+            fast_type: "ema".to_string(),
+            fast_n: 12,
+        },
+    }
+}
+
 pub fn indicators_default() -> Vec<Indicator> {
-    vec![
-        Indicator {
-            id: 1,
-            parameters: IndicatorParameters::Macd {
-                slow_type: "ema".to_string(),
-                slow_n: 26,
-                fast_type: "ema".to_string(),
-                fast_n: 12,
-            },
-        },
-        Indicator {
-            id: 2,
-            parameters: IndicatorParameters::Macd {
-                slow_type: "ema".to_string(),
-                slow_n: 26,
-                fast_type: "ema".to_string(),
-                fast_n: 12,
-            },
-        },
-    ]
+    vec![ema_macd(1), ema_macd(2)]
 }
 
 const ALTERNATING_CLOSES: [f64; 5] = [1.0, 2.0, 1.0, 2.0, 1.0];
