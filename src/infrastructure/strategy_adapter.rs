@@ -20,6 +20,24 @@ use rustc_hash::FxHashSet;
 use crate::domain::cast;
 use crate::domain::strategy::Strategy;
 
+const METRIC_PRECISION: u8 = 10;
+const METRIC_SCALE: i8 = 2;
+const METRIC_TYPE: DataType = DataType::Decimal128(METRIC_PRECISION, METRIC_SCALE);
+
+fn metric_scale_factor() -> f64 {
+    10_f64.powi(i32::from(METRIC_SCALE))
+}
+
+fn metric_from_decimal(raw: i128) -> f64 {
+    cast::i128_to_f64(raw) / metric_scale_factor()
+}
+
+fn metric_array(values: impl Iterator<Item = f64>) -> anyhow::Result<Decimal128Array> {
+    let raw = values.map(|v| cast::round_f64_to_i128(v * metric_scale_factor()));
+    Ok(Decimal128Array::from_iter_values(raw)
+        .with_precision_and_scale(METRIC_PRECISION, METRIC_SCALE)?)
+}
+
 #[derive(Debug, Clone)]
 pub struct StrategyRow {
     strategy_id: i64,
@@ -219,9 +237,9 @@ fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
         out.push(StrategyRow {
             strategy_id: strategy_ids.value(i),
             indicator_id: indicator_ids.value(i),
-            annual_roi: cast::i128_to_f64(rois.value(i)) / 100.0,
-            max_draw_down: cast::i128_to_f64(draw_downs.value(i)) / 100.0,
-            annual_operation_count: cast::i128_to_f64(op_counts.value(i)) / 100.0,
+            annual_roi: metric_from_decimal(rois.value(i)),
+            max_draw_down: metric_from_decimal(draw_downs.value(i)),
+            annual_operation_count: metric_from_decimal(op_counts.value(i)),
             long_operation_point_ids: decode_list_value(long_ids, i),
             short_operation_point_ids: decode_list_value(short_ids, i),
             money_management_strategy_id: mms_ids.value(i),
@@ -240,9 +258,9 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("strategy_id", DataType::Int64, false),
         Field::new("indicator_id", DataType::Int32, false),
-        Field::new("annual_roi", DataType::Decimal128(10, 2), false),
-        Field::new("max_draw_down", DataType::Decimal128(10, 2), false),
-        Field::new("annual_operation_count", DataType::Decimal128(10, 2), false),
+        Field::new("annual_roi", METRIC_TYPE, false),
+        Field::new("max_draw_down", METRIC_TYPE, false),
+        Field::new("annual_operation_count", METRIC_TYPE, false),
         Field::new(
             "long_operation_point_ids",
             DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
@@ -258,21 +276,9 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
 
     let strategy_ids: Int64Array = rows.iter().map(|r| r.strategy_id).collect();
     let indicator_ids: Int32Array = rows.iter().map(|r| r.indicator_id).collect();
-    let rois = Decimal128Array::from_iter_values(
-        rows.iter()
-            .map(|r| cast::round_f64_to_i128(r.annual_roi * 100.0)),
-    )
-    .with_precision_and_scale(10, 2)?;
-    let draw_downs = Decimal128Array::from_iter_values(
-        rows.iter()
-            .map(|r| cast::round_f64_to_i128(r.max_draw_down * 100.0)),
-    )
-    .with_precision_and_scale(10, 2)?;
-    let op_counts = Decimal128Array::from_iter_values(
-        rows.iter()
-            .map(|r| cast::round_f64_to_i128(r.annual_operation_count * 100.0)),
-    )
-    .with_precision_and_scale(10, 2)?;
+    let rois = metric_array(rows.iter().map(|r| r.annual_roi))?;
+    let draw_downs = metric_array(rows.iter().map(|r| r.max_draw_down))?;
+    let op_counts = metric_array(rows.iter().map(|r| r.annual_operation_count))?;
     let mms_ids: Int32Array = rows
         .iter()
         .map(|r| r.money_management_strategy_id)
@@ -453,6 +459,41 @@ mod tests {
         assert_eq!(back[0].short_operation_point_ids, vec![4, 5]);
         assert_eq!(back[0].money_management_strategy_id, 390);
         assert_eq!(back[1].annual_roi, -5.10);
+    }
+
+    #[test]
+    fn write_rows_stores_metrics_as_rounded_two_decimal_integers() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
+        let mut strategies = sample_strategies();
+        strategies[1].annual_roi = 12.346;
+        strategies[1].max_draw_down = 0.004;
+        strategies[1].annual_operation_count = -0.006;
+
+        repo.write_rows("EURUSD", 390, rows(&strategies, 1))
+            .unwrap();
+
+        let path = repo.partition_path("EURUSD", 390).unwrap();
+        let file = File::open(path).unwrap();
+        let batch = ParquetRecordBatchReaderBuilder::try_new(file)
+            .unwrap()
+            .build()
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap();
+        let raw = |name: &str| -> (DataType, Vec<i128>) {
+            let column = batch.column_by_name(name).unwrap();
+            let values = column.as_primitive::<Decimal128Type>().values().to_vec();
+            (column.data_type().clone(), values)
+        };
+        let decimal_10_2 = DataType::Decimal128(10, 2);
+        assert_eq!(raw("annual_roi"), (decimal_10_2.clone(), vec![1234, 1235]));
+        assert_eq!(raw("max_draw_down"), (decimal_10_2.clone(), vec![2567, 0]));
+        assert_eq!(
+            raw("annual_operation_count"),
+            (decimal_10_2, vec![1520, -1])
+        );
     }
 
     #[test]
