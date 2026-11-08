@@ -37,53 +37,23 @@ pub fn op_points_default() -> Vec<OperationPoint> {
 }
 
 pub fn op_points_mms_id_2() -> Vec<OperationPoint> {
-    vec![
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: 1,
-            tp: 10,
-            risk: 0.01,
+    op_points_default()
+        .into_iter()
+        .map(|p| OperationPoint {
             money_management_strategy_id: 2,
-            id: 1,
-            sl: 5,
-            timestamp: 1000,
-        },
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 2,
-            id: 2,
-            sl: 4,
-            timestamp: 1001,
-        },
-    ]
+            ..p
+        })
+        .collect()
 }
 
 pub fn op_points_default_usdcad() -> Vec<OperationPoint> {
-    vec![
-        OperationPoint {
+    op_points_default()
+        .into_iter()
+        .map(|p| OperationPoint {
             instrument: "USDCAD".into(),
-            result: 1,
-            tp: 10,
-            risk: 0.01,
-            money_management_strategy_id: 1,
-            id: 1,
-            sl: 5,
-            timestamp: 1000,
-        },
-        OperationPoint {
-            instrument: "USDCAD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id: 2,
-            sl: 4,
-            timestamp: 1001,
-        },
-    ]
+            ..p
+        })
+        .collect()
 }
 
 pub fn op_points_partial_mismatch() -> Vec<OperationPoint> {
