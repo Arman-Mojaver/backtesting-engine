@@ -211,62 +211,23 @@ pub fn indicators_default() -> Vec<Indicator> {
 // Signal-generation fixtures: resampled-point series long enough to drive RSI
 // windows, plus indicator builders with RSI parameters.
 
-/// 5 resampled points with alternating close prices (1,2,1,2,1): yields 4
-/// price diffs and supports RSI windows of n up to 4. Enough to exercise the
-/// RSI computation path through `create_signals`.
+const ALTERNATING_CLOSES: [f64; 5] = [1.0, 2.0, 1.0, 2.0, 1.0];
+
+/// Four close-to-close diffs: enough for RSI windows up to n = 4.
 pub fn resampled_points_for_rsi() -> Vec<ResampledPointD1> {
-    vec![
-        ResampledPointD1 {
-            id: 1,
+    (1..)
+        .zip(ALTERNATING_CLOSES)
+        .map(|(id, close)| ResampledPointD1 {
+            id,
             instrument: "EURUSD".into(),
-            open: 1.0,
-            high: 1.1,
-            low: 0.9,
-            close: 1.0,
+            open: close,
+            high: close + 0.1,
+            low: close - 0.1,
+            close,
             volume: 1000,
-            timestamp: 1000,
-        },
-        ResampledPointD1 {
-            id: 2,
-            instrument: "EURUSD".into(),
-            open: 2.0,
-            high: 2.1,
-            low: 1.9,
-            close: 2.0,
-            volume: 1000,
-            timestamp: 2000,
-        },
-        ResampledPointD1 {
-            id: 3,
-            instrument: "EURUSD".into(),
-            open: 1.0,
-            high: 1.1,
-            low: 0.9,
-            close: 1.0,
-            volume: 1000,
-            timestamp: 3000,
-        },
-        ResampledPointD1 {
-            id: 4,
-            instrument: "EURUSD".into(),
-            open: 2.0,
-            high: 2.1,
-            low: 1.9,
-            close: 2.0,
-            volume: 1000,
-            timestamp: 4000,
-        },
-        ResampledPointD1 {
-            id: 5,
-            instrument: "EURUSD".into(),
-            open: 1.0,
-            high: 1.1,
-            low: 0.9,
-            close: 1.0,
-            volume: 1000,
-            timestamp: 5000,
-        },
-    ]
+            timestamp: i64::from(id).saturating_mul(1000),
+        })
+        .collect()
 }
 
 /// A single RSI indicator (n=3, thresholds 70/30) with id 1.
