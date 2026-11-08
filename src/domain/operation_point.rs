@@ -232,10 +232,16 @@ mod tests {
         ];
 
         let index = group_by_cell(points);
+        let ids_in = |instrument: &str, mms_id: i32| -> Vec<i32> {
+            index[&(instrument.to_string(), mms_id)]
+                .iter()
+                .map(|p| p.id)
+                .collect()
+        };
 
         assert_eq!(index.len(), 3);
-        assert_eq!(index[&("EURUSD".to_string(), 1)].len(), 2);
-        assert_eq!(index[&("EURUSD".to_string(), 2)].len(), 1);
-        assert_eq!(index[&("USDCAD".to_string(), 1)].len(), 1);
+        assert_eq!(ids_in("EURUSD", 1), vec![1, 2]);
+        assert_eq!(ids_in("EURUSD", 2), vec![3]);
+        assert_eq!(ids_in("USDCAD", 1), vec![4]);
     }
 }
