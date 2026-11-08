@@ -10,4 +10,5 @@ pub mod resampled_point;
 pub mod signal;
 pub mod signal_group;
 pub mod strategy;
+pub mod time_span;
 pub mod validation;

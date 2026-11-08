@@ -1,6 +1,6 @@
-use crate::domain::annual_operation_count::difference_in_years;
 use crate::domain::cast;
 use crate::domain::operation_point::OperationPoint;
+use crate::domain::time_span::difference_in_years;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PerformanceMetrics {

@@ -306,6 +306,7 @@ src/
 │   ├── strategy.rs             # Strategy + GlobalStrategyFilter + filter_strategies()
 │   ├── annual_operation_count.rs  # annual_operation_count() metric
 │   ├── performance_metrics.rs  # performance_metrics() -> PerformanceMetrics (single pass) + annual_roi() method
+│   ├── time_span.rs            # difference_in_years() shared by annualised metrics
 │   ├── validation/             # Domain invariant checks (4 rules + combined)
 │   └── fixtures.rs             # Test data builders
 ├── engine/                     # Standalone Rust CLI engine (own binary)
