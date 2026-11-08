@@ -6,13 +6,20 @@ use crate::domain::resampled_point::ResampledPointD1;
 use super::ValidationError;
 
 pub fn validate_timestamps_match(
-    resampled: &[ResampledPointD1],
-    long: &[OperationPoint],
-    short: &[OperationPoint],
+    resampled_points: &[ResampledPointD1],
+    long_operation_points: &[OperationPoint],
+    short_operation_points: &[OperationPoint],
 ) -> Result<(), ValidationError> {
-    let resampled_timestamps: FxHashSet<i64> = resampled.iter().map(|rp| rp.timestamp).collect();
-    let long_timestamps: FxHashSet<i64> = long.iter().map(|op| op.timestamp).collect();
-    let short_timestamps: FxHashSet<i64> = short.iter().map(|op| op.timestamp).collect();
+    let resampled_timestamps: FxHashSet<i64> =
+        resampled_points.iter().map(|rp| rp.timestamp).collect();
+    let long_timestamps: FxHashSet<i64> = long_operation_points
+        .iter()
+        .map(|op| op.timestamp)
+        .collect();
+    let short_timestamps: FxHashSet<i64> = short_operation_points
+        .iter()
+        .map(|op| op.timestamp)
+        .collect();
 
     if let Some(&timestamp) = long_timestamps
         .symmetric_difference(&short_timestamps)

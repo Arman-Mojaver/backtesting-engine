@@ -21,10 +21,10 @@ pub fn run_strategies(
     unprocessed_ids: &[i32],
 ) -> anyhow::Result<Vec<Strategy>> {
     validate_all(
-        long_operation_points,
-        short_operation_points,
         indicators,
         resampled_points,
+        long_operation_points,
+        short_operation_points,
         money_management_strategy_id,
     )
     .context("input validation failed")?;

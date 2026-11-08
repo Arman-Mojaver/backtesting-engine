@@ -9,23 +9,36 @@ use super::same_timestamp_validation;
 use super::ValidationError;
 
 pub fn validate_all(
-    long_ops: &[OperationPoint],
-    short_ops: &[OperationPoint],
     indicators: &[Indicator],
     resampled_points: &[ResampledPointD1],
+    long_operation_points: &[OperationPoint],
+    short_operation_points: &[OperationPoint],
     expected_mms_id: i32,
 ) -> Result<(), ValidationError> {
-    empty_validation::validate_empty_entities(long_ops, short_ops, indicators, resampled_points)?;
+    empty_validation::validate_empty_entities(
+        indicators,
+        resampled_points,
+        long_operation_points,
+        short_operation_points,
+    )?;
 
-    same_instrument_validation::validate_same_instrument(resampled_points, long_ops, short_ops)?;
+    same_instrument_validation::validate_same_instrument(
+        resampled_points,
+        long_operation_points,
+        short_operation_points,
+    )?;
 
     same_mms_validation::validate_money_management_strategy_id_matches(
-        long_ops,
-        short_ops,
+        long_operation_points,
+        short_operation_points,
         expected_mms_id,
     )?;
 
-    same_timestamp_validation::validate_timestamps_match(resampled_points, long_ops, short_ops)?;
+    same_timestamp_validation::validate_timestamps_match(
+        resampled_points,
+        long_operation_points,
+        short_operation_points,
+    )?;
 
     Ok(())
 }
@@ -43,7 +56,7 @@ mod tests {
         let resampled = resampled_points_default();
 
         assert_eq!(
-            validate_all(&long, &short, &indicators, &resampled, 1),
+            validate_all(&indicators, &resampled, &long, &short, 1),
             Ok(())
         );
     }
@@ -56,7 +69,7 @@ mod tests {
         let resampled = resampled_points_default();
 
         assert_eq!(
-            validate_all(&long, &short, &indicators, &resampled, 1),
+            validate_all(&indicators, &resampled, &long, &short, 1),
             Err(ValidationError::LongOperationPointsEmpty)
         );
     }
@@ -69,7 +82,7 @@ mod tests {
         let resampled = resampled_points_default();
 
         assert_eq!(
-            validate_all(&long, &short, &indicators, &resampled, 1),
+            validate_all(&indicators, &resampled, &long, &short, 1),
             Err(ValidationError::ShortOperationPointsEmpty)
         );
     }
@@ -82,7 +95,7 @@ mod tests {
         let resampled = resampled_points_usdcad();
 
         assert_eq!(
-            validate_all(&long, &short, &indicators, &resampled, 1),
+            validate_all(&indicators, &resampled, &long, &short, 1),
             Err(ValidationError::InstrumentMismatch {
                 expected: "USDCAD".into(),
                 found: "EURUSD".into(),
@@ -98,7 +111,7 @@ mod tests {
         let resampled = resampled_points_default();
 
         assert_eq!(
-            validate_all(&long, &short, &indicators, &resampled, 2),
+            validate_all(&indicators, &resampled, &long, &short, 2),
             Err(ValidationError::MoneyManagementStrategyMismatch {
                 expected: 2,
                 found: 1,
@@ -114,7 +127,7 @@ mod tests {
         let resampled = resampled_points_ts_123();
 
         assert_eq!(
-            validate_all(&long, &short, &indicators, &resampled, 1),
+            validate_all(&indicators, &resampled, &long, &short, 1),
             Err(ValidationError::LongShortTimestampsDiffer { timestamp: 3 })
         );
     }

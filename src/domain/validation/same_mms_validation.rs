@@ -3,13 +3,13 @@ use crate::domain::operation_point::OperationPoint;
 use super::ValidationError;
 
 pub fn validate_money_management_strategy_id_matches(
-    long_points: &[OperationPoint],
-    short_points: &[OperationPoint],
+    long_operation_points: &[OperationPoint],
+    short_operation_points: &[OperationPoint],
     expected_id: i32,
 ) -> Result<(), ValidationError> {
-    let mismatched_id = long_points
+    let mismatched_id = long_operation_points
         .iter()
-        .chain(short_points)
+        .chain(short_operation_points)
         .map(|op| op.money_management_strategy_id)
         .find(|&id| id != expected_id);
 
