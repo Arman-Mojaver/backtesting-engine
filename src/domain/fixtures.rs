@@ -11,29 +11,35 @@ pub const ONE_YEAR_SECS: i64 = 365 * SECONDS_PER_DAY + SECONDS_PER_DAY / 4;
 pub const fn op_points_empty() -> Vec<OperationPoint> {
     Vec::new()
 }
+
+fn winning_op(id: i32, timestamp: i64) -> OperationPoint {
+    OperationPoint {
+        instrument: "EURUSD".into(),
+        result: 1,
+        tp: 10,
+        risk: 0.01,
+        money_management_strategy_id: 1,
+        id,
+        sl: 5,
+        timestamp,
+    }
+}
+
+fn losing_op(id: i32, timestamp: i64) -> OperationPoint {
+    OperationPoint {
+        instrument: "EURUSD".into(),
+        result: -1,
+        tp: 8,
+        risk: 0.02,
+        money_management_strategy_id: 1,
+        id,
+        sl: 4,
+        timestamp,
+    }
+}
+
 pub fn op_points_default() -> Vec<OperationPoint> {
-    vec![
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: 1,
-            tp: 10,
-            risk: 0.01,
-            money_management_strategy_id: 1,
-            id: 1,
-            sl: 5,
-            timestamp: 1000,
-        },
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id: 2,
-            sl: 4,
-            timestamp: 1001,
-        },
-    ]
+    vec![winning_op(1, 1000), losing_op(2, 1001)]
 }
 
 pub fn op_points_mms_id_2() -> Vec<OperationPoint> {
@@ -58,122 +64,30 @@ pub fn op_points_default_usdcad() -> Vec<OperationPoint> {
 
 pub fn op_points_partial_mismatch() -> Vec<OperationPoint> {
     vec![
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: 1,
-            tp: 10,
-            risk: 0.01,
-            money_management_strategy_id: 1,
-            id: 1,
-            sl: 5,
-            timestamp: 1000,
-        },
+        winning_op(1, 1000),
         OperationPoint {
             instrument: "USDCAD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id: 2,
-            sl: 4,
-            timestamp: 1001,
+            ..losing_op(2, 1001)
         },
     ]
 }
 
 pub fn op_points_mms_partial_mismatch() -> Vec<OperationPoint> {
     vec![
+        winning_op(1, 1000),
         OperationPoint {
-            instrument: "EURUSD".into(),
-            result: 1,
-            tp: 10,
-            risk: 0.01,
-            money_management_strategy_id: 1,
-            id: 1,
-            sl: 5,
-            timestamp: 1000,
-        },
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
             money_management_strategy_id: 2,
-            id: 2,
-            sl: 4,
-            timestamp: 1001,
+            ..losing_op(2, 1001)
         },
     ]
 }
 
 pub fn op_points_ts_123() -> Vec<OperationPoint> {
-    vec![
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: 1,
-            tp: 10,
-            risk: 0.01,
-            money_management_strategy_id: 1,
-            id: 1,
-            sl: 5,
-            timestamp: 1,
-        },
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id: 2,
-            sl: 4,
-            timestamp: 2,
-        },
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id: 3,
-            sl: 4,
-            timestamp: 3,
-        },
-    ]
+    vec![winning_op(1, 1), losing_op(2, 2), losing_op(3, 3)]
 }
 
 pub fn op_points_ts_124() -> Vec<OperationPoint> {
-    vec![
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: 1,
-            tp: 10,
-            risk: 0.01,
-            money_management_strategy_id: 1,
-            id: 1,
-            sl: 5,
-            timestamp: 1,
-        },
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id: 2,
-            sl: 4,
-            timestamp: 2,
-        },
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result: -1,
-            tp: 8,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id: 3,
-            sl: 4,
-            timestamp: 4,
-        },
-    ]
+    vec![winning_op(1, 1), losing_op(2, 2), losing_op(3, 4)]
 }
 
 // Resampled Point fixtures
