@@ -125,6 +125,8 @@ CrossoverPair    { upcross_long_buffer, upcross_short_buffer }
 
 // IndicatorOutput::create_signal_group(indicator_id) -> SignalGroup
 // Signal rules (domain/signal/):
+//   Values exactly on a level are skipped, so a cross through it (-1, 0, 1) still
+//   fires, on the first bar past the level; a touch-and-bounce (1, 0, 1) does not.
 //   Oscillator: prev < 0 && curr > 0 -> long; prev > 0 && curr < 0 -> short (zero-cross)
 //   Threshold:  prev < low && curr > low -> long; prev > high && curr < high -> short
 //   Crossover:  (long_buffer - short_buffer) diff, then zero-cross

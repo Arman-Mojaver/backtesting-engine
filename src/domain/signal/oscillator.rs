@@ -219,14 +219,54 @@ mod tests {
     }
 
     #[test]
-    fn value_exactly_zero_produces_no_signal_known_edge() {
-        let result = create(&buf(&[iv(100, 1.0), iv(101, 0.0), iv(102, 1.0)]));
+    fn equal_adjacent_values_no_signal() {
+        let result = create(&buf(&[iv(100, 0.5), iv(101, 0.5)]));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
-    fn equal_adjacent_values_no_signal() {
-        let result = create(&buf(&[iv(100, 0.5), iv(101, 0.5)]));
+    fn negative_through_zero_to_positive_is_long() {
+        let result = create(&buf(&[iv(100, -1.0), iv(101, 0.0), iv(102, 1.0)]));
+        assert_eq!(result, expected(&[102], &[]));
+    }
+
+    #[test]
+    fn negative_through_several_zeros_to_positive_is_long() {
+        let result = create(&buf(&[
+            iv(100, -1.0),
+            iv(101, 0.0),
+            iv(102, 0.0),
+            iv(103, 1.0),
+        ]));
+        assert_eq!(result, expected(&[103], &[]));
+    }
+
+    #[test]
+    fn positive_through_zero_to_negative_is_short() {
+        let result = create(&buf(&[iv(100, 1.0), iv(101, 0.0), iv(102, -1.0)]));
+        assert_eq!(result, expected(&[], &[102]));
+    }
+
+    #[test]
+    fn positive_through_several_zeros_to_negative_is_short() {
+        let result = create(&buf(&[
+            iv(100, 1.0),
+            iv(101, 0.0),
+            iv(102, 0.0),
+            iv(103, -1.0),
+        ]));
+        assert_eq!(result, expected(&[], &[103]));
+    }
+
+    #[test]
+    fn negative_touches_zero_and_falls_back_no_signal() {
+        let result = create(&buf(&[iv(100, -1.0), iv(101, 0.0), iv(102, -1.0)]));
+        assert_eq!(result, expected(&[], &[]));
+    }
+
+    #[test]
+    fn positive_touches_zero_and_rises_back_no_signal() {
+        let result = create(&buf(&[iv(100, 1.0), iv(101, 0.0), iv(102, 1.0)]));
         assert_eq!(result, expected(&[], &[]));
     }
 }

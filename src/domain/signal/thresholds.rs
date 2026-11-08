@@ -1,4 +1,4 @@
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 
 use crate::domain::signal::{IndicatorValue, ThresholdSeries};
 
@@ -11,19 +11,30 @@ pub fn level_crosses(
     long_level: f64,
     short_level: f64,
 ) -> (Vec<i64>, Vec<i64>) {
+    (
+        crosses_above(items, long_level),
+        crosses_below(items, short_level),
+    )
+}
+
+fn crosses_above(items: &[IndicatorValue], level: f64) -> Vec<i64> {
     items
         .iter()
+        .filter(|item| item.value != level)
         .tuple_windows()
-        .filter_map(|(prev, curr)| {
-            if prev.value < long_level && curr.value > long_level {
-                Some(Either::Left(curr.timestamp))
-            } else if prev.value > short_level && curr.value < short_level {
-                Some(Either::Right(curr.timestamp))
-            } else {
-                None
-            }
-        })
-        .partition_map(|either| either)
+        .filter(|(prev, curr)| prev.value < level && curr.value > level)
+        .map(|(_, curr)| curr.timestamp)
+        .collect()
+}
+
+fn crosses_below(items: &[IndicatorValue], level: f64) -> Vec<i64> {
+    items
+        .iter()
+        .filter(|item| item.value != level)
+        .tuple_windows()
+        .filter(|(prev, curr)| prev.value > level && curr.value < level)
+        .map(|(_, curr)| curr.timestamp)
+        .collect()
 }
 
 #[cfg(test)]
@@ -48,28 +59,36 @@ mod tests {
 
     #[test]
     fn empty_buffer_yields_no_signals() {
-        let result = create(&buf(&[], 1.0, -1.0));
+        let result = create(&buf(&[], 70.0, 30.0));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn two_values_between_thresholds_no_cross() {
-        let result = create(&buf(&[iv(1700006400, 0.5), iv(1700092800, 0.7)], 1.0, -1.0));
+        let result = create(&buf(
+            &[iv(1700006400, 50.0), iv(1700092800, 55.0)],
+            70.0,
+            30.0,
+        ));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn two_values_above_high_no_down_cross() {
-        let result = create(&buf(&[iv(1703808000, 3.0), iv(1703894400, 3.1)], 2.0, -1.0));
+        let result = create(&buf(
+            &[iv(1703808000, 80.0), iv(1703894400, 85.0)],
+            70.0,
+            30.0,
+        ));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn two_values_below_low_no_up_cross() {
         let result = create(&buf(
-            &[iv(1703980800, -2.5), iv(1704067200, -2.0)],
-            1.0,
-            -1.0,
+            &[iv(1703980800, 20.0), iv(1704067200, 25.0)],
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[], &[]));
     }
@@ -78,12 +97,12 @@ mod tests {
     fn value_on_low_threshold_strict_no_long() {
         let result = create(&buf(
             &[
-                iv(1701043200, -2.0),
-                iv(1701129600, -1.5),
-                iv(1701388800, -1.9),
+                iv(1701043200, 20.0),
+                iv(1701129600, 30.0),
+                iv(1701388800, 25.0),
             ],
-            1.0,
-            -1.5,
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[], &[]));
     }
@@ -92,12 +111,12 @@ mod tests {
     fn value_on_low_threshold_strict_no_long_v2() {
         let result = create(&buf(
             &[
-                iv(1701216000, -1.0),
-                iv(1701302400, -2.0),
-                iv(1701388800, -1.2),
+                iv(1701216000, 40.0),
+                iv(1701302400, 30.0),
+                iv(1701388800, 35.0),
             ],
-            1.0,
-            -2.0,
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[], &[]));
     }
@@ -106,12 +125,12 @@ mod tests {
     fn value_on_high_threshold_strict_no_short() {
         let result = create(&buf(
             &[
-                iv(1701216000, 2.5),
-                iv(1701302400, 2.0),
-                iv(1701388800, 2.2),
+                iv(1701216000, 80.0),
+                iv(1701302400, 70.0),
+                iv(1701388800, 75.0),
             ],
-            2.0,
-            -1.0,
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[], &[]));
     }
@@ -120,12 +139,12 @@ mod tests {
     fn value_on_high_threshold_strict_no_short_v2() {
         let result = create(&buf(
             &[
-                iv(1701216000, 1.0),
-                iv(1701302400, 1.5),
-                iv(1701388800, 1.2),
+                iv(1701216000, 60.0),
+                iv(1701302400, 70.0),
+                iv(1701388800, 65.0),
             ],
-            1.5,
-            -1.0,
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[], &[]));
     }
@@ -133,30 +152,34 @@ mod tests {
     #[test]
     fn cross_above_low_is_long() {
         let result = create(&buf(
-            &[iv(1700006400, -2.0), iv(1700092800, 0.2)],
-            1.5,
-            -1.0,
+            &[iv(1700006400, 20.0), iv(1700092800, 40.0)],
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[1700092800], &[]));
     }
 
     #[test]
     fn cross_below_high_is_short() {
-        let result = create(&buf(&[iv(1700179200, 2.5), iv(1700265600, 1.0)], 2.0, -1.5));
+        let result = create(&buf(
+            &[iv(1700179200, 80.0), iv(1700265600, 60.0)],
+            70.0,
+            30.0,
+        ));
         assert_eq!(result, expected(&[], &[1700265600]));
     }
 
     #[test]
-    fn two_long_crosses_through_zero() {
+    fn two_long_crosses() {
         let result = create(&buf(
             &[
-                iv(1700352000, -3.0),
-                iv(1700438400, 0.0),
-                iv(1700524800, -2.5),
-                iv(1700611200, -0.2),
+                iv(1700352000, 10.0),
+                iv(1700438400, 50.0),
+                iv(1700524800, 15.0),
+                iv(1700611200, 40.0),
             ],
-            2.0,
-            -1.0,
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[1700438400, 1700611200], &[]));
     }
@@ -165,13 +188,13 @@ mod tests {
     fn two_short_crosses() {
         let result = create(&buf(
             &[
-                iv(1700697600, 3.5),
-                iv(1700784000, 1.8),
-                iv(1700870400, 3.0),
-                iv(1700956800, 1.4),
+                iv(1700697600, 90.0),
+                iv(1700784000, 60.0),
+                iv(1700870400, 85.0),
+                iv(1700956800, 55.0),
             ],
-            2.5,
-            -2.0,
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[], &[1700784000, 1700956800]));
     }
@@ -180,13 +203,13 @@ mod tests {
     fn long_and_short_in_sequence() {
         let result = create(&buf(
             &[
-                iv(1701043200, -2.5),
-                iv(1701129600, 0.1),
-                iv(1701216000, 2.8),
-                iv(1701302400, 1.5),
+                iv(1701043200, 20.0),
+                iv(1701129600, 50.0),
+                iv(1701216000, 80.0),
+                iv(1701302400, 60.0),
             ],
-            2.0,
-            -1.0,
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[1701129600], &[1701302400]));
     }
@@ -195,15 +218,15 @@ mod tests {
     fn two_longs_one_short_six_points() {
         let result = create(&buf(
             &[
-                iv(1702080000, -2.5),
-                iv(1702166400, 0.5),
-                iv(1702252800, 3.2),
-                iv(1702339200, 1.4),
-                iv(1702425600, -2.2),
-                iv(1702512000, 0.3),
+                iv(1702080000, 20.0),
+                iv(1702166400, 50.0),
+                iv(1702252800, 80.0),
+                iv(1702339200, 60.0),
+                iv(1702425600, 20.0),
+                iv(1702512000, 40.0),
             ],
-            2.5,
-            -1.0,
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[1702166400, 1702512000], &[1702339200]));
     }
@@ -212,15 +235,15 @@ mod tests {
     fn one_long_two_shorts_six_points() {
         let result = create(&buf(
             &[
-                iv(1702598400, 2.8),
-                iv(1702684800, 1.7),
-                iv(1702771200, -2.0),
-                iv(1702857600, 0.1),
-                iv(1702944000, 3.0),
-                iv(1703030400, 1.9),
+                iv(1702598400, 80.0),
+                iv(1702684800, 60.0),
+                iv(1702771200, 20.0),
+                iv(1702857600, 40.0),
+                iv(1702944000, 80.0),
+                iv(1703030400, 60.0),
             ],
-            2.5,
-            -1.5,
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[1702857600], &[1702684800, 1703030400]));
     }
@@ -229,17 +252,17 @@ mod tests {
     fn two_longs_two_shorts_eight_points() {
         let result = create(&buf(
             &[
-                iv(1703116800, -3.0),
-                iv(1703203200, 0.1),
-                iv(1703289600, -3.1),
-                iv(1703376000, 0.2),
-                iv(1703462400, 3.0),
-                iv(1703548800, 1.7),
-                iv(1703635200, 2.9),
-                iv(1703721600, 1.5),
+                iv(1703116800, 10.0),
+                iv(1703203200, 40.0),
+                iv(1703289600, 10.0),
+                iv(1703376000, 40.0),
+                iv(1703462400, 80.0),
+                iv(1703548800, 60.0),
+                iv(1703635200, 75.0),
+                iv(1703721600, 65.0),
             ],
-            2.5,
-            -1.0,
+            70.0,
+            30.0,
         ));
         assert_eq!(
             result,
@@ -250,16 +273,56 @@ mod tests {
     #[test]
     fn value_exactly_on_threshold_no_signal_strict_inequality() {
         let result = create(&buf(
-            &[iv(100, 2.0), iv(101, 1.9), iv(102, -1.0), iv(103, 0.0)],
-            2.0,
-            -1.0,
+            &[iv(100, 70.0), iv(101, 65.0), iv(102, 30.0), iv(103, 40.0)],
+            70.0,
+            30.0,
         ));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn single_element_yields_no_signals() {
-        let result = create(&buf(&[iv(100, 5.0)], 2.0, -2.0));
+        let result = create(&buf(&[iv(100, 50.0)], 70.0, 30.0));
+        assert_eq!(result, expected(&[], &[]));
+    }
+
+    #[test]
+    fn below_low_through_low_to_above_low_is_long() {
+        let result = create(&buf(
+            &[iv(100, 20.0), iv(101, 30.0), iv(102, 40.0)],
+            70.0,
+            30.0,
+        ));
+        assert_eq!(result, expected(&[102], &[]));
+    }
+
+    #[test]
+    fn below_low_touches_low_and_falls_back_no_signal() {
+        let result = create(&buf(
+            &[iv(100, 20.0), iv(101, 30.0), iv(102, 20.0)],
+            70.0,
+            30.0,
+        ));
+        assert_eq!(result, expected(&[], &[]));
+    }
+
+    #[test]
+    fn above_high_through_high_to_below_high_is_short() {
+        let result = create(&buf(
+            &[iv(100, 80.0), iv(101, 70.0), iv(102, 60.0)],
+            70.0,
+            30.0,
+        ));
+        assert_eq!(result, expected(&[], &[102]));
+    }
+
+    #[test]
+    fn above_high_touches_high_and_rises_back_no_signal() {
+        let result = create(&buf(
+            &[iv(100, 80.0), iv(101, 70.0), iv(102, 80.0)],
+            70.0,
+            30.0,
+        ));
         assert_eq!(result, expected(&[], &[]));
     }
 }

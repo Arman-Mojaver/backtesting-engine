@@ -924,6 +924,7 @@ The house style mandates declarative iterator chains over imperative loops (code
 Add `itertools = "0.15"` (default features) and refactor the five sites — behavior-preserving, all existing tests kept verbatim:
 1. `same_instrument_validation` + `same_indicator_types_validation`: reference-compare → `.all_equal()` over the chained iterators (empty input stays vacuously valid).
 2. `oscillator` + `thresholds` signal semantics: manual prev/curr loop → `.tuple_windows()` + `filter_map` into `Either::Left`/`Either::Right` + `.partition_map()` — single pass, no mutable state.
+   - *Superseded 2026-11-08*: crossing detection is now one `tuple_windows` pass per level (`crosses_above` / `crosses_below` in `thresholds.rs`), skipping values exactly on the level so crosses through it are not lost. `Either` + `partition_map` are no longer used.
 3. `metadata_report`: nested product loop → `iproduct!` macro.
 
 ### Rationale
