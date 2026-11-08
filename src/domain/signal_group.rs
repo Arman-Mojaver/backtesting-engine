@@ -94,9 +94,27 @@ mod tests {
 
     #[test]
     fn filter_mixed_bag() {
-        let groups = vec![make_group(20, 0), make_group(3, 0), make_group(0, 0)];
+        let groups = vec![
+            SignalGroup {
+                indicator_id: 1,
+                ..make_group(20, 0)
+            },
+            SignalGroup {
+                indicator_id: 2,
+                ..make_group(3, 0)
+            },
+            SignalGroup {
+                indicator_id: 3,
+                ..make_group(0, 0)
+            },
+            SignalGroup {
+                indicator_id: 4,
+                ..make_group(12, 0)
+            },
+        ];
         let result = filter_signal_groups_by_annual_ops(groups, 10.0, 0, ONE_YEAR_SECS);
-        assert_eq!(result.len(), 1);
+        let kept_ids: Vec<i32> = result.iter().map(|group| group.indicator_id).collect();
+        assert_eq!(kept_ids, vec![1, 4]);
     }
 
     #[test]
