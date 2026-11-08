@@ -12,10 +12,6 @@ pub fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> f64 {
 }
 
 pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_timestamp: i64) -> f64 {
-    if total_count == 0 {
-        return 0.0;
-    }
-
     let years = difference_in_years(start_timestamp, end_timestamp);
     if years <= 0.0 {
         return 0.0;
