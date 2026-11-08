@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone)]
 pub struct ResampledPointD1 {
-    // Intentional: unread by the engine; kept to trace a point back to its DB row.
+    // Intentional: "id" is unread by the engine; kept to trace a point back to its DB row.
     pub id: i32,
     pub instrument: String,
     pub open: f64,
@@ -70,5 +70,10 @@ mod tests {
         assert_eq!(index.len(), 2);
         assert_eq!(timestamps("EURUSD"), vec![1000, 3000]);
         assert_eq!(timestamps("USDCAD"), vec![2000]);
+    }
+
+    #[test]
+    fn group_by_instrument_returns_empty_map_for_no_points() {
+        assert!(group_by_instrument(Vec::new()).is_empty());
     }
 }
