@@ -1,4 +1,4 @@
-use itertools::Itertools;
+use itertools::{AllEqualValueError, Itertools};
 
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -10,15 +10,17 @@ pub fn validate_same_instrument(
     long_operation_points: &[OperationPoint],
     short_operation_points: &[OperationPoint],
 ) -> Result<(), ValidationError> {
-    let all_match = resampled_points
+    let mut instruments = resampled_points
         .iter()
         .map(|resampled_point| &resampled_point.instrument)
         .chain(long_operation_points.iter().map(|op| &op.instrument))
-        .chain(short_operation_points.iter().map(|op| &op.instrument))
-        .all_equal();
+        .chain(short_operation_points.iter().map(|op| &op.instrument));
 
-    if !all_match {
-        return Err(ValidationError::InstrumentMismatch);
+    if let Err(AllEqualValueError(Some([expected, found]))) = instruments.all_equal_value() {
+        return Err(ValidationError::InstrumentMismatch {
+            expected: expected.clone(),
+            found: found.clone(),
+        });
     }
 
     Ok(())
@@ -28,6 +30,13 @@ pub fn validate_same_instrument(
 mod tests {
     use super::*;
     use crate::domain::fixtures::*;
+
+    fn instrument_mismatch(expected: &str, found: &str) -> Result<(), ValidationError> {
+        Err(ValidationError::InstrumentMismatch {
+            expected: expected.into(),
+            found: found.into(),
+        })
+    }
 
     #[test]
     fn test_all_equal() {
@@ -46,7 +55,7 @@ mod tests {
 
         assert_eq!(
             validate_same_instrument(&resampled, &long, &short),
-            Err(ValidationError::InstrumentMismatch)
+            instrument_mismatch("USDCAD", "EURUSD")
         );
     }
 
@@ -58,7 +67,7 @@ mod tests {
 
         assert_eq!(
             validate_same_instrument(&resampled, &long, &short),
-            Err(ValidationError::InstrumentMismatch)
+            instrument_mismatch("EURUSD", "USDCAD")
         );
     }
 
@@ -70,7 +79,7 @@ mod tests {
 
         assert_eq!(
             validate_same_instrument(&resampled, &long, &short),
-            Err(ValidationError::InstrumentMismatch)
+            instrument_mismatch("EURUSD", "USDCAD")
         );
     }
 
@@ -82,7 +91,7 @@ mod tests {
 
         assert_eq!(
             validate_same_instrument(&resampled, &long, &short),
-            Err(ValidationError::InstrumentMismatch)
+            instrument_mismatch("EURUSD", "USDCAD")
         );
     }
 
@@ -94,7 +103,7 @@ mod tests {
 
         assert_eq!(
             validate_same_instrument(&resampled, &long, &short),
-            Err(ValidationError::InstrumentMismatch)
+            instrument_mismatch("EURUSD", "USDCAD")
         );
     }
 
@@ -106,7 +115,7 @@ mod tests {
 
         assert_eq!(
             validate_same_instrument(&resampled, &long, &short),
-            Err(ValidationError::InstrumentMismatch)
+            instrument_mismatch("EURUSD", "USDCAD")
         );
     }
 }

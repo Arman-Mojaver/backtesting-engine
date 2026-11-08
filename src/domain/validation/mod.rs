@@ -16,8 +16,8 @@ pub enum ValidationError {
     IndicatorsEmpty,
     #[error("resampled points list is empty")]
     ResampledPointsEmpty,
-    #[error("instruments must match across resampled points, long operation points, and short operation points")]
-    InstrumentMismatch,
+    #[error("instruments must match across resampled points, long operation points, and short operation points, found {expected} and {found}")]
+    InstrumentMismatch { expected: String, found: String },
     #[error("all operation points must reference the expected money management strategy id")]
     MoneyManagementStrategyMismatch,
     #[error("operation point timestamps must match each other and be contained in the resampled point timestamps")]
@@ -45,8 +45,11 @@ mod tests {
                 "resampled points list is empty",
             ),
             (
-                ValidationError::InstrumentMismatch,
-                "instruments must match across resampled points, long operation points, and short operation points",
+                ValidationError::InstrumentMismatch {
+                    expected: "EURUSD".into(),
+                    found: "USDCAD".into(),
+                },
+                "instruments must match across resampled points, long operation points, and short operation points, found EURUSD and USDCAD",
             ),
             (
                 ValidationError::MoneyManagementStrategyMismatch,

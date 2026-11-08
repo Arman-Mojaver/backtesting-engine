@@ -264,11 +264,11 @@ Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_
 Before a backtest can run, the input data must satisfy **four invariants**, checked in order by `validate_all()`:
 
 1. **Non-Empty Data** (`empty_validation`) — all four datasets non-empty.
-2. **Same Instrument** (`same_instrument_validation`) — every resampled/long/short point references the same instrument (itertools `all_equal()` over the chained iterators).
+2. **Same Instrument** (`same_instrument_validation`) — every resampled/long/short point references the same instrument (itertools `all_equal_value()` over the chained iterators; the error names the first two differing instruments).
 3. **Same Money Management Strategy** (`same_mms_validation`) — every operation point's `money_management_strategy_id` matches the expected MMS ID parameter.
 4. **Timestamp Alignment** (`same_timestamp_validation`) — long and short timestamp sets are identical; both are subsets of resampled timestamps.
 
-`combined_validation::validate_all()` runs all four in order, returning early on the first failure as a `validation::ValidationError` (LongOperationPointsEmpty / ShortOperationPointsEmpty / IndicatorsEmpty / ResampledPointsEmpty / InstrumentMismatch / MoneyManagementStrategyMismatch / TimestampMismatch). Order is load-bearing: emptiness first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
+`combined_validation::validate_all()` runs all four in order, returning early on the first failure as a `validation::ValidationError` (LongOperationPointsEmpty / ShortOperationPointsEmpty / IndicatorsEmpty / ResampledPointsEmpty / InstrumentMismatch / MoneyManagementStrategyMismatch / TimestampMismatch). Order is load-bearing: emptiness first — otherwise the same-X checks would vacuously pass on empty input.
 
 ---
 
@@ -331,7 +331,7 @@ src/
 
 1. **Long/Short separation**: Longs and shorts use the same `OperationPoint` struct but are stored in separate repositories. Direction is determined by *which repository* holds the point, not by a field on the struct.
 2. **Validation as pure functions**: All validators are free functions over slices, not methods on structs. Composable and testable without object construction.
-3. **Fail-fast combined validation**: `validate_all` short-circuits on the first error. Order matters: emptiness is checked first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
+3. **Fail-fast combined validation**: `validate_all` short-circuits on the first error. Order matters: emptiness is checked first — otherwise the same-X checks would vacuously pass on empty input.
 4. **Fixtures module**: Test data lives in `domain::fixtures`, reusable across all test modules. (In-memory repos were removed 2026-08 — fixtures + tempfile cover the same need with less code.)
 5. **Ports-and-adapters**: Repository traits live in the domain; implementations live in infrastructure. The domain has zero dependencies on infrastructure.
 6. **Single-binary engine layout**: `bte` (`src/bin/bte.rs`) is the sole Rust CLI; it follows the `build -> parse -> execute` pattern and returns `anyhow::Result<()>`. The previous `ct` operator frontend (which forwarded engine commands via Docker exec and Python CLI commands via the `api` container) was removed in the commit that dropped `src/cli/` and `src/main.rs` — data CRUD and the iteration table are now reached exclusively in the companion Python service.

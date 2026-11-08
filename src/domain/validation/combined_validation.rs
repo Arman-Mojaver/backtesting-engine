@@ -83,7 +83,10 @@ mod tests {
 
         assert_eq!(
             validate_all(&long, &short, &indicators, &resampled, 1),
-            Err(ValidationError::InstrumentMismatch)
+            Err(ValidationError::InstrumentMismatch {
+                expected: "USDCAD".into(),
+                found: "EURUSD".into(),
+            })
         );
     }
 
