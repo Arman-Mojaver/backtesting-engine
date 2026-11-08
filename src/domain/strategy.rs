@@ -36,8 +36,9 @@ pub fn filter_strategies(
 ) -> Vec<Strategy> {
     strategies
         .into_iter()
-        .filter(|s| {
-            s.max_draw_down <= filter.max_draw_down_max && s.annual_roi >= filter.min_annual_roi
+        .filter(|strategy| {
+            strategy.max_draw_down <= filter.max_draw_down_max
+                && strategy.annual_roi >= filter.min_annual_roi
         })
         .collect()
 }
