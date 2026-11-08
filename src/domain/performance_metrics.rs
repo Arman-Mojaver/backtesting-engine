@@ -8,16 +8,15 @@ pub struct PerformanceMetrics {
     pub max_draw_down: f64,
 }
 
-pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceMetrics {
-    let mut sorted: Vec<&OperationPoint> = operation_points.to_vec();
-    sorted.sort_by_key(|op| op.timestamp);
+pub fn performance_metrics(mut operation_points: Vec<&OperationPoint>) -> PerformanceMetrics {
+    operation_points.sort_by_key(|op| op.timestamp);
 
     let mut cumsum: f64 = 1.0;
     let mut cummax: f64 = 1.0;
 
     let mut max_dd: f64 = 0.0;
 
-    for point in sorted {
+    for point in operation_points {
         // The PG adapter rejects sl <= 0, so the division below stays finite.
         debug_assert!(
             point.sl > 0,
@@ -80,8 +79,7 @@ mod tests {
     }
 
     fn metrics(ops: &[OperationPoint]) -> PerformanceMetrics {
-        let refs: Vec<&OperationPoint> = ops.iter().collect();
-        performance_metrics(&refs)
+        performance_metrics(ops.iter().collect())
     }
 
     // Fixture for the `annual_roi` method: only `global_roi` is relevant there.
@@ -96,7 +94,7 @@ mod tests {
     //               max_draw_down::tests::empty_ops_returns_zero
     #[test]
     fn empty_ops_returns_zero() {
-        let m = performance_metrics(&[]);
+        let m = performance_metrics(Vec::new());
         assert_eq!(m.global_roi, 0.0);
         assert_eq!(m.max_draw_down, 0.0);
     }

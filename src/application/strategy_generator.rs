@@ -63,7 +63,7 @@ fn create_strategy(
         annual_operation_count(total_count, start_timestamp, end_timestamp);
 
     let all_ops: Vec<&OperationPoint> = long_ops.into_iter().chain(short_ops).collect();
-    let metrics = performance_metrics(&all_ops);
+    let metrics = performance_metrics(all_ops);
     let annual_roi = metrics.annual_roi(start_timestamp, end_timestamp);
 
     Strategy {

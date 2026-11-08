@@ -23,7 +23,7 @@
 | A backtested strategy | `Strategy` struct | `src/domain/strategy.rs` | instrument + indicator + op-point ID sets + MMS + metrics |
 | Strategy quality bar | `GlobalStrategyFilter` + `filter_strategies()` | `src/domain/strategy.rs` | Default: DD≤20%, ROI≥5% (op count pruned early on signal counts; final pruning downstream) |
 | Annual return on investment | `annual_roi` field on `Strategy` | `src/domain/strategy.rs` | Computed by `PerformanceMetrics::annual_roi()` from global ROI + time span |
-| "How deep did it draw down?" / "What is the total return?" | `performance_metrics()` → `.max_draw_down` / `.global_roi` | `src/domain/performance_metrics.rs` | Single-pass fn over `&[&OperationPoint]` (sorts chronologically itself), returns % |
+| "How deep did it draw down?" / "What is the total return?" | `performance_metrics()` → `.max_draw_down` / `.global_roi` | `src/domain/performance_metrics.rs` | Single-pass fn over an owned `Vec<&OperationPoint>` (sorts it chronologically in place), returns % |
 | "How many trades per year?" | `annual_operation_count()` | `src/domain/annual_operation_count.rs` | Pure fn over `(count: usize, start_ts: i64, end_ts: i64)` |
 | "Is the data valid?" | `validate_all()` | `src/domain/validation/combined_validation.rs` | Runs 4 checks, fails fast |
 | "Data must not be empty" | `validate_empty_entities()` | `src/domain/validation/empty_validation.rs` | Checks all 4 datasets |
@@ -60,9 +60,9 @@ Business Question                              Code Path
 "What instrument are we on?"              →   any resampled point's instrument (validation requires all to agree)
 "What MMS are we testing?"                →   expected_mms_id parameter to validate_all()
 "What is the time span of the data?"      →   operation_points.start_end_timestamps() → (start_ts, end_ts)
-"How deep was the worst draw down?"       →   performance_metrics(&[&operation_points]).max_draw_down
-"What is the total return?"               →   performance_metrics(&[&operation_points]).global_roi
-"What is the annualized return?"          →   performance_metrics(&[&operation_points]).annual_roi(start_ts, end_ts)
+"How deep was the worst draw down?"       →   performance_metrics(operation_point_refs).max_draw_down
+"What is the total return?"               →   performance_metrics(operation_point_refs).global_roi
+"What is the annualized return?"          →   performance_metrics(operation_point_refs).annual_roi(start_ts, end_ts)
 "How many trades per year?"               →   annual_operation_count(count, start_ts, end_ts)
 "Compute indicator values?"               →   create_indicator_output(&parameters, &resampled_points)
 "Generate signal groups?"                 →   create_signal_groups(&indicators, &resampled_points)  (real indicator math)
@@ -79,7 +79,7 @@ Business Question                              Code Path
 |--------------------|---------------|-------------------|
 | New entity | `src/domain/{entity}.rs` + trait | See `indicator.rs` |
 | New validation rule | `src/domain/validation/{rule}.rs` | See `same_instrument_validation.rs` |
-| New domain metric | `src/domain/{metric}.rs` as a pure fn | See `performance_metrics.rs` (`&[&OperationPoint]` → struct, single pass + defensive sort), `annual_operation_count.rs` (count + span) |
+| New domain metric | `src/domain/{metric}.rs` as a pure fn | See `performance_metrics.rs` (`Vec<&OperationPoint>` → struct, single pass + defensive in-place sort), `annual_operation_count.rs` (count + span) |
 | New indicator | `IndicatorParameters` variant + `src/domain/indicators/{name}.rs` + dispatch arm | See `bears.rs` / `rsi.rs`; use `validate_period!`, `empty_oscillator!`, `indicator_values!` macros |
 | New signal semantics | `src/domain/signal/{name}.rs` + `IndicatorOutput` variant | See `oscillator.rs` (zero-cross) |
 | New data source adapter | `src/infrastructure/{adapter}.rs` | See `pg_adapter.rs` or `strategy_adapter.rs` |
