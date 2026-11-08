@@ -40,10 +40,7 @@ fn crosses_below(items: &[IndicatorValue], level: f64) -> Vec<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn iv(timestamp: i64, value: f64) -> IndicatorValue {
-        IndicatorValue { timestamp, value }
-    }
+    use crate::domain::fixtures::iv;
 
     fn buf(items: &[IndicatorValue], high: f64, low: f64) -> ThresholdBuffer {
         ThresholdBuffer {

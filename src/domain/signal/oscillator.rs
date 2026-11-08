@@ -8,11 +8,8 @@ pub fn detect_signals(buffer: &OscillatorBuffer) -> (Vec<i64>, Vec<i64>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::fixtures::iv;
     use crate::domain::signal::IndicatorValue;
-
-    fn iv(timestamp: i64, value: f64) -> IndicatorValue {
-        IndicatorValue { timestamp, value }
-    }
 
     fn buf(items: &[IndicatorValue]) -> OscillatorBuffer {
         OscillatorBuffer {

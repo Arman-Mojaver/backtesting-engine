@@ -71,10 +71,7 @@ impl IndicatorOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn iv(timestamp: i64, value: f64) -> IndicatorValue {
-        IndicatorValue { timestamp, value }
-    }
+    use crate::domain::fixtures::iv;
 
     #[test]
     fn oscillator_variant_routes_to_oscillator() {

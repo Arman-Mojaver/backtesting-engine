@@ -1,6 +1,7 @@
 use crate::domain::indicator::{Indicator, IndicatorParameters};
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
+use crate::domain::signal::IndicatorValue;
 
 const SECONDS_PER_DAY: i64 = 86_400;
 pub const ONE_YEAR_SECS: i64 = 365 * SECONDS_PER_DAY + SECONDS_PER_DAY / 4;
@@ -419,4 +420,10 @@ pub fn indicators_rsi_single() -> Vec<Indicator> {
             low_threshold: 30,
         },
     }]
+}
+
+// Signal fixtures
+
+pub const fn iv(timestamp: i64, value: f64) -> IndicatorValue {
+    IndicatorValue { timestamp, value }
 }
