@@ -1,8 +1,8 @@
+use rustc_hash::FxHashSet;
 use thiserror::Error;
 
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
-use std::collections::HashSet;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ValidationError {
@@ -15,9 +15,9 @@ pub fn validate_timestamps_match(
     long: &[OperationPoint],
     short: &[OperationPoint],
 ) -> Result<(), ValidationError> {
-    let resampled_timestamps: HashSet<i64> = resampled.iter().map(|rp| rp.timestamp).collect();
-    let long_timestamps: HashSet<i64> = long.iter().map(|op| op.timestamp).collect();
-    let short_timestamps: HashSet<i64> = short.iter().map(|op| op.timestamp).collect();
+    let resampled_timestamps: FxHashSet<i64> = resampled.iter().map(|rp| rp.timestamp).collect();
+    let long_timestamps: FxHashSet<i64> = long.iter().map(|op| op.timestamp).collect();
+    let short_timestamps: FxHashSet<i64> = short.iter().map(|op| op.timestamp).collect();
 
     if long_timestamps != short_timestamps || !long_timestamps.is_subset(&resampled_timestamps) {
         return Err(ValidationError::TimestampMismatch);
@@ -80,7 +80,7 @@ mod tests {
     }
 
     #[test]
-    fn test_short_is_not_subset_of_resampled() {
+    fn test_short_has_timestamp_missing_from_long() {
         let resampled = resampled_points_ts_123();
         let long = op_points_ts_123();
         let short = op_points_ts_124();
