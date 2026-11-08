@@ -6,8 +6,6 @@ use crate::domain::signal::IndicatorValue;
 const SECONDS_PER_DAY: i64 = 86_400;
 pub const ONE_YEAR_SECS: i64 = 365 * SECONDS_PER_DAY + SECONDS_PER_DAY / 4;
 
-// Operation Point fixtures
-
 pub const fn op_points_empty() -> Vec<OperationPoint> {
     Vec::new()
 }
@@ -103,8 +101,6 @@ pub fn op_point(id: i32, result: i32, timestamp: i64) -> OperationPoint {
     }
 }
 
-// Resampled Point fixtures
-
 pub const fn resampled_points_empty() -> Vec<ResampledPointD1> {
     Vec::new()
 }
@@ -179,8 +175,6 @@ pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
     ]
 }
 
-// Indicator fixtures
-
 pub const fn indicators_empty() -> Vec<Indicator> {
     Vec::new()
 }
@@ -208,9 +202,6 @@ pub fn indicators_default() -> Vec<Indicator> {
     ]
 }
 
-// Signal-generation fixtures: resampled-point series long enough to drive RSI
-// windows, plus indicator builders with RSI parameters.
-
 const ALTERNATING_CLOSES: [f64; 5] = [1.0, 2.0, 1.0, 2.0, 1.0];
 
 /// Four close-to-close diffs: enough for RSI windows up to n = 4.
@@ -230,7 +221,6 @@ pub fn resampled_points_for_rsi() -> Vec<ResampledPointD1> {
         .collect()
 }
 
-/// A single RSI indicator (n=3, thresholds 70/30) with id 1.
 pub fn indicators_rsi_single() -> Vec<Indicator> {
     vec![Indicator {
         id: 1,
@@ -241,8 +231,6 @@ pub fn indicators_rsi_single() -> Vec<Indicator> {
         },
     }]
 }
-
-// Signal fixtures
 
 pub const fn iv(timestamp: i64, value: f64) -> IndicatorValue {
     IndicatorValue { timestamp, value }
