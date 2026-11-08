@@ -85,19 +85,7 @@ pub trait ShortOperationPointRepository {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn make_point(timestamp: i64, id: i32, result: i32) -> OperationPoint {
-        OperationPoint {
-            instrument: "EURUSD".into(),
-            result,
-            tp: 100,
-            sl: 50,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id,
-            timestamp,
-        }
-    }
+    use crate::domain::fixtures::op_point;
 
     #[test]
     fn empty_operations_yield_empty_hashmaps() {
@@ -114,9 +102,9 @@ mod tests {
     #[test]
     fn long_points_keyed_by_timestamp() {
         let long = vec![
-            make_point(100, 1, 1),
-            make_point(200, 2, 1),
-            make_point(300, 3, 1),
+            op_point(1, 1, 100),
+            op_point(2, 1, 200),
+            op_point(3, 1, 300),
         ];
         let short: Vec<OperationPoint> = vec![];
         let ops = OperationPoints {
@@ -134,7 +122,7 @@ mod tests {
     #[test]
     fn short_points_keyed_by_timestamp() {
         let long: Vec<OperationPoint> = vec![];
-        let short = vec![make_point(50, 10, -1), make_point(150, 20, -1)];
+        let short = vec![op_point(10, -1, 50), op_point(20, -1, 150)];
         let ops = OperationPoints {
             long_operation_points: &long,
             short_operation_points: &short,
@@ -148,7 +136,7 @@ mod tests {
 
     #[test]
     fn duplicate_timestamp_last_wins() {
-        let long = vec![make_point(100, 1, 1), make_point(100, 2, 1)];
+        let long = vec![op_point(1, 1, 100), op_point(2, 1, 100)];
         let short: Vec<OperationPoint> = vec![];
         let ops = OperationPoints {
             long_operation_points: &long,
@@ -162,8 +150,8 @@ mod tests {
 
     #[test]
     fn long_and_short_independent() {
-        let long = vec![make_point(100, 1, 1)];
-        let short = vec![make_point(100, 10, -1)];
+        let long = vec![op_point(1, 1, 100)];
+        let short = vec![op_point(10, -1, 100)];
         let ops = OperationPoints {
             long_operation_points: &long,
             short_operation_points: &short,
@@ -180,9 +168,9 @@ mod tests {
     #[test]
     fn start_end_timestamps_unsorted() {
         let long = vec![
-            make_point(300, 1, 1),
-            make_point(100, 2, 1),
-            make_point(200, 3, 1),
+            op_point(1, 1, 300),
+            op_point(2, 1, 100),
+            op_point(3, 1, 200),
         ];
         let short: Vec<OperationPoint> = vec![];
         let ops = OperationPoints {
@@ -196,7 +184,7 @@ mod tests {
 
     #[test]
     fn start_end_timestamps_single_point() {
-        let long = vec![make_point(42, 1, 1)];
+        let long = vec![op_point(1, 1, 42)];
         let short: Vec<OperationPoint> = vec![];
         let ops = OperationPoints {
             long_operation_points: &long,
@@ -213,22 +201,22 @@ mod tests {
             OperationPoint {
                 instrument: "EURUSD".into(),
                 money_management_strategy_id: 1,
-                ..make_point(1000, 1, 1)
+                ..op_point(1, 1, 1000)
             },
             OperationPoint {
                 instrument: "EURUSD".into(),
                 money_management_strategy_id: 1,
-                ..make_point(1001, 2, -1)
+                ..op_point(2, -1, 1001)
             },
             OperationPoint {
                 instrument: "EURUSD".into(),
                 money_management_strategy_id: 2,
-                ..make_point(1000, 3, 1)
+                ..op_point(3, 1, 1000)
             },
             OperationPoint {
                 instrument: "USDCAD".into(),
                 money_management_strategy_id: 1,
-                ..make_point(1000, 4, 1)
+                ..op_point(4, 1, 1000)
             },
         ];
 
