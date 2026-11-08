@@ -30,7 +30,7 @@
 | **Max Draw Down** | Largest peak-to-trough decline of the cumulative-return curve, as a percentage. Computed from operation points via compounding against a running cummax; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` |
 | **Annual Operation Count** | Number of trades per year, annualized from a total count over the time span. Computed from signal-group operation counts; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_operation_count` |
 | **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 20%, min annual ROI ≥ 5%. (Annual operation count ≥ 10 is enforced earlier, at the signal-group stage.) | `GlobalStrategyFilter` | `domain::strategy` |
-| **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus a precomputed `operation_count`. Lives in the domain layer. | `SignalGroup` | `domain::signal_group` |
+| **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus an `operation_count()` derived from its signals. Lives in the domain layer. | `SignalGroup` | `domain::signal_group` |
 | **Cell** | One `(instrument, mms_id)` pair — the unit of work for `create_loop`. Cells are computed in parallel and persisted as one Parquet partition each. | `(String, i32)` keys, `CellOutput` | `application::cell_output`, `engine::strategy::create_loop` |
 | **Parquet Strategy Repository** | Writes strategies to partitioned parquet files under `{base}/instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. Dedups fresh rows by `indicator_id` (idempotent partitions). | `ParquetStrategyRepository` | `infrastructure::strategy_adapter` |
 | **Processed Manifest** | Parquet ledger of completed `(instrument, mms_id, indicator_id)` triples with `processed_at` timestamps. Makes `create`/`create_loop` idempotent. Atomic writes (temp + rename); dedup per triple. | `ParquetProcessedManifest` | `infrastructure::processed_manifest` |
@@ -156,15 +156,15 @@ GlobalStrategyFilter { max_draw_down_max: f64, min_annual_roi: f64, min_annual_o
 ```
 
 ### SignalGroup
-A group of signal timestamps (long and short) for a single indicator. Embeds its `indicator_id` and `instrument`, plus a precomputed `operation_count`. Lives in the domain layer.
+A group of signal timestamps (long and short) for a single indicator. Embeds its `indicator_id` and `instrument`, plus an `operation_count()` derived from its signals. Lives in the domain layer.
 ```
 SignalGroup {
     indicator_id:     i32       — which indicator this group belongs to
     long_signals:     Vec<i64>  — long signal timestamps
     short_signals:    Vec<i64>  — short signal timestamps
-    operation_count:  usize     — long.len() + short.len()
     instrument:       String    — which instrument the signals were computed on
 }
+// Method: operation_count() -> usize — long.len() + short.len()
 // Free fn: filter_signal_groups_by_annual_ops(groups, min_ops, start_ts, end_ts) -> Vec<SignalGroup>
 //          Keeps groups whose annualized operation count >= min_ops and have > 0 ops.
 ```
@@ -180,7 +180,7 @@ Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` r
 | `annual_operation_count` | `domain::annual_operation_count` | `(total_count: usize, start_ts: i64, end_ts: i64) -> f64` | `total_count / years`, where `years = (end-start)/86400/365.25` (rounded 2dp). Returns 0.0 for zero count or non-positive span. |
 | `performance_metrics` | `domain::performance_metrics` | `(ops: &[&OperationPoint]) -> PerformanceMetrics` | Sorts ops chronologically itself (stable; ties keep input order), then ONE pass: `cumsum = 1 + Σ(cummax * result * risk/sl)` with running `cummax`. Returns `{ global_roi: (cumsum - 1) * 100, max_draw_down: deepest (cummax - cumsum)/cummax * 100 }`, each rounded to 2dp independently. Both 0.0 for empty ops. |
 | `PerformanceMetrics::annual_roi` | `domain::performance_metrics` | `(&self, start_ts: i64, end_ts: i64) -> f64` | Annualizes `self.global_roi` via compounding: `((1 + roi/100)^(1/years) - 1) * 100`, rounded to 2dp. Returns 0.0 for non-positive span. |
-| `filter_signal_groups_by_annual_ops` | `domain::signal_group` | `(groups: Vec<SignalGroup>, min_ops: f64, start_ts: i64, end_ts: i64) -> Vec<SignalGroup>` | Keeps groups with `operation_count > 0` and `annual_operation_count(count, start, end) >= min_ops`. |
+| `filter_signal_groups_by_annual_ops` | `domain::signal_group` | `(groups: Vec<SignalGroup>, min_ops: f64, start_ts: i64, end_ts: i64) -> Vec<SignalGroup>` | Keeps groups with `operation_count() > 0` and `annual_operation_count(count, start, end) >= min_ops`. |
 | `filter_strategies` | `domain::strategy` | `(strategies: Vec<Strategy>, filter: &GlobalStrategyFilter) -> Vec<Strategy>` | Keeps strategies with `max_draw_down ≤ max` and `annual_roi ≥ min`. (Annual operation count is filtered earlier at the signal-group stage.) |
 
 ---

@@ -101,7 +101,6 @@ mod tests {
         SignalGroup {
             indicator_id,
             instrument: "EURUSD".to_string(),
-            operation_count: longs.len().saturating_add(shorts.len()),
             long_signals: longs,
             short_signals: shorts,
         }

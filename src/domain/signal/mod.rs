@@ -58,12 +58,10 @@ impl IndicatorOutput {
                 buffers,
             } => (instrument, crossover::detect_signals(&buffers)),
         };
-        let operation_count = long_signals.len().saturating_add(short_signals.len());
         SignalGroup {
             indicator_id,
             long_signals,
             short_signals,
-            operation_count,
             instrument,
         }
     }
@@ -89,7 +87,6 @@ mod tests {
                 indicator_id: 5,
                 long_signals: vec![2],
                 short_signals: vec![3],
-                operation_count: 2,
                 instrument: "EURUSD".to_string(),
             }
         );
@@ -112,7 +109,6 @@ mod tests {
                 indicator_id: 9,
                 long_signals: vec![2],
                 short_signals: vec![4],
-                operation_count: 2,
                 instrument: "EURUSD".to_string(),
             }
         );
@@ -134,7 +130,6 @@ mod tests {
                 indicator_id: 42,
                 long_signals: vec![2],
                 short_signals: vec![3],
-                operation_count: 2,
                 instrument: "EURUSD".to_string(),
             }
         );
@@ -153,7 +148,6 @@ mod tests {
                 indicator_id: 1,
                 long_signals: vec![],
                 short_signals: vec![],
-                operation_count: 0,
                 instrument: "EURUSD".to_string(),
             }
         );
