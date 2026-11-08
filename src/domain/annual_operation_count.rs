@@ -43,75 +43,19 @@ mod tests {
     }
 
     #[test]
-    fn one_year_count_1() {
-        let result = annual_operation_count(1, 0, ONE_YEAR_SECS);
-        assert_eq!(result, 1.0);
+    fn one_year_span_returns_total_count() {
+        for count in [1, 2, 3, 4, 100, 365] {
+            let result = annual_operation_count(count, 0, ONE_YEAR_SECS);
+            assert_eq!(result, cast::usize_to_f64(count), "count = {count}");
+        }
     }
 
     #[test]
-    fn one_year_count_2() {
-        let result = annual_operation_count(2, 0, ONE_YEAR_SECS);
-        assert_eq!(result, 2.0);
-    }
-
-    #[test]
-    fn one_year_count_3() {
-        let result = annual_operation_count(3, 0, ONE_YEAR_SECS);
-        assert_eq!(result, 3.0);
-    }
-
-    #[test]
-    fn one_year_count_4() {
-        let result = annual_operation_count(4, 0, ONE_YEAR_SECS);
-        assert_eq!(result, 4.0);
-    }
-
-    #[test]
-    fn one_year_count_100() {
-        let result = annual_operation_count(100, 0, ONE_YEAR_SECS);
-        assert_eq!(result, 100.0);
-    }
-
-    #[test]
-    fn two_years_count_1() {
-        let result = annual_operation_count(1, 0, TWO_YEARS_SECS);
-        assert_eq!(result, 0.5);
-    }
-
-    #[test]
-    fn two_years_count_2() {
-        let result = annual_operation_count(2, 0, TWO_YEARS_SECS);
-        assert_eq!(result, 1.0);
-    }
-
-    #[test]
-    fn two_years_count_3() {
-        let result = annual_operation_count(3, 0, TWO_YEARS_SECS);
-        assert_eq!(result, 1.5);
-    }
-
-    #[test]
-    fn two_years_count_4() {
-        let result = annual_operation_count(4, 0, TWO_YEARS_SECS);
-        assert_eq!(result, 2.0);
-    }
-
-    #[test]
-    fn two_years_count_5() {
-        let result = annual_operation_count(5, 0, TWO_YEARS_SECS);
-        assert_eq!(result, 2.5);
-    }
-
-    #[test]
-    fn two_years_count_300() {
-        let result = annual_operation_count(300, 0, TWO_YEARS_SECS);
-        assert_eq!(result, 150.0);
-    }
-
-    #[test]
-    fn one_op_per_day_over_one_year_returns_365() {
-        let result = annual_operation_count(365, 0, ONE_YEAR_SECS);
-        assert_eq!(result, 365.0);
+    fn two_year_span_halves_total_count() {
+        for count in [1, 2, 3, 4, 5, 300] {
+            let result = annual_operation_count(count, 0, TWO_YEARS_SECS);
+            assert_eq!(result, cast::usize_to_f64(count) / 2.0, "count = {count}");
+        }
     }
 
     #[test]
