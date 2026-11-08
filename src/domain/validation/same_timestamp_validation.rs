@@ -68,7 +68,7 @@ mod tests {
 
         assert_eq!(
             validate_timestamps_match(&resampled, &long, &short),
-            Err(ValidationError::LongShortTimestampsDiffer { timestamp: 3 })
+            Err(ValidationError::LongShortTimestampsDiffer { timestamp: 3000 })
         );
     }
 
@@ -80,7 +80,7 @@ mod tests {
 
         assert_eq!(
             validate_timestamps_match(&resampled, &long, &short),
-            Err(ValidationError::TimestampMissingFromResampled { timestamp: 4 })
+            Err(ValidationError::TimestampMissingFromResampled { timestamp: 4000 })
         );
     }
 
@@ -92,7 +92,7 @@ mod tests {
 
         assert_eq!(
             validate_timestamps_match(&resampled, &long[..2], &short),
-            Err(ValidationError::LongShortTimestampsDiffer { timestamp: 4 })
+            Err(ValidationError::LongShortTimestampsDiffer { timestamp: 4000 })
         );
     }
 }

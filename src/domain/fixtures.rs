@@ -83,11 +83,11 @@ pub fn op_points_mms_partial_mismatch() -> Vec<OperationPoint> {
 }
 
 pub fn op_points_ts_123() -> Vec<OperationPoint> {
-    vec![winning_op(1, 1), losing_op(2, 2), losing_op(3, 3)]
+    vec![winning_op(1, 1000), losing_op(2, 2000), losing_op(3, 3000)]
 }
 
 pub fn op_points_ts_124() -> Vec<OperationPoint> {
-    vec![winning_op(1, 1), losing_op(2, 2), losing_op(3, 4)]
+    vec![winning_op(1, 1000), losing_op(2, 2000), losing_op(3, 4000)]
 }
 
 pub fn op_point(id: i32, result: i32, timestamp: i64) -> OperationPoint {
@@ -108,77 +108,53 @@ pub fn op_point(id: i32, result: i32, timestamp: i64) -> OperationPoint {
 pub const fn resampled_points_empty() -> Vec<ResampledPointD1> {
     Vec::new()
 }
+
+fn base_resampled_point(id: i32, timestamp: i64) -> ResampledPointD1 {
+    ResampledPointD1 {
+        id,
+        instrument: "EURUSD".into(),
+        open: 1.0,
+        high: 1.1,
+        low: 0.9,
+        close: 1.05,
+        volume: 1000,
+        timestamp,
+    }
+}
+
+fn later_resampled_point(id: i32, timestamp: i64) -> ResampledPointD1 {
+    ResampledPointD1 {
+        id,
+        instrument: "EURUSD".into(),
+        open: 1.2,
+        high: 1.25,
+        low: 1.15,
+        close: 1.22,
+        volume: 800,
+        timestamp,
+    }
+}
+
 pub fn resampled_points_default() -> Vec<ResampledPointD1> {
     vec![
-        ResampledPointD1 {
-            id: 1,
-            instrument: "EURUSD".into(),
-            open: 1.0,
-            high: 1.1,
-            low: 0.9,
-            close: 1.05,
-            volume: 1000,
-            timestamp: 1000,
-        },
-        ResampledPointD1 {
-            id: 2,
-            instrument: "EURUSD".into(),
-            open: 1.2,
-            high: 1.25,
-            low: 1.15,
-            close: 1.22,
-            volume: 800,
-            timestamp: 1001,
-        },
+        base_resampled_point(1, 1000),
+        later_resampled_point(2, 1001),
     ]
 }
 
 pub fn resampled_points_ts_123() -> Vec<ResampledPointD1> {
     vec![
-        ResampledPointD1 {
-            id: 1,
-            instrument: "EURUSD".into(),
-            open: 1.0,
-            high: 1.1,
-            low: 0.9,
-            close: 1.05,
-            volume: 1000,
-            timestamp: 1,
-        },
-        ResampledPointD1 {
-            id: 2,
-            instrument: "EURUSD".into(),
-            open: 1.2,
-            high: 1.25,
-            low: 1.15,
-            close: 1.22,
-            volume: 800,
-            timestamp: 2,
-        },
-        ResampledPointD1 {
-            id: 3,
-            instrument: "EURUSD".into(),
-            open: 1.2,
-            high: 1.25,
-            low: 1.15,
-            close: 1.22,
-            volume: 800,
-            timestamp: 3,
-        },
+        base_resampled_point(1, 1000),
+        later_resampled_point(2, 2000),
+        later_resampled_point(3, 3000),
     ]
 }
 
 pub fn resampled_points_usdcad() -> Vec<ResampledPointD1> {
     vec![
         ResampledPointD1 {
-            id: 1,
             instrument: "USDCAD".into(),
-            open: 1.0,
-            high: 1.1,
-            low: 0.9,
-            close: 1.05,
-            volume: 1000,
-            timestamp: 1000,
+            ..base_resampled_point(1, 1000)
         },
         ResampledPointD1 {
             id: 2,
@@ -192,27 +168,13 @@ pub fn resampled_points_usdcad() -> Vec<ResampledPointD1> {
         },
     ]
 }
+
 pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
     vec![
+        base_resampled_point(1, 1000),
         ResampledPointD1 {
-            id: 1,
-            instrument: "EURUSD".into(),
-            open: 1.0,
-            high: 1.1,
-            low: 0.9,
-            close: 1.05,
-            volume: 1000,
-            timestamp: 1000,
-        },
-        ResampledPointD1 {
-            id: 2,
             instrument: "USDCAD".into(),
-            open: 1.2,
-            high: 1.25,
-            low: 1.15,
-            close: 1.22,
-            volume: 800,
-            timestamp: 1001,
+            ..later_resampled_point(2, 1001)
         },
     ]
 }

@@ -128,7 +128,7 @@ mod tests {
 
         assert_eq!(
             validate_all(&indicators, &resampled, &long, &short, 1),
-            Err(ValidationError::LongShortTimestampsDiffer { timestamp: 3 })
+            Err(ValidationError::LongShortTimestampsDiffer { timestamp: 3000 })
         );
     }
 }
