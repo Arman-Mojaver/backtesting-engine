@@ -14,8 +14,14 @@ pub fn validate_timestamps_match(
     let long_timestamps: FxHashSet<i64> = long.iter().map(|op| op.timestamp).collect();
     let short_timestamps: FxHashSet<i64> = short.iter().map(|op| op.timestamp).collect();
 
-    if long_timestamps != short_timestamps || !long_timestamps.is_subset(&resampled_timestamps) {
-        return Err(ValidationError::TimestampMismatch);
+    if let Some(&timestamp) = long_timestamps
+        .symmetric_difference(&short_timestamps)
+        .min()
+    {
+        return Err(ValidationError::LongShortTimestampsDiffer { timestamp });
+    }
+    if let Some(&timestamp) = long_timestamps.difference(&resampled_timestamps).min() {
+        return Err(ValidationError::TimestampMissingFromResampled { timestamp });
     }
 
     Ok(())
@@ -58,7 +64,7 @@ mod tests {
 
         assert_eq!(
             validate_timestamps_match(&resampled[..], &long[..], &short[..]),
-            Err(ValidationError::TimestampMismatch)
+            Err(ValidationError::LongShortTimestampsDiffer { timestamp: 3 })
         );
     }
 
@@ -70,7 +76,7 @@ mod tests {
 
         assert_eq!(
             validate_timestamps_match(&resampled[..], &long[..], &short[..]),
-            Err(ValidationError::TimestampMismatch)
+            Err(ValidationError::TimestampMissingFromResampled { timestamp: 4 })
         );
     }
 
@@ -82,7 +88,7 @@ mod tests {
 
         assert_eq!(
             validate_timestamps_match(&resampled[..], &long[..2], &short[..]),
-            Err(ValidationError::TimestampMismatch)
+            Err(ValidationError::LongShortTimestampsDiffer { timestamp: 4 })
         );
     }
 }

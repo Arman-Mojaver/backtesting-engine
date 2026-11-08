@@ -20,8 +20,10 @@ pub enum ValidationError {
     InstrumentMismatch { expected: String, found: String },
     #[error("all operation points must reference money management strategy id {expected}, found {found}")]
     MoneyManagementStrategyMismatch { expected: i32, found: i32 },
-    #[error("operation point timestamps must match each other and be contained in the resampled point timestamps")]
-    TimestampMismatch,
+    #[error("long and short operation points must share the same timestamps, timestamp {timestamp} is only on one side")]
+    LongShortTimestampsDiffer { timestamp: i64 },
+    #[error("operation point timestamp {timestamp} has no matching resampled point")]
+    TimestampMissingFromResampled { timestamp: i64 },
 }
 
 #[cfg(test)]
@@ -59,8 +61,12 @@ mod tests {
                 "all operation points must reference money management strategy id 1, found 2",
             ),
             (
-                ValidationError::TimestampMismatch,
-                "operation point timestamps must match each other and be contained in the resampled point timestamps",
+                ValidationError::LongShortTimestampsDiffer { timestamp: 4 },
+                "long and short operation points must share the same timestamps, timestamp 4 is only on one side",
+            ),
+            (
+                ValidationError::TimestampMissingFromResampled { timestamp: 4 },
+                "operation point timestamp 4 has no matching resampled point",
             ),
         ];
 

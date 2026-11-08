@@ -115,7 +115,7 @@ mod tests {
 
         assert_eq!(
             validate_all(&long, &short, &indicators, &resampled, 1),
-            Err(ValidationError::TimestampMismatch)
+            Err(ValidationError::LongShortTimestampsDiffer { timestamp: 3 })
         );
     }
 }
