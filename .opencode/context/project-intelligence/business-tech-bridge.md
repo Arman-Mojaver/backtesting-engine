@@ -56,7 +56,7 @@ Business Question                              Code Path
 ────────────────                                ─────────
 "What trades happened?"                   →   Repository trait → get_all() → Vec<OperationPoint>
 "Trades for EURUSD + mms 5?"              →   get_by_mms_id_and_instrument(5, "EURUSD")
-"Is this data valid?"                     →   combined_validation::validate_all(indicators, resampled, long, short, mms_id)
+"Is this data valid?"                     →   validation::validate_all(indicators, resampled, long, short, mms_id)
 "What instrument are we on?"              →   any resampled point's instrument (validation requires all to agree)
 "What MMS are we testing?"                →   expected_mms_id parameter to validate_all()
 "What is the time span of the data?"      →   operation_points.start_end_timestamps() → (start_ts, end_ts)

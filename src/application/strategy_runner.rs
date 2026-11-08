@@ -10,7 +10,7 @@ use crate::domain::operation_point::{OperationPoint, OperationPoints};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal_group::filter_signal_groups_by_annual_ops;
 use crate::domain::strategy::{filter_strategies, GlobalStrategyFilter, Strategy};
-use crate::domain::validation::combined_validation::validate_all;
+use crate::domain::validation::validate_all;
 
 pub fn run_strategies(
     indicators: &[Indicator],

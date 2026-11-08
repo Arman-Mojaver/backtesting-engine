@@ -1,10 +1,12 @@
 use thiserror::Error;
 
-pub mod combined_validation;
-pub mod empty_validation;
-pub mod same_instrument_validation;
-pub mod same_mms_validation;
-pub mod same_timestamp_validation;
+mod combined_validation;
+mod empty_validation;
+mod same_instrument_validation;
+mod same_mms_validation;
+mod same_timestamp_validation;
+
+pub use combined_validation::validate_all;
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ValidationError {
