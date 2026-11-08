@@ -24,8 +24,7 @@ pub fn validate_all(
         long_ops,
         short_ops,
         expected_mms_id,
-    )
-    .map_err(|_| ValidationError::MoneyManagementStrategyMismatch)?;
+    )?;
 
     same_timestamp_validation::validate_timestamps_match(resampled_points, long_ops, short_ops)
         .map_err(|_| ValidationError::TimestampMismatch)?;
