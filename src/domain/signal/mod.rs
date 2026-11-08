@@ -93,14 +93,20 @@ mod tests {
         let values = IndicatorOutput::Oscillator {
             instrument: "EURUSD".to_string(),
             buffer: OscillatorSeries {
-                items: vec![iv(1, -1.0), iv(2, 1.0)],
+                items: vec![iv(1, -1.0), iv(2, 1.0), iv(3, -1.0)],
             },
         };
         let result = values.create_signal_group(5);
-        assert_eq!(result.indicator_id, 5);
-        assert_eq!(result.long_signals, vec![2]);
-        assert!(result.short_signals.is_empty());
-        assert_eq!(result.instrument, "EURUSD");
+        assert_eq!(
+            result,
+            SignalGroup {
+                indicator_id: 5,
+                long_signals: vec![2],
+                short_signals: vec![3],
+                operation_count: 2,
+                instrument: "EURUSD".to_string(),
+            }
+        );
     }
 
     #[test]
@@ -108,14 +114,22 @@ mod tests {
         let values = IndicatorOutput::Threshold {
             instrument: "EURUSD".to_string(),
             buffer: ThresholdSeries {
-                items: vec![iv(1, -2.0), iv(2, 0.0)],
-                high_threshold: 2.0,
-                low_threshold: -1.0,
+                items: vec![iv(1, 20.0), iv(2, 40.0), iv(3, 80.0), iv(4, 60.0)],
+                high_threshold: 70.0,
+                low_threshold: 30.0,
             },
         };
         let result = values.create_signal_group(9);
-        assert_eq!(result.indicator_id, 9);
-        assert_eq!(result.long_signals, vec![2]);
+        assert_eq!(
+            result,
+            SignalGroup {
+                indicator_id: 9,
+                long_signals: vec![2],
+                short_signals: vec![4],
+                operation_count: 2,
+                instrument: "EURUSD".to_string(),
+            }
+        );
     }
 
     #[test]
@@ -123,13 +137,21 @@ mod tests {
         let values = IndicatorOutput::Crossover {
             instrument: "EURUSD".to_string(),
             buffer: CrossoverPair {
-                upcross_long_buffer: vec![iv(1, 0.0), iv(2, 2.0)],
-                upcross_short_buffer: vec![iv(1, 1.0), iv(2, 1.0)],
+                upcross_long_buffer: vec![iv(1, 0.0), iv(2, 2.0), iv(3, 0.0)],
+                upcross_short_buffer: vec![iv(1, 1.0), iv(2, 1.0), iv(3, 1.0)],
             },
         };
         let result = values.create_signal_group(42);
-        assert_eq!(result.indicator_id, 42);
-        assert_eq!(result.long_signals, vec![2]);
+        assert_eq!(
+            result,
+            SignalGroup {
+                indicator_id: 42,
+                long_signals: vec![2],
+                short_signals: vec![3],
+                operation_count: 2,
+                instrument: "EURUSD".to_string(),
+            }
+        );
     }
 
     #[test]
@@ -139,8 +161,15 @@ mod tests {
             buffer: OscillatorSeries { items: vec![] },
         };
         let result = values.create_signal_group(1);
-        assert!(result.long_signals.is_empty());
-        assert!(result.short_signals.is_empty());
-        assert_eq!(result.operation_count, 0);
+        assert_eq!(
+            result,
+            SignalGroup {
+                indicator_id: 1,
+                long_signals: vec![],
+                short_signals: vec![],
+                operation_count: 0,
+                instrument: "EURUSD".to_string(),
+            }
+        );
     }
 }
