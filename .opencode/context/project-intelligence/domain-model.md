@@ -116,7 +116,7 @@ The computed result of an indicator over a candle series, and its signal semanti
 ```
 IndicatorOutput ::= Oscillator { instrument, buffer: OscillatorBuffer }
                   | Threshold  { instrument, buffer: ThresholdBuffer }
-                  | Crossover  { instrument, buffer: CrossoverBuffers }
+                  | Crossover  { instrument, buffers: CrossoverBuffers }
 
 IndicatorValue { timestamp: i64, value: f64 }
 OscillatorBuffer { items: Vec<IndicatorValue> }

@@ -40,7 +40,7 @@ pub enum IndicatorOutput {
     },
     Crossover {
         instrument: String,
-        buffer: CrossoverBuffers,
+        buffers: CrossoverBuffers,
     },
 }
 
@@ -53,9 +53,10 @@ impl IndicatorOutput {
             Self::Threshold { instrument, buffer } => {
                 (instrument, thresholds::detect_signals(&buffer))
             }
-            Self::Crossover { instrument, buffer } => {
-                (instrument, crossover::detect_signals(&buffer))
-            }
+            Self::Crossover {
+                instrument,
+                buffers,
+            } => (instrument, crossover::detect_signals(&buffers)),
         };
         let operation_count = long_signals.len().saturating_add(short_signals.len());
         SignalGroup {
@@ -121,7 +122,7 @@ mod tests {
     fn crossover_variant_routes_to_crossover() {
         let values = IndicatorOutput::Crossover {
             instrument: "EURUSD".to_string(),
-            buffer: CrossoverBuffers {
+            buffers: CrossoverBuffers {
                 upcross_long_buffer: vec![iv(1, 0.0), iv(2, 2.0), iv(3, 0.0)],
                 upcross_short_buffer: vec![iv(1, 1.0), iv(2, 1.0), iv(3, 1.0)],
             },
