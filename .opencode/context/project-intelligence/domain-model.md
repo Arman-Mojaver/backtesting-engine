@@ -268,7 +268,7 @@ Before a backtest can run, the input data must satisfy **four invariants**, chec
 3. **Same Money Management Strategy** (`same_mms_validation`) — every operation point's `money_management_strategy_id` matches the expected MMS ID parameter.
 4. **Timestamp Alignment** (`same_timestamp_validation`) — long and short timestamp sets are identical; both are subsets of resampled timestamps.
 
-`combined_validation::validate_all()` runs all four in order, returning early on the first failure as a `CombinedValidationError` (Empty / InstrumentMismatch / MoneyManagementStrategyMismatch / TimestampMismatch). Order is load-bearing: emptiness first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
+`combined_validation::validate_all()` runs all four in order, returning early on the first failure as a `validation::ValidationError` (Empty / InstrumentMismatch / MoneyManagementStrategyMismatch / TimestampMismatch). Order is load-bearing: emptiness first — otherwise the `all_equal()`-based same-X checks would vacuously pass on empty input.
 
 ---
 

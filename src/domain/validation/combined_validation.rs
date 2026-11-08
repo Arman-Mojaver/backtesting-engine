@@ -1,5 +1,3 @@
-use thiserror::Error;
-
 use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -8,18 +6,7 @@ use super::empty_validation;
 use super::same_instrument_validation;
 use super::same_mms_validation;
 use super::same_timestamp_validation;
-
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum CombinedValidationError {
-    #[error("{0}")]
-    Empty(empty_validation::EmptyRepoValidationError),
-    #[error("instruments must match across resampled points, long operation points, and short operation points")]
-    InstrumentMismatch,
-    #[error("all operation points must reference the expected money management strategy id")]
-    MoneyManagementStrategyMismatch,
-    #[error("operation point timestamps must match each other and be contained in the resampled point timestamps")]
-    TimestampMismatch,
-}
+use super::ValidationError;
 
 pub fn validate_all(
     long_ops: &[OperationPoint],
@@ -27,22 +14,21 @@ pub fn validate_all(
     indicators: &[Indicator],
     resampled_points: &[ResampledPointD1],
     expected_mms_id: i32,
-) -> Result<(), CombinedValidationError> {
+) -> Result<(), ValidationError> {
     empty_validation::validate_empty_entities(long_ops, short_ops, indicators, resampled_points)
-        .map_err(CombinedValidationError::Empty)?;
+        .map_err(ValidationError::Empty)?;
 
-    same_instrument_validation::validate_same_instrument(resampled_points, long_ops, short_ops)
-        .map_err(|_| CombinedValidationError::InstrumentMismatch)?;
+    same_instrument_validation::validate_same_instrument(resampled_points, long_ops, short_ops)?;
 
     same_mms_validation::validate_money_management_strategy_id_matches(
         long_ops,
         short_ops,
         expected_mms_id,
     )
-    .map_err(|_| CombinedValidationError::MoneyManagementStrategyMismatch)?;
+    .map_err(|_| ValidationError::MoneyManagementStrategyMismatch)?;
 
     same_timestamp_validation::validate_timestamps_match(resampled_points, long_ops, short_ops)
-        .map_err(|_| CombinedValidationError::TimestampMismatch)?;
+        .map_err(|_| ValidationError::TimestampMismatch)?;
 
     Ok(())
 }
@@ -74,7 +60,7 @@ mod tests {
 
         assert_eq!(
             validate_all(&long, &short, &indicators, &resampled, 1),
-            Err(CombinedValidationError::Empty(
+            Err(ValidationError::Empty(
                 empty_validation::EmptyRepoValidationError::LongOperationPointsEmpty
             ))
         );
@@ -89,7 +75,7 @@ mod tests {
 
         assert_eq!(
             validate_all(&long, &short, &indicators, &resampled, 1),
-            Err(CombinedValidationError::Empty(
+            Err(ValidationError::Empty(
                 empty_validation::EmptyRepoValidationError::ShortOperationPointsEmpty
             ))
         );
@@ -104,7 +90,7 @@ mod tests {
 
         assert_eq!(
             validate_all(&long, &short, &indicators, &resampled, 1),
-            Err(CombinedValidationError::InstrumentMismatch)
+            Err(ValidationError::InstrumentMismatch)
         );
     }
 
@@ -117,7 +103,7 @@ mod tests {
 
         assert_eq!(
             validate_all(&long, &short, &indicators, &resampled, 2),
-            Err(CombinedValidationError::MoneyManagementStrategyMismatch)
+            Err(ValidationError::MoneyManagementStrategyMismatch)
         );
     }
 
@@ -130,7 +116,7 @@ mod tests {
 
         assert_eq!(
             validate_all(&long, &short, &indicators, &resampled, 1),
-            Err(CombinedValidationError::TimestampMismatch)
+            Err(ValidationError::TimestampMismatch)
         );
     }
 
@@ -138,21 +124,21 @@ mod tests {
     fn display_messages_name_the_violated_constraint() {
         let cases = [
             (
-                CombinedValidationError::Empty(
+                ValidationError::Empty(
                     empty_validation::EmptyRepoValidationError::LongOperationPointsEmpty
                 ),
                 "long operation points list is empty",
             ),
             (
-                CombinedValidationError::InstrumentMismatch,
+                ValidationError::InstrumentMismatch,
                 "instruments must match across resampled points, long operation points, and short operation points",
             ),
             (
-                CombinedValidationError::MoneyManagementStrategyMismatch,
+                ValidationError::MoneyManagementStrategyMismatch,
                 "all operation points must reference the expected money management strategy id",
             ),
             (
-                CombinedValidationError::TimestampMismatch,
+                ValidationError::TimestampMismatch,
                 "operation point timestamps must match each other and be contained in the resampled point timestamps",
             ),
         ];
@@ -167,9 +153,8 @@ mod tests {
     }
 
     #[test]
-    fn combined_validation_error_is_a_std_error_object() {
-        let boxed: Box<dyn std::error::Error> =
-            Box::new(CombinedValidationError::TimestampMismatch);
+    fn validation_error_is_a_std_error_object() {
+        let boxed: Box<dyn std::error::Error> = Box::new(ValidationError::TimestampMismatch);
         assert_eq!(
             boxed.to_string(),
             "operation point timestamps must match each other and be contained in the resampled point timestamps"
