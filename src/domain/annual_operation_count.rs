@@ -55,7 +55,6 @@ mod tests {
 
     #[test]
     fn one_year_count_1() {
-        // years = 1.0; 1/1.0 = 1.0
         let result = annual_operation_count(1, 0, ONE_YEAR_SECS);
         assert_eq!(result, 1.0);
     }
@@ -86,7 +85,6 @@ mod tests {
 
     #[test]
     fn two_years_count_1() {
-        // years = 2.0; 1/2.0 = 0.5
         let result = annual_operation_count(1, 0, TWO_YEARS_SECS);
         assert_eq!(result, 0.5);
     }
@@ -123,7 +121,6 @@ mod tests {
 
     #[test]
     fn one_op_per_day_over_one_year_returns_365() {
-        // years = 1.0; 365/1.0 = 365.0
         let result = annual_operation_count(365, 0, ONE_YEAR_SECS);
         assert_eq!(result, 365.0);
     }
@@ -137,7 +134,6 @@ mod tests {
 
     #[test]
     fn one_op_over_ten_years_returns_one_tenth() {
-        // 10 years: years = 10.0; 1/10.0 = 0.10
         let ten_years_secs: i64 = 10 * ONE_YEAR_SECS;
         let result = annual_operation_count(1, 0, ten_years_secs);
         assert_eq!(result, 0.10);
