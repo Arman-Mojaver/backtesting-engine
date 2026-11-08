@@ -1,33 +1,34 @@
 use itertools::{Either, Itertools};
 
-use crate::domain::signal::ThresholdSeries;
+use crate::domain::signal::{IndicatorValue, ThresholdSeries};
 
 pub fn create(buffer: &ThresholdSeries) -> (Vec<i64>, Vec<i64>) {
-    let values = &buffer.items;
-    let high_threshold = buffer.high_threshold;
-    let low_threshold = buffer.low_threshold;
+    level_crosses(&buffer.items, buffer.low_threshold, buffer.high_threshold)
+}
 
-    let (long_signals, short_signals) = values
+pub fn level_crosses(
+    items: &[IndicatorValue],
+    long_level: f64,
+    short_level: f64,
+) -> (Vec<i64>, Vec<i64>) {
+    items
         .iter()
         .tuple_windows()
         .filter_map(|(prev, curr)| {
-            if prev.value < low_threshold && curr.value > low_threshold {
+            if prev.value < long_level && curr.value > long_level {
                 Some(Either::Left(curr.timestamp))
-            } else if prev.value > high_threshold && curr.value < high_threshold {
+            } else if prev.value > short_level && curr.value < short_level {
                 Some(Either::Right(curr.timestamp))
             } else {
                 None
             }
         })
-        .partition_map(|either| either);
-
-    (long_signals, short_signals)
+        .partition_map(|either| either)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::signal::IndicatorValue;
 
     fn iv(timestamp: i64, value: f64) -> IndicatorValue {
         IndicatorValue { timestamp, value }

@@ -1,25 +1,8 @@
-use itertools::{Either, Itertools};
-
+use crate::domain::signal::thresholds::level_crosses;
 use crate::domain::signal::OscillatorSeries;
 
 pub fn create(buffer: &OscillatorSeries) -> (Vec<i64>, Vec<i64>) {
-    let values = &buffer.items;
-
-    let (long_signals, short_signals) = values
-        .iter()
-        .tuple_windows()
-        .filter_map(|(prev, curr)| {
-            if prev.value < 0.0 && curr.value > 0.0 {
-                Some(Either::Left(curr.timestamp))
-            } else if prev.value > 0.0 && curr.value < 0.0 {
-                Some(Either::Right(curr.timestamp))
-            } else {
-                None
-            }
-        })
-        .partition_map(|either| either);
-
-    (long_signals, short_signals)
+    level_crosses(&buffer.items, 0.0, 0.0)
 }
 
 #[cfg(test)]
