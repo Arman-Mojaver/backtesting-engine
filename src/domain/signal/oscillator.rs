@@ -1,7 +1,7 @@
 use crate::domain::signal::thresholds::level_crosses;
-use crate::domain::signal::OscillatorSeries;
+use crate::domain::signal::OscillatorBuffer;
 
-pub fn detect_signals(buffer: &OscillatorSeries) -> (Vec<i64>, Vec<i64>) {
+pub fn detect_signals(buffer: &OscillatorBuffer) -> (Vec<i64>, Vec<i64>) {
     level_crosses(&buffer.items, 0.0, 0.0)
 }
 
@@ -14,8 +14,8 @@ mod tests {
         IndicatorValue { timestamp, value }
     }
 
-    fn buf(items: &[IndicatorValue]) -> OscillatorSeries {
-        OscillatorSeries {
+    fn buf(items: &[IndicatorValue]) -> OscillatorBuffer {
+        OscillatorBuffer {
             items: items.to_vec(),
         }
     }

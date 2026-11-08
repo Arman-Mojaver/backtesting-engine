@@ -4,13 +4,13 @@
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 
 const FAST_PERIOD: usize = 5;
 const SLOW_PERIOD: usize = 34;
 const DATA_LIMIT: usize = 37;
 
-fn ao_series(points: &[ResampledPointD1]) -> Vec<f64> {
+fn compute_ao(points: &[ResampledPointD1]) -> Vec<f64> {
     let medians: Vec<f64> = points
         .iter()
         .map(|p| f64::midpoint(p.high, p.low))
@@ -24,8 +24,8 @@ fn ao_series(points: &[ResampledPointD1]) -> Vec<f64> {
         .collect()
 }
 
-pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, IndicatorError> {
-    let ao = ao_series(points);
+pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorBuffer, IndicatorError> {
+    let ao = compute_ao(points);
     let sma_ao = sma(&ao, FAST_PERIOD);
 
     let items = sma_ao
@@ -38,7 +38,7 @@ pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, Indicato
         })
         .collect();
 
-    Ok(OscillatorSeries { items })
+    Ok(OscillatorBuffer { items })
 }
 
 #[cfg(test)]

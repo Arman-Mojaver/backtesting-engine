@@ -1,8 +1,8 @@
 use itertools::Itertools;
 
-use crate::domain::signal::{IndicatorValue, ThresholdSeries};
+use crate::domain::signal::{IndicatorValue, ThresholdBuffer};
 
-pub fn detect_signals(buffer: &ThresholdSeries) -> (Vec<i64>, Vec<i64>) {
+pub fn detect_signals(buffer: &ThresholdBuffer) -> (Vec<i64>, Vec<i64>) {
     level_crosses(&buffer.items, buffer.low_threshold, buffer.high_threshold)
 }
 
@@ -45,8 +45,8 @@ mod tests {
         IndicatorValue { timestamp, value }
     }
 
-    fn buf(items: &[IndicatorValue], high: f64, low: f64) -> ThresholdSeries {
-        ThresholdSeries {
+    fn buf(items: &[IndicatorValue], high: f64, low: f64) -> ThresholdBuffer {
+        ThresholdBuffer {
             items: items.to_vec(),
             high_threshold: high,
             low_threshold: low,

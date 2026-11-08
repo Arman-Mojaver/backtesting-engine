@@ -6,12 +6,12 @@
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 
 const FAST_PERIOD: usize = 5;
 const SLOW_PERIOD: usize = 34;
 
-pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, IndicatorError> {
+pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorBuffer, IndicatorError> {
     let medians: Vec<f64> = points
         .iter()
         .map(|p| f64::midpoint(p.high, p.low))
@@ -32,7 +32,7 @@ pub fn compute(points: &[ResampledPointD1]) -> Result<OscillatorSeries, Indicato
         })
         .collect();
 
-    Ok(OscillatorSeries { items })
+    Ok(OscillatorBuffer { items })
 }
 
 #[cfg(test)]

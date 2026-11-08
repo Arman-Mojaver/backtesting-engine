@@ -117,7 +117,7 @@ Moved here for historical reference. Current team should refer to current notes 
 - **Learnings**: The 'no signal line' reasoning was wrong. The signal period is an engine constant, so the crossover needed no schema change.
 
 ### Resolved: MACD is a crossover (2026-11-02)
-- **Resolution**: `macd::compute` returns a crossover pair: the MACD line against its `SMA(9)` signal line, with the period fixed in code (`SIGNAL_N`, MQL5 `InpSignalSMA = 9`). The `Crossover` signal kind has its first producer. See the decisions log entry of the same name.
+- **Resolution**: `macd::compute` returns crossover buffers: the MACD line against its `SMA(9)` signal line, with the period fixed in code (`SIGNAL_N`, MQL5 `InpSignalSMA = 9`). The `Crossover` signal kind has its first producer. See the decisions log entry of the same name.
 - **Learnings**: The owner's intended semantics are a crossover; the Oscillator shipped in `8c5f4e2` did not match them.
 
 ### Resolved: JSON parsing via serde (2026-10-12)

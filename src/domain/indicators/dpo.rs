@@ -7,14 +7,14 @@ use crate::domain::cast;
 use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;
 use crate::validate_period;
 
 pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
-) -> Result<OscillatorSeries, IndicatorError> {
+) -> Result<OscillatorBuffer, IndicatorError> {
     validate_period!(period, InvalidDpoPeriod);
     let skip_count = cast::i32_to_usize(period / 2);
     let ext_ma_period = skip_count.saturating_add(1);
@@ -36,7 +36,7 @@ pub fn compute(
         })
         .collect();
 
-    Ok(OscillatorSeries { items })
+    Ok(OscillatorBuffer { items })
 }
 
 #[cfg(test)]

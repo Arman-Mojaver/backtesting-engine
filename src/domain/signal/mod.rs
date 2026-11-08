@@ -11,19 +11,19 @@ pub struct IndicatorValue {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OscillatorSeries {
+pub struct OscillatorBuffer {
     pub items: Vec<IndicatorValue>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ThresholdSeries {
+pub struct ThresholdBuffer {
     pub items: Vec<IndicatorValue>,
     pub high_threshold: f64,
     pub low_threshold: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct CrossoverPair {
+pub struct CrossoverBuffers {
     pub upcross_long_buffer: Vec<IndicatorValue>,
     pub upcross_short_buffer: Vec<IndicatorValue>,
 }
@@ -32,15 +32,15 @@ pub struct CrossoverPair {
 pub enum IndicatorOutput {
     Oscillator {
         instrument: String,
-        buffer: OscillatorSeries,
+        buffer: OscillatorBuffer,
     },
     Threshold {
         instrument: String,
-        buffer: ThresholdSeries,
+        buffer: ThresholdBuffer,
     },
     Crossover {
         instrument: String,
-        buffer: CrossoverPair,
+        buffer: CrossoverBuffers,
     },
 }
 
@@ -80,7 +80,7 @@ mod tests {
     fn oscillator_variant_routes_to_oscillator() {
         let values = IndicatorOutput::Oscillator {
             instrument: "EURUSD".to_string(),
-            buffer: OscillatorSeries {
+            buffer: OscillatorBuffer {
                 items: vec![iv(1, -1.0), iv(2, 1.0), iv(3, -1.0)],
             },
         };
@@ -101,7 +101,7 @@ mod tests {
     fn threshold_variant_routes_to_thresholds() {
         let values = IndicatorOutput::Threshold {
             instrument: "EURUSD".to_string(),
-            buffer: ThresholdSeries {
+            buffer: ThresholdBuffer {
                 items: vec![iv(1, 20.0), iv(2, 40.0), iv(3, 80.0), iv(4, 60.0)],
                 high_threshold: 70.0,
                 low_threshold: 30.0,
@@ -124,7 +124,7 @@ mod tests {
     fn crossover_variant_routes_to_crossover() {
         let values = IndicatorOutput::Crossover {
             instrument: "EURUSD".to_string(),
-            buffer: CrossoverPair {
+            buffer: CrossoverBuffers {
                 upcross_long_buffer: vec![iv(1, 0.0), iv(2, 2.0), iv(3, 0.0)],
                 upcross_short_buffer: vec![iv(1, 1.0), iv(2, 1.0), iv(3, 1.0)],
             },
@@ -146,7 +146,7 @@ mod tests {
     fn oscillator_empty_buffer_routes_to_empty() {
         let values = IndicatorOutput::Oscillator {
             instrument: "EURUSD".to_string(),
-            buffer: OscillatorSeries { items: vec![] },
+            buffer: OscillatorBuffer { items: vec![] },
         };
         let result = values.create_signal_group(1);
         assert_eq!(

@@ -6,14 +6,14 @@ use crate::domain::cast;
 use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;
 use crate::validate_period;
 
 pub fn compute(
     points: &[ResampledPointD1],
     period: i32,
-) -> Result<OscillatorSeries, IndicatorError> {
+) -> Result<OscillatorBuffer, IndicatorError> {
     validate_period!(period, InvalidBearsPeriod);
     let p = cast::i32_to_usize(period);
     let close: Vec<f64> = points.iter().map(|pt| pt.close).collect();
@@ -33,7 +33,7 @@ pub fn compute(
         })
         .collect();
 
-    Ok(OscillatorSeries { items })
+    Ok(OscillatorBuffer { items })
 }
 
 #[cfg(test)]

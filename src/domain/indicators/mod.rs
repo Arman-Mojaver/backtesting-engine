@@ -258,7 +258,7 @@ mod tests {
 
     /// 14 points with constant close -> 10 MACD values (fast=3, slow=5,
     /// values start at index 4) and, after the 9-bar signal window, 2
-    /// aligned crossover-pair values (constant close -> 0.0).
+    /// aligned crossover-buffer values (constant close -> 0.0).
     fn rp_macd_14() -> Vec<ResampledPointD1> {
         (1..=14)
             .map(|i| {

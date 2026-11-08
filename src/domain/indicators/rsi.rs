@@ -6,7 +6,7 @@
 use crate::domain::cast;
 use crate::domain::indicators::{IndicatorError, PriceField};
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, ThresholdSeries};
+use crate::domain::signal::{IndicatorValue, ThresholdBuffer};
 use crate::validate_period;
 
 #[derive(Debug, Clone, Copy)]
@@ -27,7 +27,7 @@ pub fn compute(
     n: i32,
     high_threshold: f64,
     low_threshold: f64,
-) -> Result<ThresholdSeries, IndicatorError> {
+) -> Result<ThresholdBuffer, IndicatorError> {
     validate_period!(n, InvalidRsiPeriod);
 
     if high_threshold < 0.0 || high_threshold > 100.0 {
@@ -66,7 +66,7 @@ pub fn compute(
         Vec::new()
     };
 
-    Ok(ThresholdSeries {
+    Ok(ThresholdBuffer {
         items: indicator_values,
         high_threshold,
         low_threshold,

@@ -114,14 +114,14 @@ IndicatorParameters ::= Macd { slow_type, slow_n, fast_type, fast_n }
 ### IndicatorOutput (domain::signal)
 The computed result of an indicator over a candle series, and its signal semantics:
 ```
-IndicatorOutput ::= Oscillator { instrument, buffer: OscillatorSeries }
-                  | Threshold  { instrument, buffer: ThresholdSeries }
-                  | Crossover  { instrument, buffer: CrossoverPair }
+IndicatorOutput ::= Oscillator { instrument, buffer: OscillatorBuffer }
+                  | Threshold  { instrument, buffer: ThresholdBuffer }
+                  | Crossover  { instrument, buffer: CrossoverBuffers }
 
 IndicatorValue { timestamp: i64, value: f64 }
-OscillatorSeries { items: Vec<IndicatorValue> }
-ThresholdSeries  { items, high_threshold, low_threshold }
-CrossoverPair    { upcross_long_buffer, upcross_short_buffer }
+OscillatorBuffer { items: Vec<IndicatorValue> }
+ThresholdBuffer  { items, high_threshold, low_threshold }
+CrossoverBuffers    { upcross_long_buffer, upcross_short_buffer }
 
 // IndicatorOutput::create_signal_group(indicator_id) -> SignalGroup
 // Signal rules (domain/signal/):
@@ -197,7 +197,7 @@ Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` r
 
 - `IndicatorError` has typed per-indicator period variants and `NotEnoughData`.
 - Period validation is uniform via the `validate_period!` macro (non-positive period → typed error).
-- Insufficient data yields an **empty series**, not an error (`empty_oscillator!` macro; the MACD pair uses `empty_crossover!`).
+- Insufficient data yields an **empty buffer**, not an error (`empty_oscillator!` macro; the MACD crossover buffers use `empty_crossover!`).
 - Shared moving-average math lives in `domain/indicators/moving_averages.rs`.
 - `PriceField` (Open/High/Low/Close) selects which candle component an indicator consumes.
 
@@ -301,7 +301,7 @@ src/
 │   │   ├── mod.rs              # IndicatorOutput enum + create_signal_group()
 │   │   ├── oscillator.rs       # zero-cross signals
 │   │   ├── thresholds.rs       # threshold-crossing signals
-│   │   └── crossover.rs        # diff-of-series → zero-cross signals
+│   │   └── crossover.rs        # diff-of-buffers → zero-cross signals
 │   ├── signal_group.rs         # SignalGroup + filter_signal_groups_by_annual_ops()
 │   ├── strategy.rs             # Strategy + GlobalStrategyFilter + filter_strategies()
 │   ├── annual_operation_count.rs  # annual_operation_count() metric

@@ -7,7 +7,7 @@ use crate::domain::cast;
 use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{IndicatorValue, OscillatorSeries};
+use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;
 use crate::validate_period;
 
@@ -16,7 +16,7 @@ pub fn compute(
     fast_ema: i32,
     slow_ema: i32,
     signal_sma: i32,
-) -> Result<OscillatorSeries, IndicatorError> {
+) -> Result<OscillatorBuffer, IndicatorError> {
     validate_period!(fast_ema, InvalidOsMaFastPeriod; slow_ema, InvalidOsMaSlowPeriod; signal_sma, InvalidOsMaSignalPeriod);
     if fast_ema > slow_ema {
         return Err(IndicatorError::InvalidOsMaPeriodOrder {
@@ -56,7 +56,7 @@ pub fn compute(
         })
         .collect();
 
-    Ok(OscillatorSeries { items })
+    Ok(OscillatorBuffer { items })
 }
 
 #[cfg(test)]

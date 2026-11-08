@@ -1,7 +1,7 @@
 //! MACD: the MACD line crossing its signal line.
 //!
 //! `MACD[i] = MA(close, fast) - MA(close, slow)`, each line `ema` or `sma`;
-//! the signal line is `SMA(MACD, SIGNAL_N)`. The output is a crossover pair:
+//! the signal line is `SMA(MACD, SIGNAL_N)`. The output is two crossover buffers:
 //! signals fire where the MACD line crosses its signal line. The MQL5
 //! example (`MACD.mq5`) hardcodes `MODE_EMA` for both lines and
 //! `InpSignalSMA = 9`; the database generalises the lines with a per-line
@@ -11,7 +11,7 @@ use crate::domain::cast;
 use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
-use crate::domain::signal::{CrossoverPair, IndicatorValue};
+use crate::domain::signal::{CrossoverBuffers, IndicatorValue};
 use crate::empty_crossover;
 use crate::validate_period;
 
@@ -87,20 +87,20 @@ fn macd_line(
         .collect())
 }
 
-/// Crosses the MACD line against its signal line, as a crossover pair.
+/// Crosses the MACD line against its signal line, as crossover buffers.
 ///
 /// The long buffer is the MACD line; the short buffer is the signal line,
 /// `SMA(MACD, SIGNAL_N)`. Both buffers share the timestamps of the bars where
 /// both lines exist: the first `SIGNAL_N - 1` MACD values, whose signal average
-/// does not yet exist, are dropped so the pair stays zip-aligned. Short input
-/// yields an empty pair, never an error.
+/// does not yet exist, are dropped so the buffers stay zip-aligned. Short input
+/// yields empty buffers, never an error.
 pub fn compute(
     points: &[ResampledPointD1],
     fast_type: &str,
     fast_n: i32,
     slow_type: &str,
     slow_n: i32,
-) -> Result<CrossoverPair, IndicatorError> {
+) -> Result<CrossoverBuffers, IndicatorError> {
     let line = macd_line(points, fast_type, fast_n, slow_type, slow_n)?;
     let values: Vec<f64> = line.iter().map(|value| value.value).collect();
     let signal = sma(&values, cast::i32_to_usize(SIGNAL_N));
@@ -125,7 +125,7 @@ pub fn compute(
         })
         .collect();
 
-    Ok(CrossoverPair {
+    Ok(CrossoverBuffers {
         upcross_long_buffer: long_buffer,
         upcross_short_buffer: short_buffer,
     })
@@ -368,23 +368,23 @@ mod tests {
         );
     }
 
-    // --- crossover pair: the MACD line against its signal line ---
+    // --- crossover buffers: the MACD line against its signal line ---
 
     #[test]
     fn empty_points_yield_empty_pair() {
-        let pair = compute(&[], "ema", 12, "ema", 26).unwrap();
-        assert!(pair.upcross_long_buffer.is_empty());
-        assert!(pair.upcross_short_buffer.is_empty());
+        let buffers = compute(&[], "ema", 12, "ema", 26).unwrap();
+        assert!(buffers.upcross_long_buffer.is_empty());
+        assert!(buffers.upcross_short_buffer.is_empty());
     }
 
     #[test]
     fn line_shorter_than_signal_window_yields_empty_pair() {
         // 12 points, fast=3, slow=5 -> line has 12 - 5 + 1 = 8 values,
-        // shorter than the 9-bar signal window -> no signal line -> empty pair.
+        // shorter than the 9-bar signal window -> no signal line -> empty buffers.
         let points = points_from_closes(&[10.0; 12]);
-        let pair = compute(&points, "ema", 3, "sma", 5).unwrap();
-        assert!(pair.upcross_long_buffer.is_empty());
-        assert!(pair.upcross_short_buffer.is_empty());
+        let buffers = compute(&points, "ema", 3, "sma", 5).unwrap();
+        assert!(buffers.upcross_long_buffer.is_empty());
+        assert!(buffers.upcross_short_buffer.is_empty());
     }
 
     #[test]
@@ -393,7 +393,7 @@ mod tests {
         // evaluated at point j+1. closes drop 100 -> 82 at index 9, recover at 10.
         //   line = [0,0,0,0,0,0,0,0,-9,9,0,0,0] (len 13) at ts 2000..14000.
         //   signal = SMA(line, 9): [-1, 0, 0, 0, 0].
-        // Pair starts at line index 8 (ts 10000):
+        // Buffers start at line index 8 (ts 10000):
         //   long  = [-9, 9, 0, 0, 0]
         //   short = [-1, 0, 0, 0, 0]
         let closes = [
@@ -412,11 +412,11 @@ mod tests {
                 )
             })
             .collect();
-        let pair = compute(&points, "ema", 1, "sma", 2).unwrap();
+        let buffers = compute(&points, "ema", 1, "sma", 2).unwrap();
 
         let expected_ts = [10000_i64, 11000, 12000, 13000, 14000];
-        let long = &pair.upcross_long_buffer;
-        let short = &pair.upcross_short_buffer;
+        let long = &buffers.upcross_long_buffer;
+        let short = &buffers.upcross_short_buffer;
         assert_eq!(long.len(), 5);
         assert_eq!(short.len(), 5);
         for (i, ts) in expected_ts.iter().enumerate() {
@@ -476,7 +476,7 @@ mod tests {
         }
     }
 
-    /// Captured-pair baseline (see the line baseline above for the caveat).
+    /// Captured-buffers baseline (see the line baseline above for the caveat).
     ///
     /// The long buffer is the MACD line from index `SIGNAL_N - 1` on (its
     /// first 8 values have no signal average yet); the short buffer is the
@@ -484,15 +484,15 @@ mod tests {
     #[test]
     fn level2_real_macd_pair_matches_captured_baseline() {
         let points = test_support::eurusd_points();
-        let pair = compute(&points, "ema", 12, "ema", 20).unwrap();
-        let long = &pair.upcross_long_buffer;
-        let short = &pair.upcross_short_buffer;
+        let buffers = compute(&points, "ema", 12, "ema", 20).unwrap();
+        let long = &buffers.upcross_long_buffer;
+        let short = &buffers.upcross_short_buffer;
 
         // 2400 points -> line 2381, signal window 9 -> 2373 aligned values.
         assert_eq!(long.len(), 2373);
         assert_eq!(short.len(), 2373);
 
-        // Pair starts 8 bars after the line's first bar (line index 8).
+        // Buffers start 8 bars after the line's first bar (line index 8).
         assert_eq!(long[0].timestamp, 1357862400);
         assert_eq!(short[0].timestamp, 1357862400);
         assert_eq!(long.last().expect("non-empty").timestamp, 1646352000);

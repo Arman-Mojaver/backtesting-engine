@@ -1,7 +1,7 @@
 use crate::domain::signal::oscillator;
-use crate::domain::signal::{CrossoverPair, IndicatorValue, OscillatorSeries};
+use crate::domain::signal::{CrossoverBuffers, IndicatorValue, OscillatorBuffer};
 
-pub fn detect_signals(buffers: &CrossoverPair) -> (Vec<i64>, Vec<i64>) {
+pub fn detect_signals(buffers: &CrossoverBuffers) -> (Vec<i64>, Vec<i64>) {
     let diff_buffer: Vec<IndicatorValue> = buffers
         .upcross_long_buffer
         .iter()
@@ -12,7 +12,7 @@ pub fn detect_signals(buffers: &CrossoverPair) -> (Vec<i64>, Vec<i64>) {
         })
         .collect();
 
-    oscillator::detect_signals(&OscillatorSeries { items: diff_buffer })
+    oscillator::detect_signals(&OscillatorBuffer { items: diff_buffer })
 }
 
 #[cfg(test)]
@@ -24,8 +24,8 @@ mod tests {
         IndicatorValue { timestamp, value }
     }
 
-    fn bufs(long: &[IndicatorValue], short: &[IndicatorValue]) -> CrossoverPair {
-        CrossoverPair {
+    fn bufs(long: &[IndicatorValue], short: &[IndicatorValue]) -> CrossoverBuffers {
+        CrossoverBuffers {
             upcross_long_buffer: long.to_vec(),
             upcross_short_buffer: short.to_vec(),
         }
