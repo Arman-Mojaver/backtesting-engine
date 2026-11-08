@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone)]
@@ -35,17 +36,11 @@ impl OperationPoints<'_> {
     /// generated in lockstep upstream), so the range from the long side
     /// bounds both.
     pub fn start_end_timestamps(&self) -> Option<(i64, i64)> {
-        let start = self
-            .long_operation_points
+        self.long_operation_points
             .iter()
             .map(|p| p.timestamp)
-            .min()?;
-        let end = self
-            .long_operation_points
-            .iter()
-            .map(|p| p.timestamp)
-            .max()?;
-        Some((start, end))
+            .minmax()
+            .into_option()
     }
 }
 
