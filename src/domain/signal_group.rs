@@ -24,10 +24,13 @@ pub fn filter_signal_groups_by_annual_ops(
 ) -> Vec<SignalGroup> {
     signal_groups
         .into_iter()
-        .filter(|sg| {
-            sg.operation_count() > 0
-                && annual_operation_count(sg.operation_count(), start_timestamp, end_timestamp)
-                    >= min_annual_operation_count
+        .filter(|signal_group| {
+            signal_group.operation_count() > 0
+                && annual_operation_count(
+                    signal_group.operation_count(),
+                    start_timestamp,
+                    end_timestamp,
+                ) >= min_annual_operation_count
         })
         .collect()
 }
