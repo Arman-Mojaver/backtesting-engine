@@ -150,9 +150,9 @@ Strategy {
 ```
 
 ### GlobalStrategyFilter
-Default thresholds for `filter_strategies()`. `Default`: max_draw_down_max=20.0, min_annual_roi=5.0, min_operation_count=10.0.
+Default thresholds for `filter_strategies()`. `Default`: max_draw_down_max=20.0, min_annual_roi=5.0, min_annual_operation_count=10.0.
 ```
-GlobalStrategyFilter { max_draw_down_max: f64, min_annual_roi: f64, min_operation_count: f64 }
+GlobalStrategyFilter { max_draw_down_max: f64, min_annual_roi: f64, min_annual_operation_count: f64 }
 ```
 
 ### SignalGroup

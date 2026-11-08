@@ -17,7 +17,7 @@ pub struct GlobalStrategyFilter {
     /// Enforced at the signal-group stage, where the count is known before
     /// the expensive metrics exist; kept here so all three thresholds live
     /// in one place.
-    pub min_operation_count: f64,
+    pub min_annual_operation_count: f64,
 }
 
 impl Default for GlobalStrategyFilter {
@@ -25,7 +25,7 @@ impl Default for GlobalStrategyFilter {
         Self {
             max_draw_down_max: 20.0,
             min_annual_roi: 5.0,
-            min_operation_count: 10.0,
+            min_annual_operation_count: 10.0,
         }
     }
 }
@@ -64,7 +64,7 @@ mod tests {
         let f = GlobalStrategyFilter::default();
         assert!(f.max_draw_down_max > 0.0);
         assert!(f.min_annual_roi > 0.0);
-        assert!(f.min_operation_count > 0.0);
+        assert!(f.min_annual_operation_count > 0.0);
     }
 
     #[test]

@@ -11,7 +11,7 @@ pub struct SignalGroup {
 
 pub fn filter_signal_groups_by_annual_ops(
     signal_groups: Vec<SignalGroup>,
-    min_operation_count: f64,
+    min_annual_operation_count: f64,
     start_timestamp: i64,
     end_timestamp: i64,
 ) -> Vec<SignalGroup> {
@@ -20,7 +20,7 @@ pub fn filter_signal_groups_by_annual_ops(
         .filter(|sg| {
             sg.operation_count > 0
                 && annual_operation_count(sg.operation_count, start_timestamp, end_timestamp)
-                    >= min_operation_count
+                    >= min_annual_operation_count
         })
         .collect()
 }

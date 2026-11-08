@@ -42,14 +42,14 @@ pub fn run_strategies(
     let global_filter = GlobalStrategyFilter::default();
     let filtered_groups = filter_signal_groups_by_annual_ops(
         signal_groups,
-        global_filter.min_operation_count,
+        global_filter.min_annual_operation_count,
         start_timestamp,
         end_timestamp,
     );
     let instrument = instrument_of(resampled_points);
     debug!(
         "{instrument} (mms_id={money_management_strategy_id}): after annual operation count filter (min {}): {} signal groups",
-        global_filter.min_operation_count,
+        global_filter.min_annual_operation_count,
         filtered_groups.len(),
     );
 
