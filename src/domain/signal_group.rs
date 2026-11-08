@@ -138,6 +138,34 @@ mod tests {
     }
 
     #[test]
+    fn filter_counts_short_signals_toward_threshold() {
+        let group = make_group(0, 10);
+        let result = filter_signal_groups_by_annual_ops(vec![group], 10.0, 0, ONE_YEAR_SECS);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn filter_keeps_group_whose_combined_signals_meet_threshold() {
+        let group = make_group(6, 4);
+        let result = filter_signal_groups_by_annual_ops(vec![group], 10.0, 0, ONE_YEAR_SECS);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn filter_excludes_all_groups_when_range_is_empty() {
+        let groups = vec![make_group(20, 0), make_group(0, 20)];
+        let result = filter_signal_groups_by_annual_ops(groups, 10.0, 1000, 1000);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn filter_excludes_group_below_threshold_over_two_years() {
+        let group = make_group(15, 0);
+        let result = filter_signal_groups_by_annual_ops(vec![group], 10.0, 0, 2 * ONE_YEAR_SECS);
+        assert!(result.is_empty());
+    }
+
+    #[test]
     fn filter_threshold_zero_keeps_non_empty() {
         let group = make_group(1, 0);
         let result = filter_signal_groups_by_annual_ops(vec![group], 0.0, 0, ONE_YEAR_SECS);
