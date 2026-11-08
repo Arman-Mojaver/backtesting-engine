@@ -70,7 +70,7 @@ mod tests {
 
     #[test]
     fn keeps_strategy_within_all_limits() {
-        let s = make_strategy(1, 15.0, 20.0);
+        let s = make_strategy(1, 15.0, 10.0);
         let filter = GlobalStrategyFilter::default();
         let result = filter_strategies(vec![s], &filter);
         assert_eq!(result.len(), 1);
@@ -89,6 +89,45 @@ mod tests {
         let s = make_strategy(1, 2.0, 20.0);
         let filter = GlobalStrategyFilter::default();
         let result = filter_strategies(vec![s], &filter);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn keeps_strategy_with_annual_roi_exactly_at_minimum() {
+        let s = make_strategy(1, 5.0, 10.0);
+        let filter = GlobalStrategyFilter::default();
+        let result = filter_strategies(vec![s], &filter);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn keeps_strategy_with_draw_down_exactly_at_maximum() {
+        let s = make_strategy(1, 15.0, 20.0);
+        let filter = GlobalStrategyFilter::default();
+        let result = filter_strategies(vec![s], &filter);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn excludes_strategy_with_nan_annual_roi() {
+        let s = make_strategy(1, f64::NAN, 10.0);
+        let filter = GlobalStrategyFilter::default();
+        let result = filter_strategies(vec![s], &filter);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn excludes_strategy_with_nan_draw_down() {
+        let s = make_strategy(1, 15.0, f64::NAN);
+        let filter = GlobalStrategyFilter::default();
+        let result = filter_strategies(vec![s], &filter);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn returns_empty_for_no_strategies() {
+        let filter = GlobalStrategyFilter::default();
+        let result = filter_strategies(vec![], &filter);
         assert!(result.is_empty());
     }
 
