@@ -189,6 +189,27 @@ mod tests {
     }
 
     #[test]
+    fn start_end_timestamps_returns_none_when_long_points_empty() {
+        let short = vec![op_point(1, -1, 100)];
+        let ops = OperationPoints {
+            long_operation_points: &[],
+            short_operation_points: &short,
+        };
+        assert_eq!(ops.start_end_timestamps(), None);
+    }
+
+    #[test]
+    fn start_end_timestamps_ignores_short_points() {
+        let long = vec![op_point(1, 1, 200), op_point(2, 1, 300)];
+        let short = vec![op_point(3, -1, 100), op_point(4, -1, 400)];
+        let ops = OperationPoints {
+            long_operation_points: &long,
+            short_operation_points: &short,
+        };
+        assert_eq!(ops.start_end_timestamps(), Some((200, 300)));
+    }
+
+    #[test]
     fn group_by_cell_groups_points() {
         let points = vec![
             OperationPoint {
@@ -225,5 +246,10 @@ mod tests {
         assert_eq!(ids_in("EURUSD", 1), vec![1, 2]);
         assert_eq!(ids_in("EURUSD", 2), vec![3]);
         assert_eq!(ids_in("USDCAD", 1), vec![4]);
+    }
+
+    #[test]
+    fn group_by_cell_returns_empty_map_for_no_points() {
+        assert!(group_by_cell(vec![]).is_empty());
     }
 }
