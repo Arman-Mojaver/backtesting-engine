@@ -14,12 +14,16 @@ pub struct ResampledPointD1 {
 }
 
 fn group_by_instrument(points: Vec<ResampledPointD1>) -> FxHashMap<String, Vec<ResampledPointD1>> {
-    points
-        .into_iter()
-        .fold(FxHashMap::default(), |mut acc, point| {
-            acc.entry(point.instrument.clone()).or_default().push(point);
-            acc
-        })
+    let mut points_by_instrument: FxHashMap<String, Vec<ResampledPointD1>> = FxHashMap::default();
+    for point in points {
+        match points_by_instrument.get_mut(&point.instrument) {
+            Some(instrument_points) => instrument_points.push(point),
+            None => {
+                points_by_instrument.insert(point.instrument.clone(), vec![point]);
+            }
+        }
+    }
+    points_by_instrument
 }
 
 pub trait ResampledPointD1Repository {
