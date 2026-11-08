@@ -84,6 +84,7 @@ fn unprocessed_indicators(indicators: &[Indicator], unprocessed_ids: &[i32]) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::fixtures::op_point;
     use crate::domain::indicator::IndicatorParameters;
 
     /// Bar spacing chosen so bars 5 and 21 are exactly one year apart:
@@ -115,34 +116,21 @@ mod tests {
             .collect()
     }
 
-    fn op(id: i32, result: i32, timestamp: i64) -> OperationPoint {
-        OperationPoint {
-            instrument: "EURUSD".to_string(),
-            result,
-            tp: 30,
-            sl: 20,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id,
-            timestamp,
-        }
-    }
-
     /// Long and short operation points share the bar-5 / bar-21 timestamps
     /// (validation requires identical timestamp sets). Short results are
     /// losers that no signal resolves: if one ever did, the 6.09 ROI
     /// assertions below would catch it.
     fn pipeline_long_ops() -> Vec<OperationPoint> {
         vec![
-            op(1, 30, 4 * BAR_SPACING_SECS),
-            op(2, 30, 20 * BAR_SPACING_SECS),
+            op_point(1, 30, 4 * BAR_SPACING_SECS),
+            op_point(2, 30, 20 * BAR_SPACING_SECS),
         ]
     }
 
     fn pipeline_short_ops() -> Vec<OperationPoint> {
         vec![
-            op(10, -20, 4 * BAR_SPACING_SECS),
-            op(11, -20, 20 * BAR_SPACING_SECS),
+            op_point(10, -20, 4 * BAR_SPACING_SECS),
+            op_point(11, -20, 20 * BAR_SPACING_SECS),
         ]
     }
 

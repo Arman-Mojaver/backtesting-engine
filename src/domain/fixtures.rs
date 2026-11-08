@@ -90,6 +90,19 @@ pub fn op_points_ts_124() -> Vec<OperationPoint> {
     vec![winning_op(1, 1), losing_op(2, 2), losing_op(3, 4)]
 }
 
+pub fn op_point(id: i32, result: i32, timestamp: i64) -> OperationPoint {
+    OperationPoint {
+        instrument: "EURUSD".into(),
+        result,
+        tp: 30,
+        sl: 20,
+        risk: 0.02,
+        money_management_strategy_id: 1,
+        id,
+        timestamp,
+    }
+}
+
 // Resampled Point fixtures
 
 pub const fn resampled_points_empty() -> Vec<ResampledPointD1> {

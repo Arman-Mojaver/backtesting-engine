@@ -82,20 +82,7 @@ fn create_strategy(
 mod tests {
     use super::*;
 
-    use crate::domain::fixtures::ONE_YEAR_SECS;
-
-    fn op_point(id: i32, result: i32, timestamp: i64) -> OperationPoint {
-        OperationPoint {
-            instrument: "EURUSD".to_string(),
-            result,
-            tp: 30,
-            sl: 20,
-            risk: 0.02,
-            money_management_strategy_id: 1,
-            id,
-            timestamp,
-        }
-    }
+    use crate::domain::fixtures::{op_point, ONE_YEAR_SECS};
 
     fn group(indicator_id: i32, longs: Vec<i64>, shorts: Vec<i64>) -> SignalGroup {
         SignalGroup {
