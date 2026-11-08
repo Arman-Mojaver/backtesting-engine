@@ -34,7 +34,7 @@ pub trait ResampledPointD1Repository {
 mod tests {
     use super::*;
 
-    fn point(id: i32, instrument: &str) -> ResampledPointD1 {
+    fn point(id: i32, instrument: &str, timestamp: i64) -> ResampledPointD1 {
         ResampledPointD1 {
             id,
             instrument: instrument.into(),
@@ -43,20 +43,27 @@ mod tests {
             low: 0.9,
             close: 1.05,
             volume: 1000,
-            timestamp: 1000,
+            timestamp,
         }
     }
 
     #[test]
-    fn group_by_instrument_groups_points() {
-        let points = vec![point(1, "EURUSD"), point(2, "EURUSD"), point(3, "USDCAD")];
+    fn group_by_instrument_keeps_chronological_order_within_instrument() {
+        let points = vec![
+            point(1, "EURUSD", 1000),
+            point(2, "USDCAD", 2000),
+            point(3, "EURUSD", 3000),
+        ];
         let index = group_by_instrument(points);
 
+        let timestamps = |instrument: &str| -> Vec<i64> {
+            index[instrument]
+                .iter()
+                .map(|point| point.timestamp)
+                .collect()
+        };
         assert_eq!(index.len(), 2);
-        assert_eq!(index["EURUSD"].len(), 2);
-        assert_eq!(index["USDCAD"].len(), 1);
-        assert_eq!(index["EURUSD"][0].id, 1);
-        assert_eq!(index["EURUSD"][1].id, 2);
-        assert_eq!(index["USDCAD"][0].id, 3);
+        assert_eq!(timestamps("EURUSD"), vec![1000, 3000]);
+        assert_eq!(timestamps("USDCAD"), vec![2000]);
     }
 }
