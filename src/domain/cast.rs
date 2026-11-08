@@ -5,22 +5,22 @@
 //! few that do not are routed through this module so every remaining cast
 //! sits in one auditable place.
 
-#[allow(clippy::as_conversions)]
+#[expect(clippy::as_conversions, reason = "no std From/TryFrom for this cast")]
 pub const fn usize_to_f64(n: usize) -> f64 {
     n as f64
 }
 
-#[allow(clippy::as_conversions)]
+#[expect(clippy::as_conversions, reason = "no std From/TryFrom for this cast")]
 pub const fn i64_to_f64(n: i64) -> f64 {
     n as f64
 }
 
-#[allow(clippy::as_conversions)]
+#[expect(clippy::as_conversions, reason = "no std From/TryFrom for this cast")]
 pub const fn i128_to_f64(n: i128) -> f64 {
     n as f64
 }
 
-#[allow(clippy::as_conversions)]
+#[expect(clippy::as_conversions, reason = "no std From/TryFrom for this cast")]
 pub const fn round_f64_to_i128(x: f64) -> i128 {
     debug_assert!(x.is_finite(), "NaN/inf would silently cast to 0/saturate");
     x.round() as i128
