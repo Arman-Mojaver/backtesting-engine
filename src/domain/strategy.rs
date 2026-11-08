@@ -46,13 +46,13 @@ pub fn filter_strategies(
 mod tests {
     use super::*;
 
-    fn make_strategy(indicator_id: i32, roi: f64, dd: f64, ops: f64) -> Strategy {
+    fn make_strategy(indicator_id: i32, annual_roi: f64, max_draw_down: f64) -> Strategy {
         Strategy {
             instrument: "EURUSD".to_string(),
             indicator_id,
-            annual_roi: roi,
-            max_draw_down: dd,
-            annual_operation_count: ops,
+            annual_roi,
+            max_draw_down,
+            annual_operation_count: 10.0,
             long_operation_point_ids: vec![],
             short_operation_point_ids: vec![],
             money_management_strategy_id: 1,
@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn keeps_strategy_within_all_limits() {
-        let s = make_strategy(1, 15.0, 20.0, 10.0);
+        let s = make_strategy(1, 15.0, 20.0);
         let filter = GlobalStrategyFilter::default();
         let result = filter_strategies(vec![s], &filter);
         assert_eq!(result.len(), 1);
@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn excludes_high_drawdown() {
-        let s = make_strategy(1, 15.0, 50.0, 10.0);
+        let s = make_strategy(1, 15.0, 50.0);
         let filter = GlobalStrategyFilter::default();
         let result = filter_strategies(vec![s], &filter);
         assert!(result.is_empty());
@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn excludes_low_roi() {
-        let s = make_strategy(1, 2.0, 20.0, 10.0);
+        let s = make_strategy(1, 2.0, 20.0);
         let filter = GlobalStrategyFilter {
             min_annual_roi: 5.0,
             ..GlobalStrategyFilter::default()
@@ -97,11 +97,11 @@ mod tests {
     #[test]
     fn filters_mixed_bag() {
         let strategies = vec![
-            make_strategy(1, 15.0, 20.0, 10.0), // passes
-            make_strategy(2, 3.0, 20.0, 10.0),  // low ROI
-            make_strategy(3, 15.0, 50.0, 10.0), // high DD
-            make_strategy(4, 15.0, 20.0, 3.0),  // passes
-            make_strategy(5, 25.0, 10.0, 20.0), // passes
+            make_strategy(1, 15.0, 20.0),
+            make_strategy(2, 3.0, 20.0),
+            make_strategy(3, 15.0, 50.0),
+            make_strategy(4, 15.0, 20.0),
+            make_strategy(5, 25.0, 10.0),
         ];
         let filter = GlobalStrategyFilter::default();
         let result = filter_strategies(strategies, &filter);
