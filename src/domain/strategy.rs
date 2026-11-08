@@ -14,9 +14,10 @@ pub struct Strategy {
 pub struct GlobalStrategyFilter {
     pub max_draw_down_max: f64,
     pub min_annual_roi: f64,
-    /// Enforced at the signal-group stage, where the count is known before
-    /// the expensive metrics exist; kept here so all three thresholds live
-    /// in one place.
+    /// A global business minimum. Here it only prunes early, on signal
+    /// counts, before the expensive metrics exist; matched operation points
+    /// can't exceed signals, so no passing strategy is lost. Final pruning on
+    /// the stored count happens downstream.
     pub min_annual_operation_count: f64,
 }
 

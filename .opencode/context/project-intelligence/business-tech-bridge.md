@@ -21,7 +21,7 @@
 | Indicator output → signals | `IndicatorOutput::create_signal_group()` | `src/domain/signal/mod.rs` | Oscillator/threshold/crossover semantics |
 | Money management strategy | `money_management_strategy_id` field | `src/domain/operation_point.rs`, `src/domain/strategy.rs` | Integer ID, no dedicated struct yet |
 | A backtested strategy | `Strategy` struct | `src/domain/strategy.rs` | instrument + indicator + op-point ID sets + MMS + metrics |
-| Strategy quality bar | `GlobalStrategyFilter` + `filter_strategies()` | `src/domain/strategy.rs` | Default: DD≤20%, ROI≥5% (op count filtered earlier) |
+| Strategy quality bar | `GlobalStrategyFilter` + `filter_strategies()` | `src/domain/strategy.rs` | Default: DD≤20%, ROI≥5% (op count pruned early on signal counts; final pruning downstream) |
 | Annual return on investment | `annual_roi` field on `Strategy` | `src/domain/strategy.rs` | Computed by `PerformanceMetrics::annual_roi()` from global ROI + time span |
 | "How deep did it draw down?" / "What is the total return?" | `performance_metrics()` → `.max_draw_down` / `.global_roi` | `src/domain/performance_metrics.rs` | Single-pass fn over `&[&OperationPoint]` (sorts chronologically itself), returns % |
 | "How many trades per year?" | `annual_operation_count()` | `src/domain/annual_operation_count.rs` | Pure fn over `(count: usize, start_ts: i64, end_ts: i64)` |
