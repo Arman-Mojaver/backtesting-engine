@@ -60,11 +60,11 @@ mod tests {
     }
 
     #[test]
-    fn default_filter_has_reasonable_values() {
-        let f = GlobalStrategyFilter::default();
-        assert!(f.max_draw_down_max > 0.0);
-        assert!(f.min_annual_roi > 0.0);
-        assert!(f.min_annual_operation_count > 0.0);
+    fn default_filter_encodes_baseline_quality_bar() {
+        let filter = GlobalStrategyFilter::default();
+        assert_eq!(filter.max_draw_down_max, 20.0);
+        assert_eq!(filter.min_annual_roi, 5.0);
+        assert_eq!(filter.min_annual_operation_count, 10.0);
     }
 
     #[test]
