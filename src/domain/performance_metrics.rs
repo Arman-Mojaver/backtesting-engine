@@ -48,10 +48,9 @@ pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceM
 
 impl PerformanceMetrics {
     pub fn annual_roi(&self, start_timestamp: i64, end_timestamp: i64) -> f64 {
-        let years = difference_in_years(start_timestamp, end_timestamp);
-        if years <= 0.0 {
+        let Some(years) = difference_in_years(start_timestamp, end_timestamp) else {
             return 0.0;
-        }
+        };
 
         let global_accumulated = 1.0 + self.global_roi / 100.0;
         if global_accumulated <= 0.0 {

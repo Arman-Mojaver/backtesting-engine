@@ -2,10 +2,9 @@ use crate::domain::cast;
 use crate::domain::time_span::difference_in_years;
 
 pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_timestamp: i64) -> f64 {
-    let years = difference_in_years(start_timestamp, end_timestamp);
-    if years <= 0.0 {
+    let Some(years) = difference_in_years(start_timestamp, end_timestamp) else {
         return 0.0;
-    }
+    };
 
     let annualized = cast::usize_to_f64(total_count) / years;
     cast::round_to(annualized, 2)
