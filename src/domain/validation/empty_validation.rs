@@ -1,38 +1,26 @@
-use thiserror::Error;
-
 use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum EmptyRepoValidationError {
-    #[error("long operation points list is empty")]
-    LongOperationPointsEmpty,
-    #[error("short operation points list is empty")]
-    ShortOperationPointsEmpty,
-    #[error("indicators list is empty")]
-    IndicatorsEmpty,
-    #[error("resampled points list is empty")]
-    ResampledPointsEmpty,
-}
+use super::ValidationError;
 
 pub const fn validate_empty_entities(
     long_ops: &[OperationPoint],
     short_ops: &[OperationPoint],
     indicators: &[Indicator],
     resampled_points: &[ResampledPointD1],
-) -> Result<(), EmptyRepoValidationError> {
+) -> Result<(), ValidationError> {
     if long_ops.is_empty() {
-        return Err(EmptyRepoValidationError::LongOperationPointsEmpty);
+        return Err(ValidationError::LongOperationPointsEmpty);
     }
     if short_ops.is_empty() {
-        return Err(EmptyRepoValidationError::ShortOperationPointsEmpty);
+        return Err(ValidationError::ShortOperationPointsEmpty);
     }
     if indicators.is_empty() {
-        return Err(EmptyRepoValidationError::IndicatorsEmpty);
+        return Err(ValidationError::IndicatorsEmpty);
     }
     if resampled_points.is_empty() {
-        return Err(EmptyRepoValidationError::ResampledPointsEmpty);
+        return Err(ValidationError::ResampledPointsEmpty);
     }
 
     Ok(())
@@ -55,7 +43,7 @@ mod tests {
                 &indicators_empty(),
                 &resampled_points_empty()
             ),
-            Err(EmptyRepoValidationError::LongOperationPointsEmpty)
+            Err(ValidationError::LongOperationPointsEmpty)
         );
     }
 
@@ -68,7 +56,7 @@ mod tests {
                 &indicators_default(),
                 &resampled_points_default()
             ),
-            Err(EmptyRepoValidationError::LongOperationPointsEmpty)
+            Err(ValidationError::LongOperationPointsEmpty)
         );
     }
 
@@ -81,7 +69,7 @@ mod tests {
                 &indicators_default(),
                 &resampled_points_default()
             ),
-            Err(EmptyRepoValidationError::ShortOperationPointsEmpty)
+            Err(ValidationError::ShortOperationPointsEmpty)
         );
     }
 
@@ -94,7 +82,7 @@ mod tests {
                 &indicators_empty(),
                 &resampled_points_default()
             ),
-            Err(EmptyRepoValidationError::IndicatorsEmpty)
+            Err(ValidationError::IndicatorsEmpty)
         );
     }
 
@@ -107,7 +95,7 @@ mod tests {
                 &indicators_default(),
                 &resampled_points_empty()
             ),
-            Err(EmptyRepoValidationError::ResampledPointsEmpty)
+            Err(ValidationError::ResampledPointsEmpty)
         );
     }
 
@@ -122,42 +110,5 @@ mod tests {
             ),
             Ok(())
         );
-    }
-
-    #[test]
-    fn display_messages_name_the_empty_input() {
-        let cases = [
-            (
-                EmptyRepoValidationError::LongOperationPointsEmpty,
-                "long operation points list is empty",
-            ),
-            (
-                EmptyRepoValidationError::ShortOperationPointsEmpty,
-                "short operation points list is empty",
-            ),
-            (
-                EmptyRepoValidationError::IndicatorsEmpty,
-                "indicators list is empty",
-            ),
-            (
-                EmptyRepoValidationError::ResampledPointsEmpty,
-                "resampled points list is empty",
-            ),
-        ];
-
-        for (error, expected) in cases {
-            assert_eq!(
-                error.to_string(),
-                expected,
-                "Display mismatch for {error:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn empty_repo_validation_error_is_a_std_error_object() {
-        let boxed: Box<dyn std::error::Error> = Box::new(EmptyRepoValidationError::IndicatorsEmpty);
-        assert_eq!(boxed.to_string(), "indicators list is empty");
-        assert!(boxed.source().is_none());
     }
 }
