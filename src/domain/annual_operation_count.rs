@@ -122,7 +122,7 @@ mod tests {
     }
 
     #[test]
-    fn count_equals_days_rounds_years_to_one() {
+    fn one_op_per_day_over_one_year_returns_365() {
         // years = 1.0; 365/1.0 = 365.0
         let result = annual_operation_count(365, 0, ONE_YEAR_SECS);
         assert_eq!(result, 365.0);
@@ -136,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn near_zero_rounds_to_small_nonzero() {
+    fn one_op_over_ten_years_returns_one_tenth() {
         // 10 years: years = 10.0; 1/10.0 = 0.10
         let ten_years_secs: i64 = 10 * ONE_YEAR_SECS;
         let result = annual_operation_count(1, 0, ten_years_secs);
