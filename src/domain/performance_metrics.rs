@@ -9,13 +9,6 @@ pub struct PerformanceMetrics {
 }
 
 pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceMetrics {
-    if operation_points.is_empty() {
-        return PerformanceMetrics {
-            global_roi: 0.0,
-            max_draw_down: 0.0,
-        };
-    }
-
     let mut sorted: Vec<&OperationPoint> = operation_points.to_vec();
     sorted.sort_by_key(|op| op.timestamp);
 
