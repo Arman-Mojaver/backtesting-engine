@@ -1164,7 +1164,7 @@ An extreme loss sequence can push the accumulated value `1 + global_roi/100` to 
 - Commit `84176b7` (guard and tests); `src/domain/performance_metrics.rs`
 - Batch 1 PRD: `.opencode/.tmp/prd/2026-11-01-batch-1-robustness-code-touchups.md`
 - Same batch: the import removal and per-cell borrow (commit `cd95311`) are mechanical and not recorded separately.
-- Not landed: the debug-only assert on the usize cast helper (PRD 1). Pending.
+- Landed later: the debug-only assert on the usize cast helper (PRD 1), in `cast::i32_to_usize`.
 
 ---
 

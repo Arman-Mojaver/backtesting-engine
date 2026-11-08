@@ -27,6 +27,7 @@ pub const fn round_f64_to_i128(x: f64) -> i128 {
 }
 
 pub fn i32_to_usize(n: i32) -> usize {
+    debug_assert!(n >= 0, "negative input would silently map to usize::MAX");
     usize::try_from(n).unwrap_or(usize::MAX)
 }
 
@@ -54,5 +55,17 @@ mod tests {
     #[should_panic(expected = "NaN/inf")]
     fn round_f64_to_i128_rejects_infinity_in_debug() {
         round_f64_to_i128(f64::INFINITY);
+    }
+
+    #[test]
+    fn i32_to_usize_converts_non_negative_values() {
+        assert_eq!(i32_to_usize(0), 0);
+        assert_eq!(i32_to_usize(14), 14);
+    }
+
+    #[test]
+    #[should_panic(expected = "negative input")]
+    fn i32_to_usize_rejects_negative_in_debug() {
+        i32_to_usize(-1);
     }
 }
