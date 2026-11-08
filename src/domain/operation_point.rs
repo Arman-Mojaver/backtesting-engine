@@ -47,11 +47,12 @@ impl OperationPoints<'_> {
 fn group_by_cell(points: Vec<OperationPoint>) -> FxHashMap<(String, i32), Vec<OperationPoint>> {
     points
         .into_iter()
-        .fold(FxHashMap::default(), |mut acc, point| {
-            acc.entry((point.instrument.clone(), point.money_management_strategy_id))
+        .fold(FxHashMap::default(), |mut points_by_cell, point| {
+            points_by_cell
+                .entry((point.instrument.clone(), point.money_management_strategy_id))
                 .or_default()
                 .push(point);
-            acc
+            points_by_cell
         })
 }
 
