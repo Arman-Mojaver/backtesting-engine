@@ -59,6 +59,13 @@ mod tests {
     }
 
     #[test]
+    fn result_is_rounded_to_two_decimals() {
+        let three_years_secs: i64 = 3 * ONE_YEAR_SECS;
+        assert_eq!(annual_operation_count(1, 0, three_years_secs), 0.33);
+        assert_eq!(annual_operation_count(2, 0, three_years_secs), 0.67);
+    }
+
+    #[test]
     fn offset_start_produces_same_result_as_zero_start() {
         let from_zero = annual_operation_count(10, 0, ONE_YEAR_SECS);
         let from_offset = annual_operation_count(10, 1_000_000, 1_000_000 + ONE_YEAR_SECS);
