@@ -124,9 +124,7 @@ mod tests {
     fn filter_preserves_indicator_id() {
         let group = SignalGroup {
             indicator_id: 42,
-            long_signals: vec![0; 15],
-            short_signals: vec![],
-            instrument: "EURUSD".to_string(),
+            ..make_group(15, 0)
         };
         let result = filter_signal_groups_by_annual_ops(vec![group], 10.0, 0, ONE_YEAR_SECS);
         assert_eq!(result.len(), 1);
