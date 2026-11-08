@@ -86,10 +86,7 @@ mod tests {
     #[test]
     fn excludes_low_roi() {
         let s = make_strategy(1, 2.0, 20.0);
-        let filter = GlobalStrategyFilter {
-            min_annual_roi: 5.0,
-            ..GlobalStrategyFilter::default()
-        };
+        let filter = GlobalStrategyFilter::default();
         let result = filter_strategies(vec![s], &filter);
         assert!(result.is_empty());
     }
