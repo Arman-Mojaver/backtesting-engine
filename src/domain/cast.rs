@@ -47,6 +47,18 @@ mod tests {
     }
 
     #[test]
+    fn round_f64_to_i128_rounds_half_away_from_zero() {
+        assert_eq!(round_f64_to_i128(2.5), 3);
+        assert_eq!(round_f64_to_i128(-2.5), -3);
+    }
+
+    #[test]
+    fn round_f64_to_i128_saturates_beyond_i128_range() {
+        assert_eq!(round_f64_to_i128(1e40), i128::MAX);
+        assert_eq!(round_f64_to_i128(-1e40), i128::MIN);
+    }
+
+    #[test]
     #[should_panic(expected = "NaN/inf")]
     fn round_f64_to_i128_rejects_nan_in_debug() {
         round_f64_to_i128(f64::NAN);
@@ -68,5 +80,29 @@ mod tests {
     #[should_panic(expected = "negative input")]
     fn i32_to_usize_rejects_negative_in_debug() {
         i32_to_usize(-1);
+    }
+
+    #[test]
+    fn round_to_rounds_to_requested_decimals() {
+        assert_eq!(round_to(12.345_678, 2), 12.35);
+        assert_eq!(round_to(12.345_678, 0), 12.0);
+    }
+
+    #[test]
+    fn round_to_rounds_negative_values_away_from_zero() {
+        assert_eq!(round_to(-12.346, 2), -12.35);
+        assert_eq!(round_to(-0.125, 2), -0.13);
+    }
+
+    #[test]
+    fn round_to_propagates_nan() {
+        assert!(round_to(f64::NAN, 2).is_nan());
+    }
+
+    #[test]
+    fn round_to_reflects_binary_representation_of_halves() {
+        // 1.005 is stored as 1.00499999999999989..., so it rounds down.
+        assert_eq!(round_to(1.005, 2), 1.0);
+        assert_eq!(round_to(0.125, 2), 0.13);
     }
 }
