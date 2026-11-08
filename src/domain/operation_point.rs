@@ -18,19 +18,17 @@ pub struct OperationPoints<'a> {
     pub short_operation_points: &'a [OperationPoint],
 }
 
+pub fn points_by_timestamp(points: &[OperationPoint]) -> FxHashMap<i64, &OperationPoint> {
+    points.iter().map(|p| (p.timestamp, p)).collect()
+}
+
 impl OperationPoints<'_> {
     pub fn long_points_by_timestamp(&self) -> FxHashMap<i64, &OperationPoint> {
-        self.long_operation_points
-            .iter()
-            .map(|p| (p.timestamp, p))
-            .collect()
+        points_by_timestamp(self.long_operation_points)
     }
 
     pub fn short_points_by_timestamp(&self) -> FxHashMap<i64, &OperationPoint> {
-        self.short_operation_points
-            .iter()
-            .map(|p| (p.timestamp, p))
-            .collect()
+        points_by_timestamp(self.short_operation_points)
     }
 
     /// Long and short operation points carry identical timestamps (they are
