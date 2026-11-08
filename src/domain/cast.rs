@@ -1,9 +1,10 @@
-//! Centralised numeric conversions.
+//! Centralised numeric conversions and rounding.
 //!
 //! Raw `as` casts are banned from business logic (`clippy::as_conversions`
 //! is denied crate-wide). Most conversions have a std `From`/`TryFrom`; the
 //! few that do not are routed through this module so every remaining cast
-//! sits in one auditable place.
+//! sits in one auditable place. Decimal rounding of reported metrics lives
+//! here too, so every place that rounds uses the same rule.
 
 #[expect(clippy::as_conversions, reason = "no std From/TryFrom for this cast")]
 pub const fn usize_to_f64(n: usize) -> f64 {
