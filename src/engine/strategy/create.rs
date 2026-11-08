@@ -1,8 +1,8 @@
-use std::collections::HashSet;
 use std::time::Instant;
 
 use anyhow::Context;
 use log::info;
+use rustc_hash::FxHashSet;
 
 use crate::application::cell_output::CellOutput;
 use crate::application::source_data::fetch_source_data;
@@ -88,7 +88,7 @@ fn read_processed_indicator_ids(
     persistence: &StrategyPersistence,
     instrument: &str,
     money_management_strategy_id: i32,
-) -> anyhow::Result<HashSet<i32>> {
+) -> anyhow::Result<FxHashSet<i32>> {
     let mut processed_ids_per_cell = persistence
         .read_processed_ids_per_cell()
         .with_context(|| {
@@ -143,7 +143,7 @@ mod tests {
 
         let processed = read_processed_indicator_ids(&persistence, "EURUSD", 390).unwrap();
 
-        assert_eq!(processed, HashSet::from([2001, 2002]));
+        assert_eq!(processed, FxHashSet::from_iter([2001, 2002]));
     }
 
     #[test]

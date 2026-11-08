@@ -1,11 +1,10 @@
-use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use anyhow::{bail, Context};
 use itertools::Itertools;
 use log::{error, info};
 use rayon::prelude::*;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::application::cell_output::CellOutput;
 use crate::application::signal_generator::signal_group_cache_stats;
@@ -108,11 +107,11 @@ enum CellOutcome {
 fn compute_cell(
     source: &SourceIndex,
     cell: &(String, i32),
-    processed_ids_per_cell: &HashMap<(String, i32), HashSet<i32>>,
+    processed_ids_per_cell: &FxHashMap<(String, i32), FxHashSet<i32>>,
 ) -> CellOutcome {
     let (instrument, mms_id) = cell;
 
-    let empty_processed_ids: HashSet<i32> = HashSet::new();
+    let empty_processed_ids: FxHashSet<i32> = FxHashSet::default();
     let processed_ids = processed_ids_per_cell
         .get(cell)
         .unwrap_or(&empty_processed_ids);
@@ -206,7 +205,7 @@ pub fn execute() -> anyhow::Result<()> {
 fn compute_cells(
     source: &SourceIndex,
     cells: &[(String, i32)],
-    processed_ids_per_cell: &HashMap<(String, i32), HashSet<i32>>,
+    processed_ids_per_cell: &FxHashMap<(String, i32), FxHashSet<i32>>,
 ) -> (Vec<CellOutput>, BatchSummary) {
     info!("{} cells to process", cells.len());
     info!("Computing strategies...");
@@ -445,8 +444,8 @@ mod tests {
         }
     }
 
-    fn processed(indicator_ids: &[i32]) -> HashMap<(String, i32), HashSet<i32>> {
-        HashMap::from([(eurusd_cell(), indicator_ids.iter().copied().collect())])
+    fn processed(indicator_ids: &[i32]) -> FxHashMap<(String, i32), FxHashSet<i32>> {
+        FxHashMap::from_iter([(eurusd_cell(), indicator_ids.iter().copied().collect())])
     }
 
     #[test]
@@ -501,7 +500,7 @@ mod tests {
     fn compute_cell_reports_failed_cell_when_instrument_has_no_resampled_points() {
         let source = source_index(fixtures::indicators_default(), Vec::new());
 
-        let outcome = compute_cell(&source, &eurusd_cell(), &HashMap::new());
+        let outcome = compute_cell(&source, &eurusd_cell(), &FxHashMap::default());
 
         let CellOutcome::Failed { instrument, mms_id } = outcome else {
             panic!("expected the cell to fail");
@@ -513,7 +512,7 @@ mod tests {
     fn compute_cell_with_no_indicators_is_already_processed() {
         let source = source_index(Vec::new(), fixtures::resampled_points_default());
 
-        let outcome = compute_cell(&source, &eurusd_cell(), &HashMap::new());
+        let outcome = compute_cell(&source, &eurusd_cell(), &FxHashMap::default());
 
         assert!(matches!(outcome, CellOutcome::AlreadyProcessed));
     }

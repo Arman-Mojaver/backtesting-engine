@@ -1,8 +1,8 @@
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 
 use crate::domain::indicator::Indicator;
 
-pub fn get_unprocessed(indicators: &[Indicator], processed_ids: &HashSet<i32>) -> Vec<i32> {
+pub fn get_unprocessed(indicators: &[Indicator], processed_ids: &FxHashSet<i32>) -> Vec<i32> {
     indicators
         .iter()
         .map(|indicator| indicator.id)
@@ -26,19 +26,19 @@ mod tests {
 
     #[test]
     fn diff_processed_empty_both_returns_empty() {
-        let result = get_unprocessed(&[], &HashSet::new());
+        let result = get_unprocessed(&[], &FxHashSet::default());
         assert!(result.is_empty());
     }
 
     #[test]
     fn diff_processed_empty_processed_returns_all() {
-        let result = get_unprocessed(&indicators(&[1, 2, 3]), &HashSet::new());
+        let result = get_unprocessed(&indicators(&[1, 2, 3]), &FxHashSet::default());
         assert_eq!(result, vec![1, 2, 3]);
     }
 
     #[test]
     fn diff_processed_full_overlap_returns_empty() {
-        let mut processed = HashSet::new();
+        let mut processed = FxHashSet::default();
         processed.insert(1);
         processed.insert(2);
         let result = get_unprocessed(&indicators(&[1, 2]), &processed);
@@ -47,7 +47,7 @@ mod tests {
 
     #[test]
     fn diff_processed_partial_overlap_returns_unprocessed() {
-        let mut processed = HashSet::new();
+        let mut processed = FxHashSet::default();
         processed.insert(1);
         processed.insert(3);
         let result = get_unprocessed(&indicators(&[1, 2, 3, 4]), &processed);
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn diff_processed_no_overlap_returns_all() {
-        let mut processed = HashSet::new();
+        let mut processed = FxHashSet::default();
         processed.insert(10);
         let result = get_unprocessed(&indicators(&[1, 2]), &processed);
         assert_eq!(result, vec![1, 2]);

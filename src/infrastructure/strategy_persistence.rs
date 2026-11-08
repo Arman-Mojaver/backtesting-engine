@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use anyhow::Context;
 use rayon::prelude::*;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::application::cell_output::CellOutput;
 use crate::infrastructure::processed_manifest::{
@@ -42,7 +42,7 @@ impl StrategyPersistence {
 
     pub fn read_processed_ids_per_cell(
         &self,
-    ) -> anyhow::Result<HashMap<(String, i32), HashSet<i32>>> {
+    ) -> anyhow::Result<FxHashMap<(String, i32), FxHashSet<i32>>> {
         self.manifest.read_processed_ids_per_cell()
     }
 

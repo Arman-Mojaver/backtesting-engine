@@ -1,7 +1,6 @@
-use std::collections::HashSet;
-
 use anyhow::Context;
 use log::debug;
+use rustc_hash::FxHashSet;
 
 use crate::application::signal_generator::{create_signal_groups, instrument_of};
 use crate::application::strategy_generator::create_strategies;
@@ -74,7 +73,7 @@ pub fn run_strategies(
 }
 
 fn unprocessed_indicators(indicators: &[Indicator], unprocessed_ids: &[i32]) -> Vec<Indicator> {
-    let unprocessed_ids: HashSet<i32> = unprocessed_ids.iter().copied().collect();
+    let unprocessed_ids: FxHashSet<i32> = unprocessed_ids.iter().copied().collect();
     indicators
         .iter()
         .filter(|indicator| unprocessed_ids.contains(&indicator.id))

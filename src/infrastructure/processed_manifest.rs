@@ -1,4 +1,3 @@
-use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;
 use std::io::ErrorKind;
@@ -16,6 +15,7 @@ use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 static TEMP_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
 
@@ -91,8 +91,8 @@ impl ParquetProcessedManifest {
 
     pub fn read_processed_ids_per_cell(
         &self,
-    ) -> anyhow::Result<HashMap<(String, i32), HashSet<i32>>> {
-        let mut map: HashMap<(String, i32), HashSet<i32>> = HashMap::new();
+    ) -> anyhow::Result<FxHashMap<(String, i32), FxHashSet<i32>>> {
+        let mut map: FxHashMap<(String, i32), FxHashSet<i32>> = FxHashMap::default();
         for row in self.read_all()? {
             map.entry((row.instrument, row.mms_id))
                 .or_default()
@@ -107,7 +107,7 @@ fn merge_entries(
     entries: &[ManifestEntry],
     processed_at: i64,
 ) -> Vec<ProcessedRow> {
-    let mut incoming: HashSet<(&str, i32, i32)> = HashSet::new();
+    let mut incoming: FxHashSet<(&str, i32, i32)> = FxHashSet::default();
     let mut fresh_rows: Vec<ProcessedRow> = Vec::new();
     for entry in entries {
         for &indicator_id in &entry.indicator_ids {
@@ -537,15 +537,15 @@ mod tests {
         assert_eq!(map.len(), 3);
         assert_eq!(
             map.get(&("EURUSD".to_string(), 390)),
-            Some(&HashSet::from([2001, 2002]))
+            Some(&FxHashSet::from_iter([2001, 2002]))
         );
         assert_eq!(
             map.get(&("EURUSD".to_string(), 391)),
-            Some(&HashSet::from([2002]))
+            Some(&FxHashSet::from_iter([2002]))
         );
         assert_eq!(
             map.get(&("USDJPY".to_string(), 390)),
-            Some(&HashSet::from([3001]))
+            Some(&FxHashSet::from_iter([3001]))
         );
     }
 
