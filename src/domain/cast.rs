@@ -22,6 +22,7 @@ pub const fn i128_to_f64(n: i128) -> f64 {
 
 #[allow(clippy::as_conversions)]
 pub const fn round_f64_to_i128(x: f64) -> i128 {
+    debug_assert!(x.is_finite(), "NaN/inf would silently cast to 0/saturate");
     x.round() as i128
 }
 
@@ -32,4 +33,26 @@ pub fn i32_to_usize(n: i32) -> usize {
 pub fn round_to(value: f64, decimals: i32) -> f64 {
     let multiplier = 10_f64.powi(decimals);
     (value * multiplier).round() / multiplier
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_f64_to_i128_rounds_finite_values() {
+        assert_eq!(round_f64_to_i128(1234.5), 1235);
+    }
+
+    #[test]
+    #[should_panic(expected = "NaN/inf")]
+    fn round_f64_to_i128_rejects_nan_in_debug() {
+        round_f64_to_i128(f64::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "NaN/inf")]
+    fn round_f64_to_i128_rejects_infinity_in_debug() {
+        round_f64_to_i128(f64::INFINITY);
+    }
 }
