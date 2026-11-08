@@ -45,10 +45,7 @@ mod tests {
         let long = op_points_ts_123();
         let short = op_points_ts_123();
 
-        assert_eq!(
-            validate_timestamps_match(&resampled[..], &long[..], &short[..]),
-            Ok(())
-        );
+        assert_eq!(validate_timestamps_match(&resampled, &long, &short), Ok(()));
     }
 
     #[test]
@@ -58,7 +55,7 @@ mod tests {
         let short = op_points_ts_123();
 
         assert_eq!(
-            validate_timestamps_match(&resampled[..], &long[..2], &short[..2]),
+            validate_timestamps_match(&resampled, &long[..2], &short[..2]),
             Ok(())
         );
     }
@@ -70,7 +67,7 @@ mod tests {
         let short = op_points_ts_124();
 
         assert_eq!(
-            validate_timestamps_match(&resampled[..], &long[..], &short[..]),
+            validate_timestamps_match(&resampled, &long, &short),
             Err(ValidationError::LongShortTimestampsDiffer { timestamp: 3 })
         );
     }
@@ -82,7 +79,7 @@ mod tests {
         let short = op_points_ts_124();
 
         assert_eq!(
-            validate_timestamps_match(&resampled[..], &long[..], &short[..]),
+            validate_timestamps_match(&resampled, &long, &short),
             Err(ValidationError::TimestampMissingFromResampled { timestamp: 4 })
         );
     }
@@ -94,7 +91,7 @@ mod tests {
         let short = op_points_ts_124();
 
         assert_eq!(
-            validate_timestamps_match(&resampled[..], &long[..2], &short[..]),
+            validate_timestamps_match(&resampled, &long[..2], &short),
             Err(ValidationError::LongShortTimestampsDiffer { timestamp: 4 })
         );
     }
