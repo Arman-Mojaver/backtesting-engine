@@ -7,17 +7,17 @@ pub fn validate_money_management_strategy_id_matches(
     short_points: &[OperationPoint],
     expected_id: i32,
 ) -> Result<(), ValidationError> {
-    if long_points
+    let mismatched_id = long_points
         .iter()
+        .chain(short_points)
         .map(|op| op.money_management_strategy_id)
-        .chain(
-            short_points
-                .iter()
-                .map(|op| op.money_management_strategy_id),
-        )
-        .any(|money_management_strategy_id| money_management_strategy_id != expected_id)
-    {
-        return Err(ValidationError::MoneyManagementStrategyMismatch);
+        .find(|&id| id != expected_id);
+
+    if let Some(found) = mismatched_id {
+        return Err(ValidationError::MoneyManagementStrategyMismatch {
+            expected: expected_id,
+            found,
+        });
     }
 
     Ok(())
@@ -27,6 +27,10 @@ pub fn validate_money_management_strategy_id_matches(
 mod tests {
     use super::*;
     use crate::domain::fixtures::*;
+
+    const fn mms_mismatch(expected: i32, found: i32) -> Result<(), ValidationError> {
+        Err(ValidationError::MoneyManagementStrategyMismatch { expected, found })
+    }
 
     #[test]
     fn test_all_equal() {
@@ -46,7 +50,7 @@ mod tests {
 
         assert_eq!(
             validate_money_management_strategy_id_matches(&long, &short, 2),
-            Err(ValidationError::MoneyManagementStrategyMismatch)
+            mms_mismatch(2, 1)
         );
     }
 
@@ -57,7 +61,7 @@ mod tests {
 
         assert_eq!(
             validate_money_management_strategy_id_matches(&long, &short, 1),
-            Err(ValidationError::MoneyManagementStrategyMismatch)
+            mms_mismatch(1, 2)
         );
     }
 
@@ -68,7 +72,7 @@ mod tests {
 
         assert_eq!(
             validate_money_management_strategy_id_matches(&long, &short, 1),
-            Err(ValidationError::MoneyManagementStrategyMismatch)
+            mms_mismatch(1, 2)
         );
     }
 
@@ -79,7 +83,7 @@ mod tests {
 
         assert_eq!(
             validate_money_management_strategy_id_matches(&long, &short, 1),
-            Err(ValidationError::MoneyManagementStrategyMismatch)
+            mms_mismatch(1, 2)
         );
     }
 
@@ -90,7 +94,7 @@ mod tests {
 
         assert_eq!(
             validate_money_management_strategy_id_matches(&long, &short, 1),
-            Err(ValidationError::MoneyManagementStrategyMismatch)
+            mms_mismatch(1, 2)
         );
     }
 }

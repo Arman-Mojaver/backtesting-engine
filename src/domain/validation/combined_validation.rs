@@ -99,7 +99,10 @@ mod tests {
 
         assert_eq!(
             validate_all(&long, &short, &indicators, &resampled, 2),
-            Err(ValidationError::MoneyManagementStrategyMismatch)
+            Err(ValidationError::MoneyManagementStrategyMismatch {
+                expected: 2,
+                found: 1,
+            })
         );
     }
 

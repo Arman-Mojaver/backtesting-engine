@@ -18,8 +18,8 @@ pub enum ValidationError {
     ResampledPointsEmpty,
     #[error("instruments must match across resampled points, long operation points, and short operation points, found {expected} and {found}")]
     InstrumentMismatch { expected: String, found: String },
-    #[error("all operation points must reference the expected money management strategy id")]
-    MoneyManagementStrategyMismatch,
+    #[error("all operation points must reference money management strategy id {expected}, found {found}")]
+    MoneyManagementStrategyMismatch { expected: i32, found: i32 },
     #[error("operation point timestamps must match each other and be contained in the resampled point timestamps")]
     TimestampMismatch,
 }
@@ -52,8 +52,11 @@ mod tests {
                 "instruments must match across resampled points, long operation points, and short operation points, found EURUSD and USDCAD",
             ),
             (
-                ValidationError::MoneyManagementStrategyMismatch,
-                "all operation points must reference the expected money management strategy id",
+                ValidationError::MoneyManagementStrategyMismatch {
+                    expected: 1,
+                    found: 2,
+                },
+                "all operation points must reference money management strategy id 1, found 2",
             ),
             (
                 ValidationError::TimestampMismatch,
