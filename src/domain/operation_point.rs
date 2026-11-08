@@ -89,11 +89,9 @@ mod tests {
 
     #[test]
     fn empty_operations_yield_empty_hashmaps() {
-        let long: Vec<OperationPoint> = vec![];
-        let short: Vec<OperationPoint> = vec![];
         let ops = OperationPoints {
-            long_operation_points: &long,
-            short_operation_points: &short,
+            long_operation_points: &[],
+            short_operation_points: &[],
         };
         assert!(ops.long_points_by_timestamp().is_empty());
         assert!(ops.short_points_by_timestamp().is_empty());
@@ -106,10 +104,9 @@ mod tests {
             op_point(2, 1, 200),
             op_point(3, 1, 300),
         ];
-        let short: Vec<OperationPoint> = vec![];
         let ops = OperationPoints {
             long_operation_points: &long,
-            short_operation_points: &short,
+            short_operation_points: &[],
         };
 
         let map = ops.long_points_by_timestamp();
@@ -121,10 +118,9 @@ mod tests {
 
     #[test]
     fn short_points_keyed_by_timestamp() {
-        let long: Vec<OperationPoint> = vec![];
         let short = vec![op_point(10, -1, 50), op_point(20, -1, 150)];
         let ops = OperationPoints {
-            long_operation_points: &long,
+            long_operation_points: &[],
             short_operation_points: &short,
         };
 
@@ -137,10 +133,9 @@ mod tests {
     #[test]
     fn duplicate_timestamp_last_wins() {
         let long = vec![op_point(1, 1, 100), op_point(2, 1, 100)];
-        let short: Vec<OperationPoint> = vec![];
         let ops = OperationPoints {
             long_operation_points: &long,
-            short_operation_points: &short,
+            short_operation_points: &[],
         };
 
         let map = ops.long_points_by_timestamp();
@@ -172,10 +167,9 @@ mod tests {
             op_point(2, 1, 100),
             op_point(3, 1, 200),
         ];
-        let short: Vec<OperationPoint> = vec![];
         let ops = OperationPoints {
             long_operation_points: &long,
-            short_operation_points: &short,
+            short_operation_points: &[],
         };
         let (start, end) = ops.start_end_timestamps().unwrap();
         assert_eq!(start, 100);
@@ -185,10 +179,9 @@ mod tests {
     #[test]
     fn start_end_timestamps_single_point() {
         let long = vec![op_point(1, 1, 42)];
-        let short: Vec<OperationPoint> = vec![];
         let ops = OperationPoints {
             long_operation_points: &long,
-            short_operation_points: &short,
+            short_operation_points: &[],
         };
         let (start, end) = ops.start_end_timestamps().unwrap();
         assert_eq!(start, 42);
