@@ -29,6 +29,37 @@ mod tests {
     const TWO_YEARS_SECS: i64 = 2 * ONE_YEAR_SECS;
 
     #[test]
+    fn difference_in_years_returns_one_for_julian_year() {
+        assert_eq!(difference_in_years(0, ONE_YEAR_SECS), 1.0);
+    }
+
+    #[test]
+    fn difference_in_years_returns_half_for_half_julian_year() {
+        assert_eq!(difference_in_years(0, ONE_YEAR_SECS / 2), 0.5);
+    }
+
+    #[test]
+    fn difference_in_years_is_positive_for_one_second_span() {
+        assert!(difference_in_years(0, 1) > 0.0);
+    }
+
+    #[test]
+    fn difference_in_years_returns_zero_for_zero_span() {
+        assert_eq!(difference_in_years(1000, 1000), 0.0);
+    }
+
+    #[test]
+    fn difference_in_years_returns_zero_for_negative_span() {
+        assert_eq!(difference_in_years(2000, 1000), 0.0);
+    }
+
+    #[test]
+    fn difference_in_years_saturates_on_extreme_timestamps() {
+        let years = difference_in_years(i64::MIN, i64::MAX);
+        assert!(years.is_finite() && years > 0.0);
+    }
+
+    #[test]
     fn zero_count_returns_zero() {
         let result = annual_operation_count(0, 0, ONE_YEAR_SECS);
         assert_eq!(result, 0.0);
