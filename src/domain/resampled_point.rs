@@ -2,6 +2,7 @@ use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone)]
 pub struct ResampledPointD1 {
+    // Intentional: unread by the engine; kept to trace a point back to its DB row.
     pub id: i32,
     pub instrument: String,
     pub open: f64,

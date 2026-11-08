@@ -77,7 +77,7 @@ OperationPoints {
 Daily OHLCV candlestick bar — the market data backdrop against which trades are evaluated.
 ```
 ResampledPointD1 {
-    id:              i32       — unique identifier
+    id:              i32       — DB primary key; unread by the engine, kept on purpose for tracing rows back to the DB
     instrument:      String    — e.g. "EURUSD"
     open:            f64       — opening price
     high:            f64       — highest price
