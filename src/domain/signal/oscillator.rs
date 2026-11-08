@@ -1,7 +1,7 @@
 use crate::domain::signal::thresholds::level_crosses;
 use crate::domain::signal::OscillatorSeries;
 
-pub fn create(buffer: &OscillatorSeries) -> (Vec<i64>, Vec<i64>) {
+pub fn detect_signals(buffer: &OscillatorSeries) -> (Vec<i64>, Vec<i64>) {
     level_crosses(&buffer.items, 0.0, 0.0)
 }
 
@@ -26,49 +26,49 @@ mod tests {
 
     #[test]
     fn empty_buffer_yields_no_signals() {
-        let result = create(&buf(&[]));
+        let result = detect_signals(&buf(&[]));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn single_positive_yields_no_signals() {
-        let result = create(&buf(&[iv(1704067200, 1.2)]));
+        let result = detect_signals(&buf(&[iv(1704067200, 1.2)]));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn single_negative_yields_no_signals() {
-        let result = create(&buf(&[iv(1704153600, -1.5)]));
+        let result = detect_signals(&buf(&[iv(1704153600, -1.5)]));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn two_positives_no_cross() {
-        let result = create(&buf(&[iv(1704758400, 1.5), iv(1704844800, 2.3)]));
+        let result = detect_signals(&buf(&[iv(1704758400, 1.5), iv(1704844800, 2.3)]));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn two_negatives_no_cross() {
-        let result = create(&buf(&[iv(1704931200, -0.6), iv(1705017600, -1.2)]));
+        let result = detect_signals(&buf(&[iv(1704931200, -0.6), iv(1705017600, -1.2)]));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn negative_to_positive_is_long() {
-        let result = create(&buf(&[iv(1704240000, -2.0), iv(1704326400, 2.0)]));
+        let result = detect_signals(&buf(&[iv(1704240000, -2.0), iv(1704326400, 2.0)]));
         assert_eq!(result, expected(&[1704326400], &[]));
     }
 
     #[test]
     fn positive_to_negative_is_short() {
-        let result = create(&buf(&[iv(1704412800, 0.7), iv(1704672000, -0.9)]));
+        let result = detect_signals(&buf(&[iv(1704412800, 0.7), iv(1704672000, -0.9)]));
         assert_eq!(result, expected(&[], &[1704672000]));
     }
 
     #[test]
     fn up_cross_then_stay_positive_yields_long_only() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1705276800, -1.1),
             iv(1705363200, 1.0),
             iv(1705449600, 0.5),
@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn alternating_crosses_long_then_short_then_long() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1705536000, -0.4),
             iv(1705622400, 0.3),
             iv(1705881600, -0.8),
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn positive_then_down_cross_then_up_cross() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1706054400, 0.6),
             iv(1706140800, 1.2),
             iv(1706227200, -1.4),
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn negatives_then_up_cross_only() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1706572800, -2.2),
             iv(1706659200, -1.1),
             iv(1706745600, 2.5),
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn alternating_four_crosses() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1707091200, 1.1),
             iv(1707177600, -1.3),
             iv(1707264000, 1.6),
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn positive_decline_single_short() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1707436800, 2.0),
             iv(1707696000, 1.8),
             iv(1707782400, -0.5),
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn two_up_crosses_one_down_cross() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1707955200, -1.7),
             iv(1708041600, 1.9),
             iv(1708300800, -0.6),
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn positive_negative_negative_positive() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1708473600, 1.2),
             iv(1708560000, -1.2),
             iv(1708646400, -0.9),
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn up_then_down_at_end() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1708992000, -0.3),
             iv(1709078400, 1.5),
             iv(1709164800, 0.2),
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn five_points_two_up_one_down() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1709510400, -0.8),
             iv(1709596800, 0.9),
             iv(1709683200, 1.7),
@@ -178,7 +178,7 @@ mod tests {
 
     #[test]
     fn five_points_alternating_long_short() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1710115200, 0.3),
             iv(1710201600, -0.4),
             iv(1710288000, 0.5),
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn five_points_one_up_one_down() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1710720000, -1.6),
             iv(1710806400, -0.3),
             iv(1710892800, 1.1),
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn five_points_two_up_two_down() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(1711324800, 2.1),
             iv(1711411200, -2.1),
             iv(1711497600, 2.2),
@@ -220,19 +220,19 @@ mod tests {
 
     #[test]
     fn equal_adjacent_values_no_signal() {
-        let result = create(&buf(&[iv(100, 0.5), iv(101, 0.5)]));
+        let result = detect_signals(&buf(&[iv(100, 0.5), iv(101, 0.5)]));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn negative_through_zero_to_positive_is_long() {
-        let result = create(&buf(&[iv(100, -1.0), iv(101, 0.0), iv(102, 1.0)]));
+        let result = detect_signals(&buf(&[iv(100, -1.0), iv(101, 0.0), iv(102, 1.0)]));
         assert_eq!(result, expected(&[102], &[]));
     }
 
     #[test]
     fn negative_through_several_zeros_to_positive_is_long() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(100, -1.0),
             iv(101, 0.0),
             iv(102, 0.0),
@@ -243,13 +243,13 @@ mod tests {
 
     #[test]
     fn positive_through_zero_to_negative_is_short() {
-        let result = create(&buf(&[iv(100, 1.0), iv(101, 0.0), iv(102, -1.0)]));
+        let result = detect_signals(&buf(&[iv(100, 1.0), iv(101, 0.0), iv(102, -1.0)]));
         assert_eq!(result, expected(&[], &[102]));
     }
 
     #[test]
     fn positive_through_several_zeros_to_negative_is_short() {
-        let result = create(&buf(&[
+        let result = detect_signals(&buf(&[
             iv(100, 1.0),
             iv(101, 0.0),
             iv(102, 0.0),
@@ -260,13 +260,13 @@ mod tests {
 
     #[test]
     fn negative_touches_zero_and_falls_back_no_signal() {
-        let result = create(&buf(&[iv(100, -1.0), iv(101, 0.0), iv(102, -1.0)]));
+        let result = detect_signals(&buf(&[iv(100, -1.0), iv(101, 0.0), iv(102, -1.0)]));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn positive_touches_zero_and_rises_back_no_signal() {
-        let result = create(&buf(&[iv(100, 1.0), iv(101, 0.0), iv(102, 1.0)]));
+        let result = detect_signals(&buf(&[iv(100, 1.0), iv(101, 0.0), iv(102, 1.0)]));
         assert_eq!(result, expected(&[], &[]));
     }
 }

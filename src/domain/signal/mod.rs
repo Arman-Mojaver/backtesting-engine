@@ -47,9 +47,15 @@ pub enum IndicatorOutput {
 impl IndicatorOutput {
     pub fn create_signal_group(self, indicator_id: i32) -> SignalGroup {
         let (instrument, (long_signals, short_signals)) = match self {
-            Self::Oscillator { instrument, buffer } => (instrument, oscillator::create(&buffer)),
-            Self::Threshold { instrument, buffer } => (instrument, thresholds::create(&buffer)),
-            Self::Crossover { instrument, buffer } => (instrument, crossover::create(&buffer)),
+            Self::Oscillator { instrument, buffer } => {
+                (instrument, oscillator::detect_signals(&buffer))
+            }
+            Self::Threshold { instrument, buffer } => {
+                (instrument, thresholds::detect_signals(&buffer))
+            }
+            Self::Crossover { instrument, buffer } => {
+                (instrument, crossover::detect_signals(&buffer))
+            }
         };
         let operation_count = long_signals.len().saturating_add(short_signals.len());
         SignalGroup {

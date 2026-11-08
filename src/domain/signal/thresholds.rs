@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::domain::signal::{IndicatorValue, ThresholdSeries};
 
-pub fn create(buffer: &ThresholdSeries) -> (Vec<i64>, Vec<i64>) {
+pub fn detect_signals(buffer: &ThresholdSeries) -> (Vec<i64>, Vec<i64>) {
     level_crosses(&buffer.items, buffer.low_threshold, buffer.high_threshold)
 }
 
@@ -59,13 +59,13 @@ mod tests {
 
     #[test]
     fn empty_buffer_yields_no_signals() {
-        let result = create(&buf(&[], 70.0, 30.0));
+        let result = detect_signals(&buf(&[], 70.0, 30.0));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn two_values_between_thresholds_no_cross() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(1700006400, 50.0), iv(1700092800, 55.0)],
             70.0,
             30.0,
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn two_values_above_high_no_down_cross() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(1703808000, 80.0), iv(1703894400, 85.0)],
             70.0,
             30.0,
@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn two_values_below_low_no_up_cross() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(1703980800, 20.0), iv(1704067200, 25.0)],
             70.0,
             30.0,
@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn value_on_low_threshold_strict_no_long() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1701043200, 20.0),
                 iv(1701129600, 30.0),
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn value_on_low_threshold_strict_no_long_v2() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1701216000, 40.0),
                 iv(1701302400, 30.0),
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn value_on_high_threshold_strict_no_short() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1701216000, 80.0),
                 iv(1701302400, 70.0),
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn value_on_high_threshold_strict_no_short_v2() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1701216000, 60.0),
                 iv(1701302400, 70.0),
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn cross_above_low_is_long() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(1700006400, 20.0), iv(1700092800, 40.0)],
             70.0,
             30.0,
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn cross_below_high_is_short() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(1700179200, 80.0), iv(1700265600, 60.0)],
             70.0,
             30.0,
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn two_long_crosses() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1700352000, 10.0),
                 iv(1700438400, 50.0),
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn two_short_crosses() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1700697600, 90.0),
                 iv(1700784000, 60.0),
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn long_and_short_in_sequence() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1701043200, 20.0),
                 iv(1701129600, 50.0),
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn two_longs_one_short_six_points() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1702080000, 20.0),
                 iv(1702166400, 50.0),
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn one_long_two_shorts_six_points() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1702598400, 80.0),
                 iv(1702684800, 60.0),
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn two_longs_two_shorts_eight_points() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[
                 iv(1703116800, 10.0),
                 iv(1703203200, 40.0),
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn value_exactly_on_threshold_no_signal_strict_inequality() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(100, 70.0), iv(101, 65.0), iv(102, 30.0), iv(103, 40.0)],
             70.0,
             30.0,
@@ -282,13 +282,13 @@ mod tests {
 
     #[test]
     fn single_element_yields_no_signals() {
-        let result = create(&buf(&[iv(100, 50.0)], 70.0, 30.0));
+        let result = detect_signals(&buf(&[iv(100, 50.0)], 70.0, 30.0));
         assert_eq!(result, expected(&[], &[]));
     }
 
     #[test]
     fn below_low_through_low_to_above_low_is_long() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(100, 20.0), iv(101, 30.0), iv(102, 40.0)],
             70.0,
             30.0,
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn below_low_touches_low_and_falls_back_no_signal() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(100, 20.0), iv(101, 30.0), iv(102, 20.0)],
             70.0,
             30.0,
@@ -308,7 +308,7 @@ mod tests {
 
     #[test]
     fn above_high_through_high_to_below_high_is_short() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(100, 80.0), iv(101, 70.0), iv(102, 60.0)],
             70.0,
             30.0,
@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn above_high_touches_high_and_rises_back_no_signal() {
-        let result = create(&buf(
+        let result = detect_signals(&buf(
             &[iv(100, 80.0), iv(101, 70.0), iv(102, 80.0)],
             70.0,
             30.0,
