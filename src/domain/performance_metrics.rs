@@ -41,8 +41,8 @@ pub fn performance_metrics(operation_points: &[&OperationPoint]) -> PerformanceM
     }
 
     PerformanceMetrics {
-        global_roi: cast::round_to((cumsum - 1.0) * 100.0, 2),
-        max_draw_down: cast::round_to(max_dd * 100.0, 2),
+        global_roi: cast::round_to((cumsum - 1.0) * 100.0, cast::METRIC_DECIMALS),
+        max_draw_down: cast::round_to(max_dd * 100.0, cast::METRIC_DECIMALS),
     }
 }
 
@@ -57,7 +57,7 @@ impl PerformanceMetrics {
             return 0.0;
         }
         let annual_accumulated = global_accumulated.powf(1.0 / years);
-        cast::round_to((annual_accumulated - 1.0) * 100.0, 2)
+        cast::round_to((annual_accumulated - 1.0) * 100.0, cast::METRIC_DECIMALS)
     }
 }
 

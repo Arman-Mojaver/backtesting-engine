@@ -7,7 +7,7 @@ pub fn annual_operation_count(total_count: usize, start_timestamp: i64, end_time
     };
 
     let annualized = cast::usize_to_f64(total_count) / years;
-    cast::round_to(annualized, 2)
+    cast::round_to(annualized, cast::METRIC_DECIMALS)
 }
 
 #[cfg(test)]
