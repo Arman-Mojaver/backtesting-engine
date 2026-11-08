@@ -26,8 +26,7 @@ pub fn validate_all(
         expected_mms_id,
     )?;
 
-    same_timestamp_validation::validate_timestamps_match(resampled_points, long_ops, short_ops)
-        .map_err(|_| ValidationError::TimestampMismatch)?;
+    same_timestamp_validation::validate_timestamps_match(resampled_points, long_ops, short_ops)?;
 
     Ok(())
 }
