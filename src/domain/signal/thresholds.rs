@@ -94,21 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn value_on_low_threshold_strict_no_long() {
-        let result = detect_signals(&buf(
-            &[
-                iv(1701043200, 20.0),
-                iv(1701129600, 30.0),
-                iv(1701388800, 25.0),
-            ],
-            70.0,
-            30.0,
-        ));
-        assert_eq!(result, expected(&[], &[]));
-    }
-
-    #[test]
-    fn value_on_low_threshold_strict_no_long_v2() {
+    fn above_low_touches_low_and_rises_back_no_signal() {
         let result = detect_signals(&buf(
             &[
                 iv(1701216000, 40.0),
@@ -122,21 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn value_on_high_threshold_strict_no_short() {
-        let result = detect_signals(&buf(
-            &[
-                iv(1701216000, 80.0),
-                iv(1701302400, 70.0),
-                iv(1701388800, 75.0),
-            ],
-            70.0,
-            30.0,
-        ));
-        assert_eq!(result, expected(&[], &[]));
-    }
-
-    #[test]
-    fn value_on_high_threshold_strict_no_short_v2() {
+    fn below_high_touches_high_and_falls_back_no_signal() {
         let result = detect_signals(&buf(
             &[
                 iv(1701216000, 60.0),

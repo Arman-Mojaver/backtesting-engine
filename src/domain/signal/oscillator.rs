@@ -143,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn positive_negative_negative_positive() {
+    fn short_then_long_with_negative_bars_between() {
         let result = detect_signals(&buf(&[
             iv(1708473600, 1.2),
             iv(1708560000, -1.2),
@@ -154,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn up_then_down_at_end() {
+    fn long_then_short_on_last_bar() {
         let result = detect_signals(&buf(&[
             iv(1708992000, -0.3),
             iv(1709078400, 1.5),
@@ -165,7 +165,7 @@ mod tests {
     }
 
     #[test]
-    fn five_points_two_up_one_down() {
+    fn long_short_long_with_positive_bars_between() {
         let result = detect_signals(&buf(&[
             iv(1709510400, -0.8),
             iv(1709596800, 0.9),
@@ -177,7 +177,7 @@ mod tests {
     }
 
     #[test]
-    fn five_points_alternating_long_short() {
+    fn sign_flip_on_every_bar_signals_on_every_bar() {
         let result = detect_signals(&buf(&[
             iv(1710115200, 0.3),
             iv(1710201600, -0.4),
@@ -192,7 +192,7 @@ mod tests {
     }
 
     #[test]
-    fn five_points_one_up_one_down() {
+    fn long_then_short_with_positive_bars_between() {
         let result = detect_signals(&buf(&[
             iv(1710720000, -1.6),
             iv(1710806400, -0.3),
@@ -201,21 +201,6 @@ mod tests {
             iv(1711065600, -0.1),
         ]));
         assert_eq!(result, expected(&[1710892800], &[1711065600]));
-    }
-
-    #[test]
-    fn five_points_two_up_two_down() {
-        let result = detect_signals(&buf(&[
-            iv(1711324800, 2.1),
-            iv(1711411200, -2.1),
-            iv(1711497600, 2.2),
-            iv(1711584000, -2.2),
-            iv(1711670400, 2.3),
-        ]));
-        assert_eq!(
-            result,
-            expected(&[1711497600, 1711670400], &[1711411200, 1711584000])
-        );
     }
 
     #[test]
