@@ -98,6 +98,22 @@ mod tests {
     }
 
     #[test]
+    fn losses_sized_on_peak_draw_down_beyond_100_percent() {
+        // Each loss risks 50% of the peak (cummax stays 1), not of the
+        // shrinking cumsum, so three losses push cumsum below zero:
+        //   cumsum = 1 - 0.5 - 0.5 - 0.5 = -0.5
+        //   roi = -150.0, dd = (1 - (-0.5)) / 1 = 150.0%
+        let ops = [
+            make_op(-20, 30, 20, 0.5),
+            make_op(-20, 30, 20, 0.5),
+            make_op(-20, 30, 20, 0.5),
+        ];
+        let m = metrics(&ops);
+        assert_eq!(m.global_roi, -150.0);
+        assert_eq!(m.max_draw_down, 150.0);
+    }
+
+    #[test]
     fn metrics_on_valid_points_are_finite() {
         let fixtures: [&[OperationPoint]; 4] = [
             &[make_op(-20, 30, 20, 0.02)],
