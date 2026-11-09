@@ -220,13 +220,13 @@ mod tests {
         use super::*;
 
         #[test]
-        fn only_positive_results_returns_zero_1() {
+        fn single_win_has_no_draw_down() {
             let ops = [make_op(20, 20, 20, 0.02)];
             assert_eq!(metrics(&ops).max_draw_down, 0.0);
         }
 
         #[test]
-        fn only_positive_results_returns_zero_2() {
+        fn consecutive_wins_have_no_draw_down() {
             let ops = [
                 make_op(20, 20, 20, 0.02),
                 make_op(30, 30, 20, 0.02),
@@ -302,7 +302,7 @@ mod tests {
         }
 
         #[test]
-        fn mixed_order_case_1() {
+        fn earlier_deeper_dip_beats_shallower_dip_from_new_peak() {
             let ops = [
                 make_op(-20, 30, 20, 0.02),
                 make_op(-20, 30, 20, 0.02),
@@ -315,7 +315,7 @@ mod tests {
         }
 
         #[test]
-        fn mixed_order_case_2() {
+        fn dip_from_new_peak_deepens_past_earlier_dip() {
             let ops = [
                 make_op(-20, 30, 20, 0.02),
                 make_op(-20, 30, 20, 0.02),
@@ -329,7 +329,7 @@ mod tests {
         }
 
         #[test]
-        fn mixed_order_case_with_decimals() {
+        fn partial_recovery_keeps_draw_down_measured_from_same_peak() {
             let ops = [
                 make_op(-20, 30, 20, 0.02),
                 make_op(-20, 30, 20, 0.02),
