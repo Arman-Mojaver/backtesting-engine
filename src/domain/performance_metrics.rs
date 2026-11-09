@@ -61,14 +61,10 @@ fn rounded_percent(fraction: f64) -> f64 {
 mod tests {
     use super::*;
 
-    // --- Shared fixtures -------------------------------------------------------
-
     fn make_op(result: i32, tp: i32, sl: i32, risk: f64) -> OperationPoint {
         make_op_at(result, tp, sl, risk, 1000)
     }
 
-    // Like `make_op`, but with an explicit timestamp. The sorting tests need
-    // distinct timestamps; every mapped test uses the historical default 1000.
     fn make_op_at(result: i32, tp: i32, sl: i32, risk: f64, timestamp: i64) -> OperationPoint {
         OperationPoint {
             instrument: "EURUSD".into(),
@@ -94,8 +90,6 @@ mod tests {
         }
     }
 
-    // Maps to BOTH: global_roi::tests::empty_ops_returns_zero
-    //               max_draw_down::tests::empty_ops_returns_zero
     #[test]
     fn empty_ops_returns_zero() {
         let m = performance_metrics(Vec::new());
@@ -139,11 +133,6 @@ mod tests {
         }
     }
 
-    // =========================================================================
-    // Mapped 1:1 from src/domain/global_roi.rs::tests; names, inputs and
-    // expectations preserved verbatim; each now asserts the `global_roi`
-    // field of the combined result.
-    // =========================================================================
     mod global_roi {
         use super::*;
 
@@ -227,11 +216,6 @@ mod tests {
         }
     }
 
-    // =========================================================================
-    // Mapped 1:1 from src/domain/max_draw_down.rs::tests; names, inputs and
-    // expectations preserved verbatim; each now asserts the `max_draw_down`
-    // field of the combined result.
-    // =========================================================================
     mod max_draw_down {
         use super::*;
 
@@ -361,11 +345,6 @@ mod tests {
         }
     }
 
-    // =========================================================================
-    // NEW tests, no 1:1 ancestor. Cover the defensive sort inside
-    // `performance_metrics()`: unsorted input must be computed in
-    // chronological order, and equal timestamps must keep input order.
-    // =========================================================================
     mod sorting {
         use super::*;
 
@@ -405,12 +384,6 @@ mod tests {
         }
     }
 
-    // =========================================================================
-    // Mapped 1:1 from src/domain/annual_roi.rs::tests; names, inputs and
-    // expectations preserved verbatim. The free function
-    // `annual_roi(start, end, roi)` became a method:
-    // `metrics_with_roi(roi).annual_roi(start, end)`.
-    // =========================================================================
     mod annual_roi {
         use super::*;
 
