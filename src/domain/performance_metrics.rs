@@ -33,8 +33,8 @@ pub fn performance_metrics(mut operation_points: Vec<&OperationPoint>) -> Perfor
     }
 
     PerformanceMetrics {
-        global_roi: cast::round_to((cumsum - 1.0) * 100.0, cast::METRIC_DECIMALS),
-        max_draw_down: cast::round_to(max_dd * 100.0, cast::METRIC_DECIMALS),
+        global_roi: rounded_percent(cumsum - 1.0),
+        max_draw_down: rounded_percent(max_dd),
     }
 }
 
@@ -49,8 +49,12 @@ impl PerformanceMetrics {
             return 0.0;
         }
         let annual_accumulated = global_accumulated.powf(1.0 / years);
-        cast::round_to((annual_accumulated - 1.0) * 100.0, cast::METRIC_DECIMALS)
+        rounded_percent(annual_accumulated - 1.0)
     }
+}
+
+fn rounded_percent(fraction: f64) -> f64 {
+    cast::round_to(fraction * 100.0, cast::METRIC_DECIMALS)
 }
 
 #[cfg(test)]
