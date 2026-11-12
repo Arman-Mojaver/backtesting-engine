@@ -44,9 +44,9 @@ fn moving_average(values: &[f64], ma_type: MovingAverageType, period: usize) -> 
 /// empty (not enough data), never an error for short input.
 fn macd_line(
     points: &[ResampledPointD1],
-    fast_type: &str,
+    fast_type: MovingAverageType,
     fast_n: i32,
-    slow_type: &str,
+    slow_type: MovingAverageType,
     slow_n: i32,
 ) -> Result<Vec<IndicatorValue>, IndicatorError> {
     validate_period!(fast_n, InvalidMacdFastPeriod; slow_n, InvalidMacdSlowPeriod);
@@ -57,14 +57,12 @@ fn macd_line(
             slow: slow_n,
         });
     }
-    let fast_method = parse_ma_method(fast_type)?;
-    let slow_method = parse_ma_method(slow_type)?;
     let fast = cast::i32_to_usize(fast_n);
     let slow = cast::i32_to_usize(slow_n);
 
     let closes: Vec<f64> = points.iter().map(|pt| pt.close).collect();
-    let fast_ma = moving_average(&closes, fast_method, fast);
-    let slow_ma = moving_average(&closes, slow_method, slow);
+    let fast_ma = moving_average(&closes, fast_type, fast);
+    let slow_ma = moving_average(&closes, slow_type, slow);
 
     if fast_ma.is_empty() || slow_ma.is_empty() {
         return Ok(Vec::new());
@@ -96,6 +94,8 @@ pub fn compute(
     slow_type: &str,
     slow_n: i32,
 ) -> Result<CrossoverBuffers, IndicatorError> {
+    let fast_type = parse_ma_method(fast_type)?;
+    let slow_type = parse_ma_method(slow_type)?;
     let line = macd_line(points, fast_type, fast_n, slow_type, slow_n)?;
     let values: Vec<f64> = line.iter().map(|value| value.value).collect();
     let signal = sma(&values, cast::i32_to_usize(SIGNAL_N));
@@ -129,6 +129,7 @@ pub fn compute(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::indicator::MovingAverageType::{Ema, Sma};
     use crate::domain::indicators::test_support;
     use crate::domain::resampled_point::ResampledPointD1;
 
@@ -173,7 +174,7 @@ mod tests {
         //        = [5.0, 8.5, 16.25, 32.125] (len 4).
         // Values at original indices 2..5 -> ts 3..6.
         let points = points_from_closes(&[3.0, 6.0, 12.0, 24.0, 48.0, 96.0]);
-        let vals = macd_line(&points, "ema", 1, "ema", 3).unwrap();
+        let vals = macd_line(&points, Ema, 1, Ema, 3).unwrap();
         assert_eq!(vals.len(), 4);
         assert_eq!(vals[0].value, 5.0);
         assert_eq!(vals[0].timestamp, 3);
@@ -193,7 +194,7 @@ mod tests {
         // delta = 2. MACD[j] = FastSMA[2+j] - SlowSMA[j] = 1.0 for all j.
         // Values at original indices 3..6 -> ts 4..7.
         let points = points_from_closes(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]);
-        let vals = macd_line(&points, "sma", 2, "sma", 4).unwrap();
+        let vals = macd_line(&points, Sma, 2, Sma, 4).unwrap();
         assert_eq!(vals.len(), 4);
         for (i, val) in vals.iter().enumerate() {
             assert_eq!(val.value, 1.0, "value mismatch at index {i}");
@@ -215,7 +216,7 @@ mod tests {
         //        = [2.0, 2.5, 4.25, 8.125] (len 4).
         // Values at original indices 2..5 -> ts 3..6.
         let points = points_from_closes(&[3.0, 6.0, 12.0, 24.0, 48.0, 96.0]);
-        let vals = macd_line(&points, "sma", 2, "ema", 3).unwrap();
+        let vals = macd_line(&points, Sma, 2, Ema, 3).unwrap();
         assert_eq!(vals.len(), 4);
         assert_eq!(vals[0].value, 2.0);
         assert_eq!(vals[0].timestamp, 3);
@@ -244,7 +245,7 @@ mod tests {
         // close = [10, 10, 10, 10, 10, 10], fast=3 ema, slow=5 ema (fast < slow).
         // Both EMAs on constant data converge to 10.0 -> MACD identically 0.0.
         let points = points_from_closes(&[10.0; 6]);
-        let vals = macd_line(&points, "ema", 3, "ema", 5).unwrap();
+        let vals = macd_line(&points, Ema, 3, Ema, 5).unwrap();
         assert_eq!(vals.len(), 2);
         assert!(vals.iter().all(|v| v.value == 0.0));
     }
@@ -254,7 +255,7 @@ mod tests {
         // close = [3, 6, 12, 24, 48, 96], fast=3 ema, slow=5 sma (fast < slow).
         // Different periods and types produce nonzero MACD.
         let points = points_from_closes(&[3.0, 6.0, 12.0, 24.0, 48.0, 96.0]);
-        let vals = macd_line(&points, "ema", 3, "sma", 5).unwrap();
+        let vals = macd_line(&points, Ema, 3, Sma, 5).unwrap();
         assert_eq!(vals.len(), 2);
         assert!(!vals.iter().all(|v| v.value == 0.0));
     }
@@ -264,7 +265,7 @@ mod tests {
         // 8 constant points, fast=3 ema, slow=5 sma -> 4 zero values
         // (len = 8 - 5 + 1) at indices 4..7 -> ts 5..8.
         let points = points_from_closes(&[10.0; 8]);
-        let vals = macd_line(&points, "ema", 3, "sma", 5).unwrap();
+        let vals = macd_line(&points, Ema, 3, Sma, 5).unwrap();
         assert_eq!(vals.len(), 4);
         assert!(vals.iter().all(|v| v.value == 0.0));
         assert_eq!(vals[0].timestamp, 5);
@@ -275,7 +276,7 @@ mod tests {
 
     #[test]
     fn empty_points_yields_empty_macd_line() {
-        let vals = macd_line(&[], "ema", 12, "ema", 26).unwrap();
+        let vals = macd_line(&[], Ema, 12, Ema, 26).unwrap();
         assert!(vals.is_empty());
     }
 
@@ -283,7 +284,7 @@ mod tests {
     fn fewer_than_max_period_points_yields_empty_macd_line() {
         // max(fast, slow) = 5; 4 points -> slow MA empty -> no MACD values.
         let points = points_from_closes(&[10.0; 4]);
-        let vals = macd_line(&points, "ema", 3, "sma", 5).unwrap();
+        let vals = macd_line(&points, Ema, 3, Sma, 5).unwrap();
         assert!(vals.is_empty());
     }
 
@@ -291,7 +292,7 @@ mod tests {
     fn exactly_max_period_points_yields_single_macd_line_value() {
         // max(fast, slow) = 5; 5 points -> 1 MACD value (constant -> 0.0).
         let points = points_from_closes(&[10.0; 5]);
-        let vals = macd_line(&points, "ema", 3, "sma", 5).unwrap();
+        let vals = macd_line(&points, Ema, 3, Sma, 5).unwrap();
         assert_eq!(vals.len(), 1);
         assert_eq!(vals[0].value, 0.0);
         assert_eq!(vals[0].timestamp, 5);
@@ -304,7 +305,7 @@ mod tests {
         let points: Vec<ResampledPointD1> = (0..8)
             .map(|i: i32| rp(i.saturating_add(1), i64::from(i.saturating_add(100)), 10.0))
             .collect();
-        let vals = macd_line(&points, "ema", 3, "sma", 5).unwrap();
+        let vals = macd_line(&points, Ema, 3, Sma, 5).unwrap();
         assert_eq!(vals.len(), 4);
         assert_eq!(vals[0].timestamp, 104);
         assert_eq!(vals[1].timestamp, 105);
@@ -316,7 +317,7 @@ mod tests {
     fn macd_line_length_is_n_minus_slow_plus_one() {
         // 10 points, fast=3, slow=5 -> 10 - 5 + 1 = 6 MACD values.
         let points = points_from_closes(&[10.0; 10]);
-        let vals = macd_line(&points, "ema", 3, "ema", 5).unwrap();
+        let vals = macd_line(&points, Ema, 3, Ema, 5).unwrap();
         assert_eq!(vals.len(), 6);
     }
 
@@ -430,14 +431,14 @@ mod tests {
     ///
     /// These values are **not ground-truth**; they were produced by running
     /// `macd_line` on the 2400 real EURUSD `resampled_point_d1` rows with
-    /// `fast = 12`, `slow = 20`, both `"ema"` (a database-plausible
+    /// `fast = 12`, `slow = 20`, both `Ema` (a database-plausible
     /// configuration) and capturing the output. They serve as a regression
     /// baseline. The user will later compare them against an external source
     /// of truth.
     #[test]
     fn level2_real_macd_line_matches_captured_baseline() {
         let points = test_support::eurusd_points();
-        let vals = macd_line(&points, "ema", 12, "ema", 20).unwrap();
+        let vals = macd_line(&points, Ema, 12, Ema, 20).unwrap();
 
         // 2400 points -> 2381 MACD values (2400 - 20 + 1).
         assert_eq!(vals.len(), 2381);
