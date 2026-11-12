@@ -10,7 +10,9 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::config::environment::DbConfig;
-use crate::domain::indicator::{Indicator, IndicatorParameters, IndicatorRepository};
+use crate::domain::indicator::{
+    Indicator, IndicatorParameters, IndicatorRepository, MovingAverageType,
+};
 use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
 };
@@ -90,9 +92,9 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
         "macd" => {
             let p = parse_params::<MacdParams>(indicator_type, json_text)?;
             IndicatorParameters::Macd {
-                slow_type: p.slow_type,
+                slow_type: parse_moving_average_type(&p.slow_type)?,
                 slow_n: p.slow_n,
-                fast_type: p.fast_type,
+                fast_type: parse_moving_average_type(&p.fast_type)?,
                 fast_n: p.fast_n,
             }
         }
@@ -163,6 +165,14 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
             IndicatorParameters::Vroc { period: p.period }
         }
         _ => bail!("unknown indicator type: {indicator_type}"),
+    })
+}
+
+fn parse_moving_average_type(raw: &str) -> anyhow::Result<MovingAverageType> {
+    Ok(match raw {
+        "ema" => MovingAverageType::Ema,
+        "sma" => MovingAverageType::Sma,
+        _ => bail!("moving-average type must be \"ema\" or \"sma\", got \"{raw}\""),
     })
 }
 
@@ -387,12 +397,22 @@ mod tests {
         assert_eq!(
             params,
             IndicatorParameters::Macd {
-                slow_type: "sma".to_string(),
+                slow_type: MovingAverageType::Sma,
                 slow_n: 20,
-                fast_type: "ema".to_string(),
+                fast_type: MovingAverageType::Ema,
                 fast_n: 21,
             }
         );
+    }
+
+    #[test]
+    fn macd_params_reject_unknown_moving_average_type() {
+        let err = map_parameters(
+            "macd",
+            r#"{"slow_type": "sma", "slow_n": 20, "fast_type": "wma", "fast_n": 21}"#,
+        )
+        .unwrap_err();
+        assert!(format!("{err:#}").contains(r#"got "wma""#), "{err:#}");
     }
 
     #[test]

@@ -22,16 +22,6 @@ use crate::validate_period;
 /// carries the reference default as a constant.
 const SIGNAL_N: i32 = 9;
 
-pub fn parse_ma_method(ma_type: &str) -> Result<MovingAverageType, IndicatorError> {
-    match ma_type {
-        "ema" => Ok(MovingAverageType::Ema),
-        "sma" => Ok(MovingAverageType::Sma),
-        _ => Err(IndicatorError::InvalidMacdMaType {
-            ma_type: ma_type.to_string(),
-        }),
-    }
-}
-
 fn moving_average(values: &[f64], ma_type: MovingAverageType, period: usize) -> Vec<f64> {
     match ma_type {
         MovingAverageType::Ema => ema(values, period),

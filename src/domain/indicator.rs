@@ -1,9 +1,9 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndicatorParameters {
     Macd {
-        slow_type: String,
+        slow_type: MovingAverageType,
         slow_n: i32,
-        fast_type: String,
+        fast_type: MovingAverageType,
         fast_n: i32,
     },
     Rsi {

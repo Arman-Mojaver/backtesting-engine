@@ -1,4 +1,4 @@
-use crate::domain::indicator::{Indicator, IndicatorParameters};
+use crate::domain::indicator::{Indicator, IndicatorParameters, MovingAverageType};
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::IndicatorValue;
@@ -183,9 +183,9 @@ fn ema_macd(id: i32) -> Indicator {
     Indicator {
         id,
         parameters: IndicatorParameters::Macd {
-            slow_type: "ema".to_string(),
+            slow_type: MovingAverageType::Ema,
             slow_n: 26,
-            fast_type: "ema".to_string(),
+            fast_type: MovingAverageType::Ema,
             fast_n: 12,
         },
     }

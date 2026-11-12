@@ -135,9 +135,7 @@ pub fn create_indicator_output(
             fast_type,
             fast_n,
         } => {
-            let fast_type = macd::parse_ma_method(fast_type)?;
-            let slow_type = macd::parse_ma_method(slow_type)?;
-            let buffers = macd::compute(points, fast_type, *fast_n, slow_type, *slow_n)?;
+            let buffers = macd::compute(points, *fast_type, *fast_n, *slow_type, *slow_n)?;
             Ok(IndicatorOutput::Crossover {
                 instrument,
                 buffers,
@@ -204,7 +202,7 @@ pub fn create_indicator_output(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::indicator::IndicatorParameters;
+    use crate::domain::indicator::{IndicatorParameters, MovingAverageType};
     use crate::domain::resampled_point::ResampledPointD1;
     use crate::domain::signal::IndicatorOutput;
 
@@ -285,9 +283,9 @@ mod tests {
     #[test]
     fn macd_dispatch_returns_crossover_buffers() {
         let params = IndicatorParameters::Macd {
-            slow_type: "ema".to_string(),
+            slow_type: MovingAverageType::Ema,
             slow_n: 5,
-            fast_type: "ema".to_string(),
+            fast_type: MovingAverageType::Ema,
             fast_n: 3,
         };
         let points = rp_macd_14();
@@ -313,9 +311,9 @@ mod tests {
     #[test]
     fn macd_dispatch_with_insufficient_data_yields_empty_buffers() {
         let params = IndicatorParameters::Macd {
-            slow_type: "ema".to_string(),
+            slow_type: MovingAverageType::Ema,
             slow_n: 26,
-            fast_type: "ema".to_string(),
+            fast_type: MovingAverageType::Ema,
             fast_n: 12,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
@@ -332,29 +330,11 @@ mod tests {
     }
 
     #[test]
-    fn macd_dispatch_invalid_ma_type_propagates_error_through_dispatch() {
-        let params = IndicatorParameters::Macd {
-            slow_type: "ema".to_string(),
-            slow_n: 26,
-            fast_type: "wma".to_string(),
-            fast_n: 12,
-        };
-        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
-        let err = create_indicator_output(&params, &points).unwrap_err();
-        assert_eq!(
-            err,
-            IndicatorError::InvalidMacdMaType {
-                ma_type: "wma".to_string()
-            }
-        );
-    }
-
-    #[test]
     fn macd_invalid_fast_period_propagates_error_through_dispatch() {
         let params = IndicatorParameters::Macd {
-            slow_type: "ema".to_string(),
+            slow_type: MovingAverageType::Ema,
             slow_n: 26,
-            fast_type: "ema".to_string(),
+            fast_type: MovingAverageType::Ema,
             fast_n: 0,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
@@ -365,9 +345,9 @@ mod tests {
     #[test]
     fn macd_invalid_slow_period_propagates_error_through_dispatch() {
         let params = IndicatorParameters::Macd {
-            slow_type: "ema".to_string(),
+            slow_type: MovingAverageType::Ema,
             slow_n: 0,
-            fast_type: "ema".to_string(),
+            fast_type: MovingAverageType::Ema,
             fast_n: 12,
         };
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];

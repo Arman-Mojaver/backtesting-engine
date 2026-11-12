@@ -87,7 +87,7 @@ pub fn instrument_of(resampled_points: &[ResampledPointD1]) -> &str {
 mod tests {
     use super::*;
     use crate::domain::fixtures::{indicators_rsi_single, resampled_points_for_rsi};
-    use crate::domain::indicator::{Indicator, IndicatorParameters};
+    use crate::domain::indicator::{Indicator, IndicatorParameters, MovingAverageType};
     use crate::domain::resampled_point::ResampledPointD1;
 
     // Signal behavior is tested through the macro's uncached companion: the
@@ -130,9 +130,9 @@ mod tests {
         Indicator {
             id,
             parameters: IndicatorParameters::Macd {
-                slow_type: "ema".to_string(),
+                slow_type: MovingAverageType::Ema,
                 slow_n: 12,
-                fast_type: "ema".to_string(),
+                fast_type: MovingAverageType::Ema,
                 fast_n: 26,
             },
         }
@@ -175,9 +175,9 @@ mod tests {
         let indicator = Indicator {
             id: 9001,
             parameters: IndicatorParameters::Macd {
-                slow_type: "sma".to_string(),
+                slow_type: MovingAverageType::Sma,
                 slow_n: 2,
-                fast_type: "ema".to_string(),
+                fast_type: MovingAverageType::Ema,
                 fast_n: 1,
             },
         };
@@ -202,9 +202,9 @@ mod tests {
         let indicator = Indicator {
             id: 9002,
             parameters: IndicatorParameters::Macd {
-                slow_type: "sma".to_string(),
+                slow_type: MovingAverageType::Sma,
                 slow_n: 2,
-                fast_type: "ema".to_string(),
+                fast_type: MovingAverageType::Ema,
                 fast_n: 1,
             },
         };
@@ -222,9 +222,9 @@ mod tests {
         let indicators = vec![Indicator {
             id: 9101,
             parameters: IndicatorParameters::Macd {
-                slow_type: "sma".to_string(),
+                slow_type: MovingAverageType::Sma,
                 slow_n: 2,
-                fast_type: "ema".to_string(),
+                fast_type: MovingAverageType::Ema,
                 fast_n: 1,
             },
         }];
