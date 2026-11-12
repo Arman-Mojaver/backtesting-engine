@@ -17,6 +17,7 @@
 | **Resampled Point (D1)** | An OHLCV candlestick bar resampled to the **daily (D1)** timeframe. | `ResampledPointD1` | `domain::resampled_point` |
 | **Indicator** | A technical indicator applied to market data. Has an `id` and typed `parameters`. | `Indicator` | `domain::indicator` |
 | **Indicator Parameters** | Typed parameters for an indicator — a 14-variant enum: `Macd`, `Rsi`, `AwesomeOscillator`, `AcceleratorDecelerator`, `BearsPower`, `BullsPower`, `ChaikinOscillator`, `ChaikinVolatility`, `DetrendedPriceOscillator`, `ForceIndex`, `OsMa`, `Roc`, `Trix`, `Vroc`. | `IndicatorParameters` | `domain::indicator` |
+| **Moving Average Type** | The moving average behind one MACD line: `Ema` or `Sma`. The PG adapter maps the companion's `"ema"`/`"sma"` strings to it and rejects any other value when loading. | `MovingAverageType` | `domain::indicator` |
 | **Indicator Type** | The category/kind of a technical indicator (e.g. `macd`, `rsi`). Not a domain-struct field: lives in the database `type` column, which the PG adapter reads to select the `IndicatorParameters` variant. | `type` DB column | `infrastructure::pg_adapter` |
 | **Indicator Output** | The computed result of an indicator over a candle series — `Oscillator`, `Threshold`, or `Crossover` — carrying timestamped values. Converted to a `SignalGroup` by signal semantics. | `IndicatorOutput` | `domain::signal` |
 | **Money Management Strategy (MMS)** | A strategy that governs position sizing and risk. Identified by `money_management_strategy_id`. All operation points in a run must use the same MMS. | `i32` field | `domain::operation_point`, `domain::strategy` |
@@ -95,7 +96,7 @@ Indicator {
     id:          i32                 — unique identifier
     parameters:  IndicatorParameters — 14-variant typed enum (see below)
 }
-IndicatorParameters ::= Macd { slow_type, slow_n, fast_type, fast_n }
+IndicatorParameters ::= Macd { slow_type: MovingAverageType, slow_n, fast_type: MovingAverageType, fast_n }
                       | Rsi { n, high_threshold, low_threshold }
                       | AwesomeOscillator
                       | AcceleratorDecelerator
@@ -109,6 +110,7 @@ IndicatorParameters ::= Macd { slow_type, slow_n, fast_type, fast_n }
                       | Roc { period }
                       | Trix { period }
                       | Vroc { period }
+MovingAverageType   ::= Ema | Sma
 ```
 
 ### IndicatorOutput (domain::signal)
