@@ -15,17 +15,6 @@ pub struct CellOutputDto {
     pub instrument: String,
     pub mms_id: i32,
     pub strategy_rows: Vec<StrategyRow>,
-    pub processed_indicator_ids: Vec<i32>,
-}
-
-impl CellOutputDto {
-    pub fn manifest_entry(&self) -> ManifestEntry {
-        ManifestEntry {
-            instrument: self.instrument.clone(),
-            mms_id: self.mms_id,
-            indicator_ids: self.processed_indicator_ids.clone(),
-        }
-    }
 }
 
 pub struct StrategyPersistence {
@@ -54,24 +43,24 @@ impl StrategyPersistence {
         // across all partitions, so they stay unique across the whole tree.
         let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
         let mut dto_cells: Vec<CellOutputDto> = Vec::with_capacity(cells.len());
+        let mut manifest_entries: Vec<ManifestEntry> = Vec::with_capacity(cells.len());
         for cell in cells {
             let mut strategy_rows = Vec::with_capacity(cell.strategies.len());
             for strategy in cell.strategies {
                 strategy_rows.push(StrategyRow::from_strategy(strategy, next_id));
                 next_id = next_id.saturating_add(1);
             }
+            manifest_entries.push(ManifestEntry {
+                instrument: cell.instrument.clone(),
+                mms_id: cell.mms_id,
+                indicator_ids: cell.computed_indicator_ids,
+            });
             dto_cells.push(CellOutputDto {
                 instrument: cell.instrument,
                 mms_id: cell.mms_id,
                 strategy_rows,
-                processed_indicator_ids: cell.computed_indicator_ids,
             });
         }
-
-        let manifest_entries: Vec<ManifestEntry> = dto_cells
-            .iter()
-            .map(CellOutputDto::manifest_entry)
-            .collect();
 
         dto_cells.into_par_iter().try_for_each(|c| {
             self.strategies
