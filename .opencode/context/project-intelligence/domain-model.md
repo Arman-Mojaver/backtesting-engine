@@ -31,7 +31,7 @@
 | **Annual Operation Count** | Number of trades per year, annualized from a total count over the time span. Computed from signal-group operation counts; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_operation_count` |
 | **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 20%, min annual ROI ≥ 5%. Annual operation count ≥ 10 is a global business minimum: this engine only prunes early on signal counts (an upper bound on matched operation points, so nothing that would pass is lost); final pruning on the stored count happens downstream. | `GlobalStrategyFilter` | `domain::strategy` |
 | **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus an `operation_count()` derived from its signals. Lives in the domain layer. | `SignalGroup` | `domain::signal_group` |
-| **Cell** | One `(instrument, mms_id)` pair — the unit of work for `create_loop`. Cells are computed in parallel and persisted as one Parquet partition each. | `(String, i32)` keys, `CellOutput` | `application::cell_output`, `engine::strategy::create_loop` |
+| **Cell** | One `(instrument, mms_id)` pair — the unit of work for `create_loop`. Cells are computed in parallel and persisted as one Parquet partition each. | `Cell`, `CellOutput` | `domain::cell`, `application::cell_output`, `engine::strategy::create_loop` |
 | **Parquet Strategy Repository** | Writes strategies to partitioned parquet files under `{base}/instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. Dedups fresh rows by `indicator_id` (idempotent partitions). | `ParquetStrategyRepository` | `infrastructure::strategy_adapter` |
 | **Processed Manifest** | Parquet ledger of completed `(instrument, mms_id, indicator_id)` triples with `processed_at` timestamps. Makes `create`/`create_loop` idempotent. Atomic writes (temp + rename); dedup per triple. | `ParquetProcessedManifest` | `infrastructure::processed_manifest` |
 | **Strategy Persistence** | Batch commit for `create_loop`: assigns `strategy_id`s from the global max, writes partitions in parallel (rayon), commits the manifest once. | `StrategyPersistence` | `infrastructure::strategy_persistence` |
@@ -209,7 +209,7 @@ The domain defines repository traits — ports in a ports-and-adapters architect
 
 | Trait | Methods | Semantics |
 |-------|---------|-----------|
-| `LongOperationPointRepository` | `get_all()`, `get_by_mms_id_and_instrument(mms_id, instrument)`, `index_by_cell()` (default) | Long (buy) trades; `index_by_cell` groups by `(instrument, mms_id)` |
+| `LongOperationPointRepository` | `get_all()`, `get_by_mms_id_and_instrument(mms_id, instrument)`, `index_by_cell()` (default) | Long (buy) trades; `index_by_cell` groups by `Cell` |
 | `ShortOperationPointRepository` | `get_all()`, `get_by_mms_id_and_instrument(mms_id, instrument)`, `index_by_cell()` (default) | Short (sell) trades |
 | `ResampledPointD1Repository` | `get_all()`, `get_by_instrument(instrument)`, `index_by_instrument()` (default) | Daily candles |
 | `IndicatorRepository` | `get_all()` | Indicators |
@@ -255,7 +255,7 @@ Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_
 
 ### Processed Manifest
 `{root_dir}/processed.parquet` — schema: `instrument` (Utf8), `mms_id` (Int32), `indicator_id` (Int32), `processed_at` (Int64).
-- `read_processed_ids_per_cell()`, `append_all(&[ManifestEntry], processed_at)`.
+- `read_processed_ids_per_cell()` (keyed by `Cell`), `append_all(&[ManifestEntry], processed_at)`.
 - Dedups on the (instrument, mms_id, indicator_id) triple; atomic writes (temp file + fsync + rename; temp file removed on failure).
 - Consumed by `strategy create` (skip processed) and `create_loop` (per-cell skip).
 
@@ -287,6 +287,7 @@ src/
 │   ├── strategy_runner.rs      # run_strategies() — validate → signals → filter → strategies → filter
 │   └── strategy_runner_utils.rs # get_unprocessed() — manifest diffing
 ├── domain/                     # Pure domain logic — no I/O, no frameworks
+│   ├── cell.rs                 # Cell — the (instrument, mms_id) unit of work; Display + Ord
 │   ├── indicator.rs            # Indicator + IndicatorParameters (14 variants) + IndicatorRepository
 │   ├── indicators/             # Indicator computation: 14 indicators + dispatch + macros + moving averages
 │   │   ├── mod.rs              # create_indicator_output() dispatch, PriceField, IndicatorError
