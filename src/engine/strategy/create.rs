@@ -7,7 +7,7 @@ use rustc_hash::FxHashSet;
 use crate::application::cell_output::CellOutput;
 use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
-use crate::application::strategy_runner_utils::get_unprocessed;
+use crate::application::strategy_runner_utils::{get_unprocessed, indicator_ids};
 use crate::config::environment::{
     parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig,
 };
@@ -31,10 +31,11 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
 
     let processed_ids =
         read_processed_indicator_ids(&persistence, instrument, money_management_strategy_id)?;
-    let unprocessed_ids = get_unprocessed(&data.indicators, &processed_ids);
+    let unprocessed_indicators = get_unprocessed(&data.indicators, &processed_ids);
     let indicator_count = data.indicators.len();
+    let unprocessed_ids = indicator_ids(&unprocessed_indicators);
     let unprocessed_count = unprocessed_ids.len();
-    if unprocessed_ids.is_empty() {
+    if unprocessed_indicators.is_empty() {
         info!(
             "All {indicator_count} indicators already processed for {instrument} (mms_id={money_management_strategy_id}). Nothing to do."
         );

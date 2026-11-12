@@ -9,7 +9,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::application::cell_output::CellOutput;
 use crate::application::signal_generator::signal_group_cache_stats;
 use crate::application::strategy_runner::run_strategies;
-use crate::application::strategy_runner_utils::get_unprocessed;
+use crate::application::strategy_runner_utils::{get_unprocessed, indicator_ids};
 use crate::config::environment::{
     parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig,
 };
@@ -115,10 +115,11 @@ fn compute_cell(
     let processed_ids = processed_ids_per_cell
         .get(cell)
         .unwrap_or(&empty_processed_ids);
-    let unprocessed_indicator_ids = get_unprocessed(&source.indicators, processed_ids);
-    if unprocessed_indicator_ids.is_empty() {
+    let unprocessed_indicators = get_unprocessed(&source.indicators, processed_ids);
+    if unprocessed_indicators.is_empty() {
         return CellOutcome::AlreadyProcessed;
     }
+    let unprocessed_indicator_ids = indicator_ids(&unprocessed_indicators);
 
     let strategies = match run_strategies(
         &source.indicators,

@@ -2,12 +2,16 @@ use rustc_hash::FxHashSet;
 
 use crate::domain::indicator::Indicator;
 
-pub fn get_unprocessed(indicators: &[Indicator], processed_ids: &FxHashSet<i32>) -> Vec<i32> {
+pub fn get_unprocessed(indicators: &[Indicator], processed_ids: &FxHashSet<i32>) -> Vec<Indicator> {
     indicators
         .iter()
-        .map(|indicator| indicator.id)
-        .filter(|id| !processed_ids.contains(id))
+        .filter(|indicator| !processed_ids.contains(&indicator.id))
+        .cloned()
         .collect()
+}
+
+pub fn indicator_ids(indicators: &[Indicator]) -> Vec<i32> {
+    indicators.iter().map(|indicator| indicator.id).collect()
 }
 
 #[cfg(test)]
@@ -33,7 +37,7 @@ mod tests {
     #[test]
     fn diff_processed_empty_processed_returns_all() {
         let result = get_unprocessed(&indicators(&[1, 2, 3]), &FxHashSet::default());
-        assert_eq!(result, vec![1, 2, 3]);
+        assert_eq!(indicator_ids(&result), vec![1, 2, 3]);
     }
 
     #[test]
@@ -51,7 +55,7 @@ mod tests {
         processed.insert(1);
         processed.insert(3);
         let result = get_unprocessed(&indicators(&[1, 2, 3, 4]), &processed);
-        assert_eq!(result, vec![2, 4]);
+        assert_eq!(indicator_ids(&result), vec![2, 4]);
     }
 
     #[test]
@@ -59,6 +63,6 @@ mod tests {
         let mut processed = FxHashSet::default();
         processed.insert(10);
         let result = get_unprocessed(&indicators(&[1, 2]), &processed);
-        assert_eq!(result, vec![1, 2]);
+        assert_eq!(indicator_ids(&result), vec![1, 2]);
     }
 }
