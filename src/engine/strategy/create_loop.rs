@@ -119,15 +119,13 @@ fn compute_cell(
     if unprocessed_indicators.is_empty() {
         return CellOutcome::AlreadyProcessed;
     }
-    let unprocessed_indicator_ids = indicator_ids(&unprocessed_indicators);
 
     let strategies = match run_strategies(
-        &source.indicators,
+        &unprocessed_indicators,
         source.resampled_points(instrument),
         source.long_operation_points(cell),
         source.short_operation_points(cell),
         *mms_id,
-        &unprocessed_indicator_ids,
     ) {
         Ok(strategies) => strategies,
         Err(e) => {
@@ -143,7 +141,7 @@ fn compute_cell(
         instrument: instrument.clone(),
         mms_id: *mms_id,
         strategies,
-        computed_indicator_ids: unprocessed_indicator_ids,
+        computed_indicator_ids: indicator_ids(&unprocessed_indicators),
     })
 }
 

@@ -47,12 +47,11 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
     );
     let run_start = Instant::now();
     let strategies = run_strategies(
-        &data.indicators,
+        &unprocessed_indicators,
         &data.resampled_points,
         &data.long_operation_points,
         &data.short_operation_points,
         money_management_strategy_id,
-        &unprocessed_ids,
     )
     .with_context(|| {
         format!("failed to run strategies for {instrument} (mms_id={money_management_strategy_id})")

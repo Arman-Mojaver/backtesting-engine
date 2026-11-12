@@ -1,6 +1,5 @@
 use anyhow::Context;
 use log::debug;
-use rustc_hash::FxHashSet;
 
 use crate::application::signal_generator::{create_signal_groups, instrument_of};
 use crate::application::strategy_generator::create_strategies;
@@ -17,7 +16,6 @@ pub fn run_strategies(
     long_operation_points: &[OperationPoint],
     short_operation_points: &[OperationPoint],
     money_management_strategy_id: i32,
-    unprocessed_ids: &[i32],
 ) -> anyhow::Result<Vec<Strategy>> {
     validate_all(
         indicators,
@@ -36,8 +34,7 @@ pub fn run_strategies(
         .start_end_timestamps()
         .ok_or_else(|| anyhow::anyhow!("long operation points should never be empty"))?;
 
-    let unprocessed_indicators = unprocessed_indicators(indicators, unprocessed_ids);
-    let signal_groups = create_signal_groups(&unprocessed_indicators, resampled_points);
+    let signal_groups = create_signal_groups(indicators, resampled_points);
 
     let global_filter = GlobalStrategyFilter::default();
     let filtered_groups = filter_signal_groups_by_annual_ops(
@@ -70,15 +67,6 @@ pub fn run_strategies(
     );
 
     Ok(strategies)
-}
-
-fn unprocessed_indicators(indicators: &[Indicator], unprocessed_ids: &[i32]) -> Vec<Indicator> {
-    let unprocessed_ids: FxHashSet<i32> = unprocessed_ids.iter().copied().collect();
-    indicators
-        .iter()
-        .filter(|indicator| unprocessed_ids.contains(&indicator.id))
-        .cloned()
-        .collect()
 }
 
 #[cfg(test)]
@@ -162,28 +150,19 @@ mod tests {
         ]
     }
 
-    fn all_indicator_ids() -> Vec<i32> {
-        pipeline_indicators().iter().map(|i| i.id).collect()
-    }
-
-    fn run_pipeline(
-        money_management_strategy_id: i32,
-        unprocessed_ids: &[i32],
-    ) -> anyhow::Result<Vec<Strategy>> {
+    fn run_pipeline(money_management_strategy_id: i32) -> anyhow::Result<Vec<Strategy>> {
         run_strategies(
             &pipeline_indicators(),
             &pipeline_resampled_points(),
             &pipeline_long_ops(),
             &pipeline_short_ops(),
             money_management_strategy_id,
-            unprocessed_ids,
         )
     }
 
     #[test]
     fn full_pipeline_applies_validation_and_both_filter_stages() {
-        let strategies =
-            run_pipeline(1, &all_indicator_ids()).expect("valid inputs must pass validation");
+        let strategies = run_pipeline(1).expect("valid inputs must pass validation");
 
         let ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
         assert_eq!(
@@ -204,30 +183,8 @@ mod tests {
     }
 
     #[test]
-    fn processed_indicators_are_excluded_before_compute() {
-        let unprocessed_ids = [
-            PASSES_BOTH_STAGES,
-            DROPPED_FOR_INACTIVITY,
-            DROPPED_FOR_LOW_ROI,
-        ];
-        let strategies =
-            run_pipeline(1, &unprocessed_ids).expect("valid inputs must pass validation");
-
-        let ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
-        assert_eq!(ids, vec![PASSES_BOTH_STAGES]);
-    }
-
-    #[test]
-    fn all_indicators_processed_yields_no_strategies() {
-        let strategies = run_pipeline(1, &[]).expect("valid inputs must pass validation");
-
-        assert!(strategies.is_empty());
-    }
-
-    #[test]
     fn validation_failure_surfaces_the_invariant_and_context() {
-        let err =
-            run_pipeline(2, &all_indicator_ids()).expect_err("mms mismatch must fail validation");
+        let err = run_pipeline(2).expect_err("mms mismatch must fail validation");
         let chain = format!("{err:#}");
         assert!(chain.contains("input validation failed"));
         assert!(chain.contains("money management strategy id"));
