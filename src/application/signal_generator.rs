@@ -125,15 +125,15 @@ mod tests {
         assert_eq!(result[0].indicator_id, 2);
     }
 
-    /// A MACD whose fast line uses an unsupported moving-average type ("wma").
+    /// A MACD whose fast period is not below its slow period.
     fn invalid_macd(id: i32) -> Indicator {
         Indicator {
             id,
             parameters: IndicatorParameters::Macd {
                 slow_type: "ema".to_string(),
-                slow_n: 26,
-                fast_type: "wma".to_string(),
-                fast_n: 12,
+                slow_n: 12,
+                fast_type: "ema".to_string(),
+                fast_n: 26,
             },
         }
     }
