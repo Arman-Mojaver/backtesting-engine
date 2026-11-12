@@ -25,8 +25,8 @@ use crate::infrastructure::strategy_persistence::StrategyPersistence;
 struct SourceIndex {
     indicators: Vec<Indicator>,
     resampled_by_instrument: FxHashMap<String, Vec<ResampledPointD1>>,
-    long_by_cell: FxHashMap<(String, i32), Vec<OperationPoint>>,
-    short_by_cell: FxHashMap<(String, i32), Vec<OperationPoint>>,
+    long_by_cell: FxHashMap<Cell, Vec<OperationPoint>>,
+    short_by_cell: FxHashMap<Cell, Vec<OperationPoint>>,
 }
 
 impl SourceIndex {
@@ -59,10 +59,8 @@ impl SourceIndex {
         let indicators = indicators.context("failed to load indicators")?;
         let resampled_by_instrument =
             resampled_by_instrument.context("failed to load resampled points")?;
-        let long_by_cell =
-            into_tuple_keys(long_by_cell.context("failed to load long operation points")?);
-        let short_by_cell =
-            into_tuple_keys(short_by_cell.context("failed to load short operation points")?);
+        let long_by_cell = long_by_cell.context("failed to load long operation points")?;
+        let short_by_cell = short_by_cell.context("failed to load short operation points")?;
         info!("Source data loaded in {:?}", load_start.elapsed());
 
         Ok(Self {
@@ -74,8 +72,8 @@ impl SourceIndex {
     }
 
     /// The `(instrument, mms_id)` cells that have operation points.
-    fn cells(&self) -> Vec<(String, i32)> {
-        let mut cells: Vec<(String, i32)> = self
+    fn cells(&self) -> Vec<Cell> {
+        let mut cells: Vec<Cell> = self
             .long_by_cell
             .keys()
             .chain(self.short_by_cell.keys())
@@ -92,21 +90,13 @@ impl SourceIndex {
             .map_or(&[], Vec::as_slice)
     }
 
-    fn long_operation_points(&self, cell: &(String, i32)) -> &[OperationPoint] {
+    fn long_operation_points(&self, cell: &Cell) -> &[OperationPoint] {
         self.long_by_cell.get(cell).map_or(&[], Vec::as_slice)
     }
 
-    fn short_operation_points(&self, cell: &(String, i32)) -> &[OperationPoint] {
+    fn short_operation_points(&self, cell: &Cell) -> &[OperationPoint] {
         self.short_by_cell.get(cell).map_or(&[], Vec::as_slice)
     }
-}
-
-// Temporary: removed once `SourceIndex` is keyed by `Cell`.
-fn into_tuple_keys<V>(by_cell: FxHashMap<Cell, V>) -> FxHashMap<(String, i32), V> {
-    by_cell
-        .into_iter()
-        .map(|(cell, value)| ((cell.instrument, cell.mms_id), value))
-        .collect()
 }
 
 enum CellOutcome {
@@ -117,10 +107,10 @@ enum CellOutcome {
 
 fn compute_cell(
     source: &SourceIndex,
-    cell: &(String, i32),
-    processed_ids_per_cell: &FxHashMap<(String, i32), FxHashSet<i32>>,
+    cell: &Cell,
+    processed_ids_per_cell: &FxHashMap<Cell, FxHashSet<i32>>,
 ) -> CellOutcome {
-    let (instrument, mms_id) = cell;
+    let Cell { instrument, mms_id } = cell;
 
     let empty_processed_ids: FxHashSet<i32> = FxHashSet::default();
     let processed_ids = processed_ids_per_cell
@@ -201,11 +191,9 @@ pub fn execute() -> anyhow::Result<()> {
     let source = SourceIndex::load(&DbConfig::from_env(env))?;
     let cells = source.cells();
     let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
-    let processed_ids_per_cell = into_tuple_keys(
-        persistence
-            .read_processed_ids_per_cell()
-            .context("failed to read processed manifest")?,
-    );
+    let processed_ids_per_cell = persistence
+        .read_processed_ids_per_cell()
+        .context("failed to read processed manifest")?;
 
     let (computed, summary) = compute_cells(&source, &cells, &processed_ids_per_cell);
     persist_computed_cells(&persistence, computed)?;
@@ -216,8 +204,8 @@ pub fn execute() -> anyhow::Result<()> {
 
 fn compute_cells(
     source: &SourceIndex,
-    cells: &[(String, i32)],
-    processed_ids_per_cell: &FxHashMap<(String, i32), FxHashSet<i32>>,
+    cells: &[Cell],
+    processed_ids_per_cell: &FxHashMap<Cell, FxHashSet<i32>>,
 ) -> (Vec<CellOutput>, BatchSummary) {
     info!("{} cells to process", cells.len());
     info!("Computing strategies...");
@@ -437,8 +425,8 @@ mod tests {
         assert!(fail_on_total_failure(&summary).is_ok());
     }
 
-    fn eurusd_cell() -> (String, i32) {
-        ("EURUSD".to_string(), 1)
+    fn eurusd_cell() -> Cell {
+        Cell::new("EURUSD", 1)
     }
 
     fn source_index(
@@ -456,13 +444,13 @@ mod tests {
         }
     }
 
-    fn processed(indicator_ids: &[i32]) -> FxHashMap<(String, i32), FxHashSet<i32>> {
+    fn processed(indicator_ids: &[i32]) -> FxHashMap<Cell, FxHashSet<i32>> {
         FxHashMap::from_iter([(eurusd_cell(), indicator_ids.iter().copied().collect())])
     }
 
     #[test]
     fn cells_are_sorted_union_of_long_and_short_without_duplicates() {
-        let cell = |instrument: &str, mms_id| ((instrument.to_string(), mms_id), Vec::new());
+        let cell = |instrument: &str, mms_id| (Cell::new(instrument, mms_id), Vec::new());
         let source = SourceIndex {
             indicators: Vec::new(),
             resampled_by_instrument: FxHashMap::default(),
@@ -473,9 +461,9 @@ mod tests {
         assert_eq!(
             source.cells(),
             vec![
-                ("EURUSD".to_string(), 1),
-                ("EURUSD".to_string(), 2),
-                ("USDJPY".to_string(), 1),
+                Cell::new("EURUSD", 1),
+                Cell::new("EURUSD", 2),
+                Cell::new("USDJPY", 1),
             ]
         );
     }
