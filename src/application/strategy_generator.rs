@@ -6,11 +6,12 @@ use crate::domain::annual_operation_count::annual_operation_count;
 use crate::domain::operation_point::{OperationPoint, OperationPoints};
 use crate::domain::performance_metrics::performance_metrics;
 use crate::domain::signal_group::SignalGroup;
-use crate::domain::strategy::Strategy;
+use crate::domain::strategy::{GlobalStrategyFilter, Strategy};
 
 pub fn create_strategies(
     signal_groups: &[SignalGroup],
     operation_points: &OperationPoints<'_>,
+    filter: &GlobalStrategyFilter,
     money_management_strategy_id: i32,
     start_timestamp: i64,
     end_timestamp: i64,
@@ -20,6 +21,14 @@ pub fn create_strategies(
 
     signal_groups
         .par_iter()
+        .filter(|sg| {
+            let count = matched_trade_count(sg, &long_map, &short_map);
+            filter.admits_activity(annual_operation_count(
+                count,
+                start_timestamp,
+                end_timestamp,
+            ))
+        })
         .map(|sg| {
             create_strategy(
                 sg,
@@ -31,6 +40,24 @@ pub fn create_strategies(
             )
         })
         .collect()
+}
+
+fn matched_trade_count(
+    signal_group: &SignalGroup,
+    long_map: &FxHashMap<i64, &OperationPoint>,
+    short_map: &FxHashMap<i64, &OperationPoint>,
+) -> usize {
+    let long_count = signal_group
+        .long_signals
+        .iter()
+        .filter(|ts| long_map.contains_key(ts))
+        .count();
+    let short_count = signal_group
+        .short_signals
+        .iter()
+        .filter(|ts| short_map.contains_key(ts))
+        .count();
+    long_count.saturating_add(short_count)
 }
 
 fn create_strategy(
@@ -84,6 +111,13 @@ mod tests {
 
     use crate::domain::fixtures::{op_point, ONE_YEAR_SECS};
     use crate::domain::operation_point::points_by_timestamp;
+
+    fn min_ops(min_annual_operation_count: f64) -> GlobalStrategyFilter {
+        GlobalStrategyFilter {
+            min_annual_operation_count,
+            ..GlobalStrategyFilter::default()
+        }
+    }
 
     fn group(indicator_id: i32, longs: Vec<i64>, shorts: Vec<i64>) -> SignalGroup {
         SignalGroup {
@@ -189,7 +223,14 @@ mod tests {
             .map(|&id| group(id, vec![1000], vec![]))
             .collect();
 
-        let strategies = create_strategies(&groups, &operation_points, 1, 0, ONE_YEAR_SECS);
+        let strategies = create_strategies(
+            &groups,
+            &operation_points,
+            &min_ops(0.0),
+            1,
+            0,
+            ONE_YEAR_SECS,
+        );
 
         let result_ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
         assert_eq!(result_ids, indicator_ids);
@@ -207,8 +248,40 @@ mod tests {
             short_operation_points: &short_ops,
         };
 
-        let strategies = create_strategies(&[], &operation_points, 1, 0, ONE_YEAR_SECS);
+        let strategies =
+            create_strategies(&[], &operation_points, &min_ops(0.0), 1, 0, ONE_YEAR_SECS);
 
         assert!(strategies.is_empty());
+    }
+
+    #[test]
+    fn group_with_enough_signals_but_too_few_matched_trades_is_dropped() {
+        let long_ops: Vec<OperationPoint> =
+            (1..=10).map(|ts| op_point(ts, 30, i64::from(ts))).collect();
+        let short_ops: Vec<OperationPoint> = (1..=10)
+            .map(|ts| op_point(100 + ts, -20, i64::from(ts)))
+            .collect();
+        let operation_points = OperationPoints {
+            long_operation_points: &long_ops,
+            short_operation_points: &short_ops,
+        };
+        let all_matched = group(1, (1..=10).collect(), vec![]);
+        let one_matched = group(
+            2,
+            vec![1, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009],
+            vec![],
+        );
+
+        let strategies = create_strategies(
+            &[all_matched, one_matched],
+            &operation_points,
+            &min_ops(10.0),
+            1,
+            0,
+            ONE_YEAR_SECS,
+        );
+
+        let result_ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
+        assert_eq!(result_ids, vec![1]);
     }
 }

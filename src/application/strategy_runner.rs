@@ -53,6 +53,7 @@ pub fn run_strategies(
     let strategies = create_strategies(
         &filtered_groups,
         &operation_points,
+        &global_filter,
         money_management_strategy_id,
         start_timestamp,
         end_timestamp,
