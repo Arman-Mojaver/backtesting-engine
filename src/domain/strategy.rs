@@ -31,16 +31,19 @@ impl Default for GlobalStrategyFilter {
     }
 }
 
+impl GlobalStrategyFilter {
+    pub fn admits_performance(&self, annual_roi: f64, max_draw_down: f64) -> bool {
+        annual_roi >= self.min_annual_roi && max_draw_down <= self.max_draw_down_max
+    }
+}
+
 pub fn filter_strategies(
     strategies: Vec<Strategy>,
     filter: &GlobalStrategyFilter,
 ) -> Vec<Strategy> {
     strategies
         .into_iter()
-        .filter(|strategy| {
-            strategy.max_draw_down <= filter.max_draw_down_max
-                && strategy.annual_roi >= filter.min_annual_roi
-        })
+        .filter(|strategy| filter.admits_performance(strategy.annual_roi, strategy.max_draw_down))
         .collect()
 }
 
@@ -67,6 +70,49 @@ mod tests {
         assert_eq!(filter.max_draw_down_max, 20.0);
         assert_eq!(filter.min_annual_roi, 5.0);
         assert_eq!(filter.min_annual_operation_count, 10.0);
+    }
+
+    #[test]
+    fn admits_performance_with_annual_roi_at_minimum() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(filter.admits_performance(5.0, 10.0));
+    }
+
+    #[test]
+    fn rejects_performance_with_annual_roi_just_below_minimum() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(!filter.admits_performance(4.99, 10.0));
+    }
+
+    #[test]
+    fn admits_performance_with_annual_roi_just_above_minimum() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(filter.admits_performance(5.01, 10.0));
+    }
+
+    #[test]
+    fn admits_performance_with_draw_down_at_maximum() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(filter.admits_performance(15.0, 20.0));
+    }
+
+    #[test]
+    fn admits_performance_with_draw_down_just_below_maximum() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(filter.admits_performance(15.0, 19.99));
+    }
+
+    #[test]
+    fn rejects_performance_with_draw_down_just_above_maximum() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(!filter.admits_performance(15.0, 20.01));
+    }
+
+    #[test]
+    fn rejects_performance_with_nan_metrics() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(!filter.admits_performance(f64::NAN, 10.0));
+        assert!(!filter.admits_performance(15.0, f64::NAN));
     }
 
     #[test]
