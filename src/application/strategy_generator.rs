@@ -298,4 +298,78 @@ mod tests {
         let result_ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
         assert_eq!(result_ids, vec![1]);
     }
+
+    // Mirrors the real data shape: operation points cover a contiguous run
+    // of bars, trimmed at the start (ATR warm-up) and at the end (not enough
+    // data left to resolve a trade), while signals span every bar.
+    const WARM_UP_BARS: [i64; 4] = [1, 2, 3, 4];
+    const TRIMMED_TAIL_BARS: [i64; 4] = [25, 26, 27, 28];
+
+    fn operation_points_on_bars_5_to_24() -> (Vec<OperationPoint>, Vec<OperationPoint>) {
+        let long_ops = (5..=24)
+            .map(|bar| op_point(bar, 30, i64::from(bar)))
+            .collect();
+        let short_ops = (5..=24)
+            .map(|bar: i32| op_point(bar.saturating_add(100), -20, i64::from(bar)))
+            .collect();
+        (long_ops, short_ops)
+    }
+
+    #[test]
+    fn group_passing_only_on_signals_outside_the_operation_point_range_is_dropped() {
+        let (long_ops, short_ops) = operation_points_on_bars_5_to_24();
+        let operation_points = OperationPoints {
+            long_operation_points: &long_ops,
+            short_operation_points: &short_ops,
+        };
+        let inside = [6, 8, 10, 12, 14, 16];
+        let longs: Vec<i64> = WARM_UP_BARS
+            .into_iter()
+            .chain(inside)
+            .chain(TRIMMED_TAIL_BARS)
+            .collect();
+        let edge_inflated = group(1, longs, vec![]);
+
+        let strategies = create_strategies(
+            &[edge_inflated],
+            &operation_points,
+            &min_ops(10.0),
+            1,
+            0,
+            ONE_YEAR_SECS,
+        );
+
+        assert!(strategies.is_empty());
+    }
+
+    #[test]
+    fn stored_annual_operation_count_excludes_signals_outside_the_operation_point_range() {
+        let (long_ops, short_ops) = operation_points_on_bars_5_to_24();
+        let operation_points = OperationPoints {
+            long_operation_points: &long_ops,
+            short_operation_points: &short_ops,
+        };
+        let longs: Vec<i64> = WARM_UP_BARS
+            .into_iter()
+            .chain(5..=14)
+            .chain(TRIMMED_TAIL_BARS)
+            .collect();
+        let sg = group(2, longs, vec![]);
+
+        let strategies = create_strategies(
+            &[sg],
+            &operation_points,
+            &min_ops(10.0),
+            1,
+            0,
+            ONE_YEAR_SECS,
+        );
+
+        assert_eq!(strategies.len(), 1);
+        assert_eq!(strategies[0].annual_operation_count, 10.0);
+        assert_eq!(
+            strategies[0].long_operation_point_ids,
+            (5..=14).collect::<Vec<i32>>()
+        );
+    }
 }
