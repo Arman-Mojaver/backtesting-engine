@@ -22,7 +22,7 @@ use crate::validate_period;
 /// carries the reference default as a constant.
 const SIGNAL_N: i32 = 9;
 
-fn parse_ma_method(ma_type: &str) -> Result<MovingAverageType, IndicatorError> {
+pub fn parse_ma_method(ma_type: &str) -> Result<MovingAverageType, IndicatorError> {
     match ma_type {
         "ema" => Ok(MovingAverageType::Ema),
         "sma" => Ok(MovingAverageType::Sma),
@@ -89,13 +89,11 @@ fn macd_line(
 /// yields empty buffers, never an error.
 pub fn compute(
     points: &[ResampledPointD1],
-    fast_type: &str,
+    fast_type: MovingAverageType,
     fast_n: i32,
-    slow_type: &str,
+    slow_type: MovingAverageType,
     slow_n: i32,
 ) -> Result<CrossoverBuffers, IndicatorError> {
-    let fast_type = parse_ma_method(fast_type)?;
-    let slow_type = parse_ma_method(slow_type)?;
     let line = macd_line(points, fast_type, fast_n, slow_type, slow_n)?;
     let values: Vec<f64> = line.iter().map(|value| value.value).collect();
     let signal = sma(&values, cast::i32_to_usize(SIGNAL_N));
@@ -233,7 +231,7 @@ mod tests {
         // fast=4 > slow=2 must be rejected with InvalidMacdPeriodOrder,
         // through the public entry point.
         let points = points_from_closes(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]);
-        let err = compute(&points, "sma", 4, "sma", 2).unwrap_err();
+        let err = compute(&points, Sma, 4, Sma, 2).unwrap_err();
         assert_eq!(
             err,
             IndicatorError::InvalidMacdPeriodOrder { fast: 4, slow: 2 },
@@ -325,11 +323,11 @@ mod tests {
     fn non_positive_fast_period_returns_error() {
         let points = vec![rp(1, 1, 10.0)];
         assert_eq!(
-            compute(&points, "ema", 0, "ema", 26).unwrap_err(),
+            compute(&points, Ema, 0, Ema, 26).unwrap_err(),
             IndicatorError::InvalidMacdFastPeriod { n: 0 }
         );
         assert_eq!(
-            compute(&points, "ema", -3, "ema", 26).unwrap_err(),
+            compute(&points, Ema, -3, Ema, 26).unwrap_err(),
             IndicatorError::InvalidMacdFastPeriod { n: -3 }
         );
     }
@@ -338,29 +336,12 @@ mod tests {
     fn non_positive_slow_period_returns_error() {
         let points = vec![rp(1, 1, 10.0)];
         assert_eq!(
-            compute(&points, "ema", 12, "ema", 0).unwrap_err(),
+            compute(&points, Ema, 12, Ema, 0).unwrap_err(),
             IndicatorError::InvalidMacdSlowPeriod { n: 0 }
         );
         assert_eq!(
-            compute(&points, "ema", 12, "ema", -5).unwrap_err(),
+            compute(&points, Ema, 12, Ema, -5).unwrap_err(),
             IndicatorError::InvalidMacdSlowPeriod { n: -5 }
-        );
-    }
-
-    #[test]
-    fn unknown_ma_type_returns_error() {
-        let points = vec![rp(1, 1, 10.0)];
-        assert_eq!(
-            compute(&points, "wma", 12, "ema", 26).unwrap_err(),
-            IndicatorError::InvalidMacdMaType {
-                ma_type: "wma".to_string()
-            }
-        );
-        assert_eq!(
-            compute(&points, "ema", 12, "lwma", 26).unwrap_err(),
-            IndicatorError::InvalidMacdMaType {
-                ma_type: "lwma".to_string()
-            }
         );
     }
 
@@ -368,7 +349,7 @@ mod tests {
 
     #[test]
     fn empty_points_yield_empty_pair() {
-        let buffers = compute(&[], "ema", 12, "ema", 26).unwrap();
+        let buffers = compute(&[], Ema, 12, Ema, 26).unwrap();
         assert!(buffers.upcross_long_buffer.is_empty());
         assert!(buffers.upcross_short_buffer.is_empty());
     }
@@ -378,7 +359,7 @@ mod tests {
         // 12 points, fast=3, slow=5 -> line has 12 - 5 + 1 = 8 values,
         // shorter than the 9-bar signal window -> no signal line -> empty buffers.
         let points = points_from_closes(&[10.0; 12]);
-        let buffers = compute(&points, "ema", 3, "sma", 5).unwrap();
+        let buffers = compute(&points, Ema, 3, Sma, 5).unwrap();
         assert!(buffers.upcross_long_buffer.is_empty());
         assert!(buffers.upcross_short_buffer.is_empty());
     }
@@ -408,7 +389,7 @@ mod tests {
                 )
             })
             .collect();
-        let buffers = compute(&points, "ema", 1, "sma", 2).unwrap();
+        let buffers = compute(&points, Ema, 1, Sma, 2).unwrap();
 
         let expected_ts = [10000_i64, 11000, 12000, 13000, 14000];
         let long = &buffers.upcross_long_buffer;
@@ -480,7 +461,7 @@ mod tests {
     #[test]
     fn level2_real_macd_pair_matches_captured_baseline() {
         let points = test_support::eurusd_points();
-        let buffers = compute(&points, "ema", 12, "ema", 20).unwrap();
+        let buffers = compute(&points, Ema, 12, Ema, 20).unwrap();
         let long = &buffers.upcross_long_buffer;
         let short = &buffers.upcross_short_buffer;
 

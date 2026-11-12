@@ -135,6 +135,8 @@ pub fn create_indicator_output(
             fast_type,
             fast_n,
         } => {
+            let fast_type = macd::parse_ma_method(fast_type)?;
+            let slow_type = macd::parse_ma_method(slow_type)?;
             let buffers = macd::compute(points, fast_type, *fast_n, slow_type, *slow_n)?;
             Ok(IndicatorOutput::Crossover {
                 instrument,
