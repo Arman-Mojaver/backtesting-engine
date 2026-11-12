@@ -32,6 +32,10 @@ impl Default for GlobalStrategyFilter {
 }
 
 impl GlobalStrategyFilter {
+    pub fn admits_activity(&self, annual_operation_count: f64) -> bool {
+        annual_operation_count >= self.min_annual_operation_count
+    }
+
     pub fn admits_performance(&self, annual_roi: f64, max_draw_down: f64) -> bool {
         annual_roi >= self.min_annual_roi && max_draw_down <= self.max_draw_down_max
     }
@@ -70,6 +74,24 @@ mod tests {
         assert_eq!(filter.max_draw_down_max, 20.0);
         assert_eq!(filter.min_annual_roi, 5.0);
         assert_eq!(filter.min_annual_operation_count, 10.0);
+    }
+
+    #[test]
+    fn admits_activity_at_minimum() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(filter.admits_activity(10.0));
+    }
+
+    #[test]
+    fn rejects_activity_just_below_minimum() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(!filter.admits_activity(9.99));
+    }
+
+    #[test]
+    fn admits_activity_just_above_minimum() {
+        let filter = GlobalStrategyFilter::default();
+        assert!(filter.admits_activity(10.01));
     }
 
     #[test]

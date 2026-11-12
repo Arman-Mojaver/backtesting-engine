@@ -39,7 +39,7 @@ pub fn run_strategies(
     let global_filter = GlobalStrategyFilter::default();
     let filtered_groups = filter_signal_groups_by_annual_ops(
         signal_groups,
-        global_filter.min_annual_operation_count,
+        &global_filter,
         start_timestamp,
         end_timestamp,
     );
