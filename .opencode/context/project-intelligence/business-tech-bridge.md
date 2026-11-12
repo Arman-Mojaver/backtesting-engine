@@ -21,7 +21,7 @@
 | Indicator output → signals | `IndicatorOutput::create_signal_group()` | `src/domain/signal/mod.rs` | Oscillator/threshold/crossover semantics |
 | Money management strategy | `money_management_strategy_id` field | `src/domain/operation_point.rs`, `src/domain/strategy.rs` | Integer ID, no dedicated struct yet |
 | A backtested strategy | `Strategy` struct | `src/domain/strategy.rs` | instrument + indicator + op-point ID sets + MMS + metrics |
-| Strategy quality bar | `GlobalStrategyFilter` + `filter_strategies()` | `src/domain/strategy.rs` | Default: DD≤20%, ROI≥5% (op count pruned early on signal counts; final pruning downstream) |
+| Strategy quality bar | `GlobalStrategyFilter` (`admits_activity()`, `admits_performance()`) | `src/domain/strategy.rs` | Default: DD≤20%, ROI≥5%, ops≥10/yr on matched trades |
 | Annual return on investment | `annual_roi` field on `Strategy` | `src/domain/strategy.rs` | Computed by `PerformanceMetrics::annual_roi()` from global ROI + time span |
 | "How deep did it draw down?" / "What is the total return?" | `performance_metrics()` → `.max_draw_down` / `.global_roi` | `src/domain/performance_metrics.rs` | Single-pass fn over an owned `Vec<&OperationPoint>` (sorts it chronologically in place), returns % |
 | "How many trades per year?" | `annual_operation_count()` | `src/domain/annual_operation_count.rs` | Pure fn over `(count: usize, start_ts: i64, end_ts: i64)` |
@@ -35,8 +35,8 @@
 | Parquet base directory | `parquet_base_dir(env)` / `parquet_root_dir(env)` | `src/config/environment.rs` | `/app/parquet_files/{env}/strategy` and `/app/parquet_files/{env}` |
 | Fetch strategy inputs from DB | `fetch_source_data(query)` | `src/application/source_data.rs` | `(instrument, mms_id)` → `SourceData` |
 | Generate signal groups from indicators | `create_signals` → **`create_signal_groups`** | `src/application/signal_generator.rs` | REAL indicator outputs → signal semantics; rayon + `#[cached]` keyed `(indicator_id, instrument)` |
-| Build strategies from signal groups | `create_strategies()` | `src/application/strategy_generator.rs` | One strategy per signal group; computes real metrics; rayon-parallelized |
-| Run the full pipeline for one cell | `run_strategies()` | `src/application/strategy_runner.rs` | validate → signals → filter ops → strategies → filter DD/ROI |
+| Build strategies from signal groups | `create_strategies()` | `src/application/strategy_generator.rs` | One rayon pass: matched-trade count filter → real metrics → performance filter |
+| Run the full pipeline for one cell | `run_strategies()` | `src/application/strategy_runner.rs` | validate → signals → filter signal counts → strategies (filters matched ops, DD/ROI) |
 | Which indicators are already done? | `get_unprocessed()` | `src/application/strategy_runner_utils.rs` | Set-diff DB indicator IDs vs manifest |
 | One cell's compute result | `CellOutput` | `src/application/cell_output.rs` | instrument, mms_id, strategies, processed IDs |
 | Write strategies to parquet | `ParquetStrategyRepository::write_rows()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD; idempotent by indicator_id |
@@ -66,8 +66,8 @@ Business Question                              Code Path
 "How many trades per year?"               →   annual_operation_count(count, start_ts, end_ts)
 "Compute indicator values?"               →   create_indicator_output(&parameters, &resampled_points)
 "Generate signal groups?"                 →   create_signal_groups(&indicators, &resampled_points)  (real indicator math)
-"Which signal groups have enough ops?"    →   filter_signal_groups_by_annual_ops(groups, min_ops, start_ts, end_ts)
-"Which strategies pass the quality bar?"  →   filter_strategies(strategies, &GlobalStrategyFilter::default())
+"Which signal groups have enough ops?"    →   filter_signal_groups_by_annual_ops(groups, &filter, start_ts, end_ts)
+"Which strategies pass the quality bar?"  →   create_strategies(..., &filter, ...)  (admits_activity on matched trades, then admits_performance)
 "Create strategies for one cell?"         →   bte strategy create -m <mms_id> [-i <instrument>]
 "Create strategies for everything?"       →   bte strategy create_loop (load once → parallel cells → batch persist)
 "Which indicators are already processed?" →   StrategyPersistence::read_processed_ids_per_cell()

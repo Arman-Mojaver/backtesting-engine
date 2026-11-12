@@ -47,7 +47,7 @@ The engine is in **active development** — the strategy pipeline is real end-to
 - ✅ Engine CLI (`bte` binary: strategy create, create_loop)
 - ✅ Environment/DB configuration (production / development / testing)
 - ✅ PostgreSQL adapters for indicators, operation points, resampled points (+ indexed batch loads)
-- ✅ `Strategy` entity + `GlobalStrategyFilter` + `filter_strategies()` (DD ≤ 20%, ROI ≥ 5%)
+- ✅ `Strategy` entity + `GlobalStrategyFilter` with `admits_activity()` / `admits_performance()` (DD ≤ 20%, ROI ≥ 5%, ops ≥ 10/yr on matched trades)
 - ✅ Application layer (`fetch_source_data`, `create_signal_groups`, `create_strategies`, `run_strategies`)
 - ✅ Performance metrics: single-pass `performance_metrics()` (global ROI + max draw down), `annual_roi()`, `annual_operation_count()` — pure domain functions
 - ✅ Real metrics computed in the strategy generator (rayon-parallelized)

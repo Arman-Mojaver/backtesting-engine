@@ -30,14 +30,14 @@
 | **Annual ROI** | Annualized return on investment for a strategy. Computed by compounding the global ROI over the time span; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` (method) |
 | **Max Draw Down** | Largest peak-to-trough decline of the cumulative-return curve, as a percentage. Computed from operation points via compounding against a running cummax; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` |
 | **Annual Operation Count** | Number of trades per year, annualized from a total count over the time span. Computed from signal-group operation counts; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_operation_count` |
-| **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 20%, min annual ROI ≥ 5%. Annual operation count ≥ 10 is a global business minimum: this engine only prunes early on signal counts (an upper bound on matched operation points, so nothing that would pass is lost); final pruning on the stored count happens downstream. | `GlobalStrategyFilter` | `domain::strategy` |
-| **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus an `operation_count()` derived from its signals. Lives in the domain layer. | `SignalGroup` | `domain::signal_group` |
+| **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 20%, min annual ROI ≥ 5%. Annual operation count ≥ 10, checked on matched trades (the stored count). Owns the threshold checks: `admits_activity()` and `admits_performance()`. | `GlobalStrategyFilter` | `domain::strategy` |
+| **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus a `signal_count()` derived from its signals. Lives in the domain layer. | `SignalGroup` | `domain::signal_group` |
 | **Cell** | One `(instrument, mms_id)` pair — the unit of work for `create_loop`. Cells are computed in parallel and persisted as one Parquet partition each. | `Cell`, `CellOutput` | `domain::cell`, `application::cell_output`, `engine::strategy::create_loop` |
 | **Parquet Strategy Repository** | Writes strategies to partitioned parquet files under `{base}/instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. Dedups fresh rows by `indicator_id` (idempotent partitions). | `ParquetStrategyRepository` | `infrastructure::strategy_adapter` |
 | **Processed Manifest** | Parquet ledger of completed `(instrument, mms_id, indicator_id)` triples with `processed_at` timestamps. Makes `create`/`create_loop` idempotent. Atomic writes (temp + rename); dedup per triple. | `ParquetProcessedManifest` | `infrastructure::processed_manifest` |
 | **Strategy Persistence** | Batch commit for `create_loop`: assigns `strategy_id`s from the global max, writes partitions in parallel (rayon), commits the manifest once. | `StrategyPersistence` | `infrastructure::strategy_persistence` |
 | **Strategy Runner** | The core use case: validate → signal groups → filter by annual ops → create strategies (real metrics) → filter by DD/ROI. | `run_strategies` | `application::strategy_runner` |
-| **Strategy Generator** | Builds `Strategy` records from signal groups + operation points, computing real metrics (`annual_roi`, `max_draw_down`, `annual_operation_count`) for each. Parallelized with rayon. | `create_strategies` | `application::strategy_generator` |
+| **Strategy Generator** | Builds `Strategy` records from signal groups + operation points in one rayon pass: drops groups below the minimum matched annual operation count, computes real metrics (`annual_roi`, `max_draw_down`, `annual_operation_count`) for the rest, and keeps only those passing the performance check. | `create_strategies` | `application::strategy_generator` |
 | **Source Data** | The fetched-from-PostgreSQL inputs for strategy generation: indicators, resampled points, long/short operation points for one (instrument, mms_id). | `SourceData`, `fetch_source_data` | `application::source_data` |
 | **Global ROI** | Total return on investment across a sequence of operation points, as a percentage. Compounds each trade's contribution against a running cummax. Computed together with max draw down in one pass. | `f64` field on `PerformanceMetrics` | `domain::performance_metrics` |
 | **Signal Generator** | Produces `SignalGroup`s from indicators + resampled points by computing real indicator outputs (`create_indicator_output`) and applying signal semantics (zero-cross / threshold / crossover). Memoized per `(indicator_id, instrument)` via the `cached` crate. | `create_signal_groups` | `application::signal_generator` |
@@ -152,13 +152,15 @@ Strategy {
 ```
 
 ### GlobalStrategyFilter
-Default thresholds for `filter_strategies()`. `Default`: max_draw_down_max=20.0, min_annual_roi=5.0, min_annual_operation_count=10.0.
+The single home of strategy thresholds and their checks. `Default`: max_draw_down_max=20.0, min_annual_roi=5.0, min_annual_operation_count=10.0.
 ```
 GlobalStrategyFilter { max_draw_down_max: f64, min_annual_roi: f64, min_annual_operation_count: f64 }
+// Method: admits_activity(annual_operation_count) -> bool — count >= min
+// Method: admits_performance(annual_roi, max_draw_down) -> bool — ROI >= min && DD <= max
 ```
 
 ### SignalGroup
-A group of signal timestamps (long and short) for a single indicator. Embeds its `indicator_id` and `instrument`, plus an `operation_count()` derived from its signals. Lives in the domain layer.
+A group of signal timestamps (long and short) for a single indicator. Embeds its `indicator_id` and `instrument`, plus a `signal_count()` derived from its signals. Lives in the domain layer.
 ```
 SignalGroup {
     indicator_id:     i32       — which indicator this group belongs to
@@ -166,9 +168,9 @@ SignalGroup {
     short_signals:    Vec<i64>  — short signal timestamps
     instrument:       String    — which instrument the signals were computed on
 }
-// Method: operation_count() -> usize — long.len() + short.len()
-// Free fn: filter_signal_groups_by_annual_ops(groups, min_ops, start_ts, end_ts) -> Vec<SignalGroup>
-//          Keeps groups whose annualized operation count >= min_ops and have > 0 ops.
+// Method: signal_count() -> usize — long.len() + short.len()
+// Free fn: filter_signal_groups_by_annual_ops(groups, &filter, start_ts, end_ts) -> Vec<SignalGroup>
+//          Keeps groups with > 0 signals whose annualized signal count passes filter.admits_activity().
 ```
 
 ---
@@ -182,8 +184,7 @@ Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` r
 | `annual_operation_count` | `domain::annual_operation_count` | `(total_count: usize, start_ts: i64, end_ts: i64) -> f64` | `total_count / years`, where `years = (end-start)/86400/365.25` (rounded 2dp). Returns 0.0 for zero count or non-positive span. |
 | `performance_metrics` | `domain::performance_metrics` | `(ops: Vec<&OperationPoint>) -> PerformanceMetrics` | Sorts the owned ops chronologically in place (stable; ties keep input order), then ONE pass: `cumsum = 1 + Σ(cummax * result * risk/sl)` with running `cummax`. Returns `{ global_roi: (cumsum - 1) * 100, max_draw_down: deepest (cummax - cumsum)/cummax * 100 }`, each rounded to 2dp independently. Both 0.0 for empty ops. |
 | `PerformanceMetrics::annual_roi` | `domain::performance_metrics` | `(&self, start_ts: i64, end_ts: i64) -> f64` | Annualizes `self.global_roi` via compounding: `((1 + roi/100)^(1/years) - 1) * 100`, rounded to 2dp. Returns 0.0 for non-positive span. |
-| `filter_signal_groups_by_annual_ops` | `domain::signal_group` | `(groups: Vec<SignalGroup>, min_ops: f64, start_ts: i64, end_ts: i64) -> Vec<SignalGroup>` | Keeps groups with `operation_count() > 0` and `annual_operation_count(count, start, end) >= min_ops`. |
-| `filter_strategies` | `domain::strategy` | `(strategies: Vec<Strategy>, filter: &GlobalStrategyFilter) -> Vec<Strategy>` | Keeps strategies with `max_draw_down ≤ max` and `annual_roi ≥ min`. (Annual operation count is only pruned early, on signal counts, at the signal-group stage; final pruning happens downstream.) |
+| `filter_signal_groups_by_annual_ops` | `domain::signal_group` | `(groups: Vec<SignalGroup>, filter: &GlobalStrategyFilter, start_ts: i64, end_ts: i64) -> Vec<SignalGroup>` | Keeps groups with `signal_count() > 0` and `filter.admits_activity(annual_operation_count(signal_count, start, end))`. Raw signals are an upper bound on matched trades, so this never drops a passing group. |
 
 ---
 
@@ -230,8 +231,8 @@ PG adapters expose no extra public read methods beyond the repository traits.
 |------|------|---------|
 | `fetch_source_data` | `application::source_data` | Connects to PG via `DbConfig::from_env`, fetches indicators/resampled/long/short for one (instrument, mms_id). Rich connection diagnostics on failure. |
 | `create_signal_groups` | `application::signal_generator` | Computes REAL indicator outputs (`create_indicator_output`) and converts them to `SignalGroup`s via signal semantics. Rayon `par_iter`; per-indicator memoization via `#[cached]` keyed `(indicator_id, instrument)`. Indicators that fail to compute are logged as warnings and skipped, not aborted. |
-| `create_strategies` | `application::strategy_generator` | Builds one `Strategy` per signal group, gathering referenced operation points and computing real metrics. Parallelized with **rayon** `par_iter()`. |
-| `run_strategies` | `application::strategy_runner` | The core use case: `validate_all` → `create_signal_groups` → `filter_signal_groups_by_annual_ops` → `create_strategies` → `filter_strategies`. |
+| `create_strategies` | `application::strategy_generator` | One **rayon** `par_iter()` pass per signal group: counts matched trades and drops the group unless `admits_activity()`; builds the `Strategy` with real metrics; keeps it only if `admits_performance()`. Survivors keep input order. |
+| `run_strategies` | `application::strategy_runner` | The core use case: `validate_all` → `create_signal_groups` → `filter_signal_groups_by_annual_ops` → `create_strategies` (matched-trade and performance filters inside). |
 | `get_unprocessed` | `application::strategy_runner_utils` | Set-diff of all indicator IDs vs manifest-processed IDs. |
 | `CellOutput` | `application::cell_output` | One cell's compute result: instrument, mms_id, strategies, processed indicator IDs. |
 
@@ -285,8 +286,8 @@ src/
 │   ├── cell_output.rs          # CellOutput — one (instrument, mms_id) cell's compute result
 │   ├── signal_generator.rs     # create_signal_groups() — REAL indicator-derived signals
 │   ├── source_data.rs          # fetch_source_data() — PG-backed data assembly
-│   ├── strategy_generator.rs   # create_strategies() / create_strategy() — real metrics
-│   ├── strategy_runner.rs      # run_strategies() — validate → signals → filter → strategies → filter
+│   ├── strategy_generator.rs   # create_strategies() / create_strategy() — staged filters + real metrics
+│   ├── strategy_runner.rs      # run_strategies() — validate → signals → filter → strategies
 │   └── strategy_runner_utils.rs # get_unprocessed() — manifest diffing
 ├── domain/                     # Pure domain logic — no I/O, no frameworks
 │   ├── cell.rs                 # Cell — the (instrument, mms_id) unit of work; Display + Ord
@@ -306,7 +307,7 @@ src/
 │   │   ├── thresholds.rs       # threshold-crossing signals
 │   │   └── crossover.rs        # diff-of-buffers → zero-cross signals
 │   ├── signal_group.rs         # SignalGroup + filter_signal_groups_by_annual_ops()
-│   ├── strategy.rs             # Strategy + GlobalStrategyFilter + filter_strategies()
+│   ├── strategy.rs             # Strategy + GlobalStrategyFilter (admits_activity / admits_performance)
 │   ├── annual_operation_count.rs  # annual_operation_count() metric
 │   ├── performance_metrics.rs  # performance_metrics() -> PerformanceMetrics (single pass) + annual_roi() method
 │   ├── time_span.rs            # difference_in_years() shared by annualised metrics
@@ -343,11 +344,11 @@ src/
 6. **Single-binary engine layout**: `bte` (`src/bin/bte.rs`) is the sole Rust CLI; it follows the `build -> parse -> execute` pattern and returns `anyhow::Result<()>`. The previous `ct` operator frontend (which forwarded engine commands via Docker exec and Python CLI commands via the `api` container) was removed in the commit that dropped `src/cli/` and `src/main.rs` — data CRUD and the iteration table are now reached exclusively in the companion Python service.
 7. **Application layer**: `src/application/` orchestrates domain + infrastructure. Keeps `engine/` CLI handlers thin. One file per use case.
 8. **Metrics as pure domain functions**: `performance_metrics()` takes an owned `Vec<&OperationPoint>` (sorted in place, no copy) and returns `PerformanceMetrics` (`global_roi` + `max_draw_down`) computed in a single pass over the shared compounding curve, sorting its input chronologically itself (stable; ties keep input order). `annual_roi` is a method on `PerformanceMetrics`. No I/O — composable and unit-tested in isolation.
-9. **Two-stage filtering**: `filter_signal_groups_by_annual_ops()` prunes signal groups by annual operation count first (cheap), then `filter_strategies(strategies, &GlobalStrategyFilter)` prunes by max draw down + annual ROI (expensive, runs on fewer candidates). `GlobalStrategyFilter::default()` encodes the baseline quality bar (DD ≤ 20%, ROI ≥ 5%, ops ≥ 10/yr).
+9. **Staged filtering**: each check runs at the earliest stage where its input exists. (1) `filter_signal_groups_by_annual_ops()` on raw signal counts (free, upper bound); (2) inside `create_strategies`, on matched-trade counts (hash lookups, no allocation), before any metrics; (3) inside the same parallel pass, on max draw down + annual ROI (expensive). All thresholds and checks live on `GlobalStrategyFilter` (`admits_activity`, `admits_performance`); `GlobalStrategyFilter::default()` encodes the baseline quality bar (DD ≤ 20%, ROI ≥ 5%, ops ≥ 10/yr).
 10. **Parquet partitioning by (instrument, mms_id)**: Strategies are written as partitioned parquet files — `instrument=.../money_management_strategy_id=.../strategies.parquet`. Matches the single-instrument, single-MMS backtest constraint and enables efficient per-partition reads.
 11. **Typed indicator parameters**: `IndicatorParameters` is a 14-variant enum — the PG adapter deserializes the JSON `parameters` column with `serde_json`, selecting the variant by the `type` column.
 12. **Real metrics in the generator**: `create_strategies()` computes `performance_metrics()` → `annual_roi()`, plus `annual_operation_count`, from each strategy's referenced operation points. Parallelized with **rayon** `par_iter()`.
-13. **`SignalGroup` lives in the domain**: `SignalGroup` embeds `indicator_id`, `instrument`, and a precomputed `operation_count`. The cache stores `Vec<SignalGroup>` — IDs travel with each group.
+13. **`SignalGroup` lives in the domain**: `SignalGroup` embeds `indicator_id`, `instrument`, and a derived `signal_count()`. The cache stores `Vec<SignalGroup>` — IDs travel with each group.
 14. **Timestamps are `i64`**: All timestamps are `i64` epoch seconds. The PG adapter casts `i32` DB columns to `i64` on read.
 15. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. IDs are assigned at parquet write time (global max across all partitions + 1). Keeps the domain free of persistence concerns.
 16. **Idempotent parquet partitions**: `write_partition` dedups fresh rows by `indicator_id` against existing rows — re-runs never duplicate strategies for the same indicator.
