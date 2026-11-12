@@ -102,7 +102,7 @@ impl SourceIndex {
 enum CellOutcome {
     Computed(CellOutput),
     AlreadyProcessed,
-    Failed { instrument: String, mms_id: i32 },
+    Failed(Cell),
 }
 
 fn compute_cell(
@@ -110,8 +110,6 @@ fn compute_cell(
     cell: &Cell,
     processed_ids_per_cell: &FxHashMap<Cell, FxHashSet<i32>>,
 ) -> CellOutcome {
-    let Cell { instrument, mms_id } = cell;
-
     let empty_processed_ids: FxHashSet<i32> = FxHashSet::default();
     let processed_ids = processed_ids_per_cell
         .get(cell)
@@ -123,24 +121,21 @@ fn compute_cell(
 
     let strategies = match run_strategies(
         &unprocessed_indicators,
-        source.resampled_points(instrument),
+        source.resampled_points(&cell.instrument),
         source.long_operation_points(cell),
         source.short_operation_points(cell),
-        *mms_id,
+        cell.mms_id,
     ) {
         Ok(strategies) => strategies,
         Err(e) => {
-            error!("{instrument} (mms_id={mms_id}): {e:#}");
-            return CellOutcome::Failed {
-                instrument: instrument.clone(),
-                mms_id: *mms_id,
-            };
+            error!("{cell}: {e:#}");
+            return CellOutcome::Failed(cell.clone());
         }
     };
 
     CellOutcome::Computed(CellOutput {
-        instrument: instrument.clone(),
-        mms_id: *mms_id,
+        instrument: cell.instrument.clone(),
+        mms_id: cell.mms_id,
         strategies,
         computed_indicator_ids: indicator_ids(&unprocessed_indicators),
     })
@@ -149,7 +144,7 @@ fn compute_cell(
 struct BatchSummary {
     computed: usize,
     skipped: usize,
-    failed_cells: Vec<(String, i32)>,
+    failed_cells: Vec<Cell>,
 }
 
 impl BatchSummary {
@@ -166,7 +161,7 @@ fn split_outcomes(outcomes: Vec<CellOutcome>) -> (Vec<CellOutput>, BatchSummary)
         match outcome {
             CellOutcome::Computed(cell_output) => computed_cells.push(cell_output),
             CellOutcome::AlreadyProcessed => skipped = skipped.saturating_add(1),
-            CellOutcome::Failed { instrument, mms_id } => failed_cells.push((instrument, mms_id)),
+            CellOutcome::Failed(cell) => failed_cells.push(cell),
         }
     }
 
@@ -178,11 +173,8 @@ fn split_outcomes(outcomes: Vec<CellOutcome>) -> (Vec<CellOutput>, BatchSummary)
     (computed_cells, summary)
 }
 
-fn format_failed_cells(failed_cells: &[(String, i32)]) -> String {
-    failed_cells
-        .iter()
-        .map(|(instrument, mms_id)| format!("{instrument} (mms_id={mms_id})"))
-        .join(", ")
+fn format_failed_cells(failed_cells: &[Cell]) -> String {
+    failed_cells.iter().join(", ")
 }
 
 pub fn execute() -> anyhow::Result<()> {
@@ -293,10 +285,7 @@ mod tests {
     }
 
     fn failed_outcome(instrument: &str, mms_id: i32) -> CellOutcome {
-        CellOutcome::Failed {
-            instrument: instrument.to_string(),
-            mms_id,
-        }
+        CellOutcome::Failed(Cell::new(instrument, mms_id))
     }
 
     #[test]
@@ -358,7 +347,7 @@ mod tests {
         let (_, summary) = split_outcomes(outcomes);
         assert_eq!(
             summary.failed_cells,
-            vec![("EURUSD".to_string(), 7), ("USDJPY".to_string(), 3),]
+            vec![Cell::new("EURUSD", 7), Cell::new("USDJPY", 3)]
         );
     }
 
@@ -383,7 +372,7 @@ mod tests {
 
     #[test]
     fn format_failed_cells_matches_the_per_cell_error_shape() {
-        let failed_cells = vec![("EURUSD".to_string(), 7), ("USDJPY".to_string(), 3)];
+        let failed_cells = vec![Cell::new("EURUSD", 7), Cell::new("USDJPY", 3)];
         assert_eq!(
             format_failed_cells(&failed_cells),
             "EURUSD (mms_id=7), USDJPY (mms_id=3)"
@@ -502,10 +491,10 @@ mod tests {
 
         let outcome = compute_cell(&source, &eurusd_cell(), &FxHashMap::default());
 
-        let CellOutcome::Failed { instrument, mms_id } = outcome else {
+        let CellOutcome::Failed(cell) = outcome else {
             panic!("expected the cell to fail");
         };
-        assert_eq!((instrument.as_str(), mms_id), ("EURUSD", 1));
+        assert_eq!(cell, eurusd_cell());
     }
 
     #[test]
