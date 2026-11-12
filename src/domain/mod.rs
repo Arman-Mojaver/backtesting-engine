@@ -1,5 +1,6 @@
 pub mod annual_operation_count;
 pub mod cast;
+pub mod cell;
 #[cfg(test)]
 pub mod fixtures;
 pub mod indicator;
