@@ -8,6 +8,7 @@
 //! type but carries no signal period, so the engine fixes it at the MQL5
 //! default.
 use crate::domain::cast;
+use crate::domain::indicator::MovingAverageType;
 use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::indicators::IndicatorError;
 use crate::domain::resampled_point::ResampledPointD1;
@@ -21,26 +22,20 @@ use crate::validate_period;
 /// carries the reference default as a constant.
 const SIGNAL_N: i32 = 9;
 
-#[derive(Clone, Copy)]
-enum MaMethod {
-    Ema,
-    Sma,
-}
-
-fn parse_ma_method(ma_type: &str) -> Result<MaMethod, IndicatorError> {
+fn parse_ma_method(ma_type: &str) -> Result<MovingAverageType, IndicatorError> {
     match ma_type {
-        "ema" => Ok(MaMethod::Ema),
-        "sma" => Ok(MaMethod::Sma),
+        "ema" => Ok(MovingAverageType::Ema),
+        "sma" => Ok(MovingAverageType::Sma),
         _ => Err(IndicatorError::InvalidMacdMaType {
             ma_type: ma_type.to_string(),
         }),
     }
 }
 
-fn moving_average(values: &[f64], method: MaMethod, period: usize) -> Vec<f64> {
-    match method {
-        MaMethod::Ema => ema(values, period),
-        MaMethod::Sma => sma(values, period),
+fn moving_average(values: &[f64], ma_type: MovingAverageType, period: usize) -> Vec<f64> {
+    match ma_type {
+        MovingAverageType::Ema => ema(values, period),
+        MovingAverageType::Sma => sma(values, period),
     }
 }
 

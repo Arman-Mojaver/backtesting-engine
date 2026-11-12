@@ -50,6 +50,12 @@ pub enum IndicatorParameters {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MovingAverageType {
+    Ema,
+    Sma,
+}
+
 #[derive(Debug, Clone)]
 pub struct Indicator {
     pub id: i32,
