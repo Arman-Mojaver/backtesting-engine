@@ -1,6 +1,8 @@
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
+use crate::domain::cell::Cell;
+
 #[derive(Debug, Clone)]
 pub struct OperationPoint {
     pub id: i32,
@@ -44,12 +46,15 @@ impl OperationPoints<'_> {
     }
 }
 
-fn group_by_cell(points: Vec<OperationPoint>) -> FxHashMap<(String, i32), Vec<OperationPoint>> {
+fn group_by_cell(points: Vec<OperationPoint>) -> FxHashMap<Cell, Vec<OperationPoint>> {
     points
         .into_iter()
         .fold(FxHashMap::default(), |mut points_by_cell, point| {
             points_by_cell
-                .entry((point.instrument.clone(), point.money_management_strategy_id))
+                .entry(Cell::new(
+                    point.instrument.clone(),
+                    point.money_management_strategy_id,
+                ))
                 .or_default()
                 .push(point);
             points_by_cell
@@ -64,7 +69,7 @@ pub trait LongOperationPointRepository {
         instrument: &str,
     ) -> anyhow::Result<Vec<OperationPoint>>;
 
-    fn index_by_cell(&self) -> anyhow::Result<FxHashMap<(String, i32), Vec<OperationPoint>>> {
+    fn index_by_cell(&self) -> anyhow::Result<FxHashMap<Cell, Vec<OperationPoint>>> {
         Ok(group_by_cell(self.get_all()?))
     }
 }
@@ -77,7 +82,7 @@ pub trait ShortOperationPointRepository {
         instrument: &str,
     ) -> anyhow::Result<Vec<OperationPoint>>;
 
-    fn index_by_cell(&self) -> anyhow::Result<FxHashMap<(String, i32), Vec<OperationPoint>>> {
+    fn index_by_cell(&self) -> anyhow::Result<FxHashMap<Cell, Vec<OperationPoint>>> {
         Ok(group_by_cell(self.get_all()?))
     }
 }
@@ -236,7 +241,7 @@ mod tests {
 
         let index = group_by_cell(points);
         let ids_in = |instrument: &str, mms_id: i32| -> Vec<i32> {
-            index[&(instrument.to_string(), mms_id)]
+            index[&Cell::new(instrument, mms_id)]
                 .iter()
                 .map(|p| p.id)
                 .collect()

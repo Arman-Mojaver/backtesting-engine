@@ -13,6 +13,7 @@ use crate::application::strategy_runner_utils::{get_unprocessed, indicator_ids};
 use crate::config::environment::{
     parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig,
 };
+use crate::domain::cell::Cell;
 use crate::domain::indicator::{Indicator, IndicatorRepository};
 use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
@@ -58,8 +59,10 @@ impl SourceIndex {
         let indicators = indicators.context("failed to load indicators")?;
         let resampled_by_instrument =
             resampled_by_instrument.context("failed to load resampled points")?;
-        let long_by_cell = long_by_cell.context("failed to load long operation points")?;
-        let short_by_cell = short_by_cell.context("failed to load short operation points")?;
+        let long_by_cell =
+            into_tuple_keys(long_by_cell.context("failed to load long operation points")?);
+        let short_by_cell =
+            into_tuple_keys(short_by_cell.context("failed to load short operation points")?);
         info!("Source data loaded in {:?}", load_start.elapsed());
 
         Ok(Self {
@@ -96,6 +99,16 @@ impl SourceIndex {
     fn short_operation_points(&self, cell: &(String, i32)) -> &[OperationPoint] {
         self.short_by_cell.get(cell).map_or(&[], Vec::as_slice)
     }
+}
+
+// Temporary: removed once `SourceIndex` is keyed by `Cell`.
+fn into_tuple_keys(
+    points_by_cell: FxHashMap<Cell, Vec<OperationPoint>>,
+) -> FxHashMap<(String, i32), Vec<OperationPoint>> {
+    points_by_cell
+        .into_iter()
+        .map(|(cell, points)| ((cell.instrument, cell.mms_id), points))
+        .collect()
 }
 
 enum CellOutcome {
