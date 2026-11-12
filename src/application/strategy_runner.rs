@@ -7,7 +7,7 @@ use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::{OperationPoint, OperationPoints};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal_group::filter_signal_groups_by_annual_ops;
-use crate::domain::strategy::{filter_strategies, GlobalStrategyFilter, Strategy};
+use crate::domain::strategy::{GlobalStrategyFilter, Strategy};
 use crate::domain::validation::validate_all;
 
 pub fn run_strategies(
@@ -58,8 +58,6 @@ pub fn run_strategies(
         start_timestamp,
         end_timestamp,
     );
-
-    let strategies = filter_strategies(strategies, &global_filter);
     debug!(
         "{instrument} (mms_id={money_management_strategy_id}): after strategy filter (min annual ROI {}, max drawdown {}): {} strategies",
         global_filter.min_annual_roi,

@@ -39,6 +39,7 @@ pub fn create_strategies(
                 end_timestamp,
             )
         })
+        .filter(|strategy| filter.admits_performance(strategy.annual_roi, strategy.max_draw_down))
         .collect()
 }
 
@@ -210,8 +211,10 @@ mod tests {
     }
 
     #[test]
-    fn create_strategies_returns_one_strategy_per_group_in_input_order() {
-        let long_ops = vec![op_point(31, 30, 1000)];
+    fn create_strategies_returns_survivors_in_input_order() {
+        // A +60 long compounds to ROI 6.0 (passes the default min of 5);
+        // a -20 short loses 2.0 (fails it).
+        let long_ops = vec![op_point(31, 60, 1000)];
         let short_ops = vec![op_point(32, -20, 1000)];
         let operation_points = OperationPoints {
             long_operation_points: &long_ops,
@@ -220,7 +223,18 @@ mod tests {
         let indicator_ids: Vec<i32> = (1..=64).rev().collect();
         let groups: Vec<SignalGroup> = indicator_ids
             .iter()
-            .map(|&id| group(id, vec![1000], vec![]))
+            .map(|&id| {
+                if id % 2 == 0 {
+                    group(id, vec![1000], vec![])
+                } else {
+                    group(id, vec![], vec![1000])
+                }
+            })
+            .collect();
+        let even_ids: Vec<i32> = indicator_ids
+            .iter()
+            .copied()
+            .filter(|id| id % 2 == 0)
             .collect();
 
         let strategies = create_strategies(
@@ -233,7 +247,7 @@ mod tests {
         );
 
         let result_ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
-        assert_eq!(result_ids, indicator_ids);
+        assert_eq!(result_ids, even_ids);
         assert!(strategies
             .iter()
             .all(|s| s.long_operation_point_ids == vec![31]));
