@@ -42,12 +42,12 @@ impl StrategyPersistence {
         // strategy_id is persistence-assigned: new ids start from the global max
         // across all partitions, so they stay unique across the whole tree.
         let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
-        let mut dto_cells: Vec<PartitionWrite> = Vec::with_capacity(cells.len());
+        let mut partition_writes: Vec<PartitionWrite> = Vec::with_capacity(cells.len());
         let mut manifest_entries: Vec<ManifestEntry> = Vec::with_capacity(cells.len());
         for cell in cells {
-            let mut strategy_rows = Vec::with_capacity(cell.strategies.len());
+            let mut rows = Vec::with_capacity(cell.strategies.len());
             for strategy in cell.strategies {
-                strategy_rows.push(StrategyRow::from_strategy(strategy, next_id));
+                rows.push(StrategyRow::from_strategy(strategy, next_id));
                 next_id = next_id.saturating_add(1);
             }
             manifest_entries.push(ManifestEntry {
@@ -55,20 +55,20 @@ impl StrategyPersistence {
                 mms_id: cell.mms_id,
                 indicator_ids: cell.computed_indicator_ids,
             });
-            dto_cells.push(PartitionWrite {
+            partition_writes.push(PartitionWrite {
                 instrument: cell.instrument,
                 mms_id: cell.mms_id,
-                rows: strategy_rows,
+                rows,
             });
         }
 
-        dto_cells.into_par_iter().try_for_each(|c| {
+        partition_writes.into_par_iter().try_for_each(|write| {
             self.strategies
-                .write_rows(&c.instrument, c.mms_id, c.rows)
+                .write_rows(&write.instrument, write.mms_id, write.rows)
                 .with_context(|| {
                     format!(
                         "failed to write partition {} (mms_id={})",
-                        c.instrument, c.mms_id
+                        write.instrument, write.mms_id
                     )
                 })
         })?;
