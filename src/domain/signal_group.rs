@@ -9,7 +9,7 @@ pub struct SignalGroup {
 }
 
 impl SignalGroup {
-    pub const fn operation_count(&self) -> usize {
+    pub const fn signal_count(&self) -> usize {
         self.long_signals
             .len()
             .saturating_add(self.short_signals.len())
@@ -25,9 +25,9 @@ pub fn filter_signal_groups_by_annual_ops(
     signal_groups
         .into_iter()
         .filter(|signal_group| {
-            signal_group.operation_count() > 0
+            signal_group.signal_count() > 0
                 && annual_operation_count(
-                    signal_group.operation_count(),
+                    signal_group.signal_count(),
                     start_timestamp,
                     end_timestamp,
                 ) >= min_annual_operation_count
@@ -53,25 +53,25 @@ mod tests {
     #[test]
     fn both_empty_returns_zero() {
         let group = make_group(0, 0);
-        assert_eq!(group.operation_count(), 0);
+        assert_eq!(group.signal_count(), 0);
     }
 
     #[test]
     fn only_longs_returns_long_count() {
         let group = make_group(5, 0);
-        assert_eq!(group.operation_count(), 5);
+        assert_eq!(group.signal_count(), 5);
     }
 
     #[test]
     fn only_shorts_returns_short_count() {
         let group = make_group(0, 3);
-        assert_eq!(group.operation_count(), 3);
+        assert_eq!(group.signal_count(), 3);
     }
 
     #[test]
     fn both_populated_returns_sum() {
         let group = make_group(4, 7);
-        assert_eq!(group.operation_count(), 11);
+        assert_eq!(group.signal_count(), 11);
     }
 
     #[test]
