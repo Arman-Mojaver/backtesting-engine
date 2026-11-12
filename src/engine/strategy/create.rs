@@ -11,6 +11,7 @@ use crate::application::strategy_runner_utils::{get_unprocessed, indicator_ids};
 use crate::config::environment::{
     parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig,
 };
+use crate::domain::cell::Cell;
 use crate::infrastructure::strategy_persistence::StrategyPersistence;
 
 pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
@@ -96,7 +97,7 @@ fn read_processed_indicator_ids(
                 "failed to read processed manifest for {instrument} (mms_id={money_management_strategy_id})"
             )
         })?;
-    let cell = (instrument.to_string(), money_management_strategy_id);
+    let cell = Cell::new(instrument, money_management_strategy_id);
     Ok(processed_ids_per_cell.remove(&cell).unwrap_or_default())
 }
 

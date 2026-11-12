@@ -5,6 +5,7 @@ use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::application::cell_output::CellOutput;
+use crate::domain::cell::Cell;
 use crate::infrastructure::processed_manifest::{
     unix_now_secs, ManifestEntry, ParquetProcessedManifest,
 };
@@ -40,9 +41,7 @@ impl StrategyPersistence {
         }
     }
 
-    pub fn read_processed_ids_per_cell(
-        &self,
-    ) -> anyhow::Result<FxHashMap<(String, i32), FxHashSet<i32>>> {
+    pub fn read_processed_ids_per_cell(&self) -> anyhow::Result<FxHashMap<Cell, FxHashSet<i32>>> {
         self.manifest.read_processed_ids_per_cell()
     }
 
@@ -263,13 +262,13 @@ mod tests {
 
         // Manifest records the full processed set, including 2003 (which had no strategy).
         let processed = persistence.read_processed_ids_per_cell().unwrap();
-        let eur = processed.get(&("EURUSD".to_string(), 390)).unwrap();
+        let eur = processed.get(&Cell::new("EURUSD", 390)).unwrap();
         assert_eq!(eur.len(), 3);
         assert!(eur.contains(&2001));
         assert!(eur.contains(&2002));
         assert!(eur.contains(&2003));
 
-        let usd = processed.get(&("USDJPY".to_string(), 400)).unwrap();
+        let usd = processed.get(&Cell::new("USDJPY", 400)).unwrap();
         assert_eq!(usd.len(), 1);
         assert!(usd.contains(&3001));
     }

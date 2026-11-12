@@ -102,12 +102,10 @@ impl SourceIndex {
 }
 
 // Temporary: removed once `SourceIndex` is keyed by `Cell`.
-fn into_tuple_keys(
-    points_by_cell: FxHashMap<Cell, Vec<OperationPoint>>,
-) -> FxHashMap<(String, i32), Vec<OperationPoint>> {
-    points_by_cell
+fn into_tuple_keys<V>(by_cell: FxHashMap<Cell, V>) -> FxHashMap<(String, i32), V> {
+    by_cell
         .into_iter()
-        .map(|(cell, points)| ((cell.instrument, cell.mms_id), points))
+        .map(|(cell, value)| ((cell.instrument, cell.mms_id), value))
         .collect()
 }
 
@@ -203,9 +201,11 @@ pub fn execute() -> anyhow::Result<()> {
     let source = SourceIndex::load(&DbConfig::from_env(env))?;
     let cells = source.cells();
     let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
-    let processed_ids_per_cell = persistence
-        .read_processed_ids_per_cell()
-        .context("failed to read processed manifest")?;
+    let processed_ids_per_cell = into_tuple_keys(
+        persistence
+            .read_processed_ids_per_cell()
+            .context("failed to read processed manifest")?,
+    );
 
     let (computed, summary) = compute_cells(&source, &cells, &processed_ids_per_cell);
     persist_computed_cells(&persistence, computed)?;

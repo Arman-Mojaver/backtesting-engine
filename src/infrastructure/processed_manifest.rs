@@ -17,6 +17,8 @@ use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::domain::cell::Cell;
+
 static TEMP_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// Unique per call so concurrent writes never share a temp file, and in
@@ -89,12 +91,10 @@ impl ParquetProcessedManifest {
         write_atomically(&self.path(), &rows)
     }
 
-    pub fn read_processed_ids_per_cell(
-        &self,
-    ) -> anyhow::Result<FxHashMap<(String, i32), FxHashSet<i32>>> {
-        let mut map: FxHashMap<(String, i32), FxHashSet<i32>> = FxHashMap::default();
+    pub fn read_processed_ids_per_cell(&self) -> anyhow::Result<FxHashMap<Cell, FxHashSet<i32>>> {
+        let mut map: FxHashMap<Cell, FxHashSet<i32>> = FxHashMap::default();
         for row in self.read_all()? {
-            map.entry((row.instrument, row.mms_id))
+            map.entry(Cell::new(row.instrument, row.mms_id))
                 .or_default()
                 .insert(row.indicator_id);
         }
@@ -536,15 +536,15 @@ mod tests {
 
         assert_eq!(map.len(), 3);
         assert_eq!(
-            map.get(&("EURUSD".to_string(), 390)),
+            map.get(&Cell::new("EURUSD", 390)),
             Some(&FxHashSet::from_iter([2001, 2002]))
         );
         assert_eq!(
-            map.get(&("EURUSD".to_string(), 391)),
+            map.get(&Cell::new("EURUSD", 391)),
             Some(&FxHashSet::from_iter([2002]))
         );
         assert_eq!(
-            map.get(&("USDJPY".to_string(), 390)),
+            map.get(&Cell::new("USDJPY", 390)),
             Some(&FxHashSet::from_iter([3001]))
         );
     }
