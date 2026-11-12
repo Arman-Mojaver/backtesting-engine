@@ -11,10 +11,10 @@ use crate::infrastructure::processed_manifest::{
 };
 use crate::infrastructure::strategy_adapter::{ParquetStrategyRepository, StrategyRow};
 
-pub struct CellOutputDto {
-    pub instrument: String,
-    pub mms_id: i32,
-    pub strategy_rows: Vec<StrategyRow>,
+struct PartitionWrite {
+    instrument: String,
+    mms_id: i32,
+    rows: Vec<StrategyRow>,
 }
 
 pub struct StrategyPersistence {
@@ -42,7 +42,7 @@ impl StrategyPersistence {
         // strategy_id is persistence-assigned: new ids start from the global max
         // across all partitions, so they stay unique across the whole tree.
         let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
-        let mut dto_cells: Vec<CellOutputDto> = Vec::with_capacity(cells.len());
+        let mut dto_cells: Vec<PartitionWrite> = Vec::with_capacity(cells.len());
         let mut manifest_entries: Vec<ManifestEntry> = Vec::with_capacity(cells.len());
         for cell in cells {
             let mut strategy_rows = Vec::with_capacity(cell.strategies.len());
@@ -55,16 +55,16 @@ impl StrategyPersistence {
                 mms_id: cell.mms_id,
                 indicator_ids: cell.computed_indicator_ids,
             });
-            dto_cells.push(CellOutputDto {
+            dto_cells.push(PartitionWrite {
                 instrument: cell.instrument,
                 mms_id: cell.mms_id,
-                strategy_rows,
+                rows: strategy_rows,
             });
         }
 
         dto_cells.into_par_iter().try_for_each(|c| {
             self.strategies
-                .write_rows(&c.instrument, c.mms_id, c.strategy_rows)
+                .write_rows(&c.instrument, c.mms_id, c.rows)
                 .with_context(|| {
                     format!(
                         "failed to write partition {} (mms_id={})",
