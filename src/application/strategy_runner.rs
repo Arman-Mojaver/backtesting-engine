@@ -75,11 +75,11 @@ mod tests {
     use crate::domain::fixtures::op_point;
     use crate::domain::indicator::IndicatorParameters;
 
-    /// Bar spacing chosen so bars 5 and 21 are exactly one year apart:
-    /// 16 * BAR_SPACING_SECS = 31_557_600 (365.25 days). With the long
-    /// operation points sitting on bars 5 and 21, every annualized figure
-    /// in these tests is computed over exactly one year.
-    const BAR_SPACING_SECS: i64 = 1_972_350;
+    /// Bar spacing chosen so bars 5 and 25 are exactly one year apart:
+    /// 20 * BAR_SPACING_SECS = 31_557_600 (365.25 days). With the operation
+    /// points spanning bars 5 to 25, every annualized figure in these tests
+    /// is computed over exactly one year.
+    const BAR_SPACING_SECS: i64 = 1_577_880;
 
     /// Closes repeat [5, 4, 3, 4]: diffs repeat [-1, -1, +1, +1]. RSI(3)
     /// windows then always hold both gains and losses, so the series is
@@ -104,22 +104,37 @@ mod tests {
             .collect()
     }
 
-    /// Long and short operation points share the bar-5 / bar-21 timestamps
-    /// (validation requires identical timestamp sets). Short results are
-    /// losers that no signal resolves: if one ever did, the 6.09 ROI
-    /// assertions below would catch it.
+    const OPERATION_BARS: std::ops::RangeInclusive<i32> = 5..=25;
+    const SHORT_ID_OFFSET: i32 = 100;
+
+    /// Long and short operation points sit on every bar from 5 to 25
+    /// (validation requires identical timestamp sets), so each RSI(3)
+    /// indicator matches 10 trades in the year. Winners are placed only
+    /// where the passing RSI signals: longs on bars 0 mod 4, shorts on
+    /// bars 2 mod 4. Every other operation point loses.
     fn pipeline_long_ops() -> Vec<OperationPoint> {
-        vec![
-            op_point(1, 30, 4 * BAR_SPACING_SECS),
-            op_point(2, 30, 20 * BAR_SPACING_SECS),
-        ]
+        pipeline_ops(0, 0)
     }
 
     fn pipeline_short_ops() -> Vec<OperationPoint> {
-        vec![
-            op_point(10, -20, 4 * BAR_SPACING_SECS),
-            op_point(11, -20, 20 * BAR_SPACING_SECS),
-        ]
+        pipeline_ops(2, SHORT_ID_OFFSET)
+    }
+
+    fn pipeline_ops(winning_bar_mod_4: i32, id_offset: i32) -> Vec<OperationPoint> {
+        OPERATION_BARS
+            .map(|bar| {
+                let result = if bar % 4 == winning_bar_mod_4 {
+                    30
+                } else {
+                    -20
+                };
+                op_point(
+                    id_offset.saturating_add(bar),
+                    result,
+                    i64::from(bar).saturating_mul(BAR_SPACING_SECS),
+                )
+            })
+            .collect()
     }
 
     const PASSES_BOTH_STAGES: i32 = 7;
@@ -173,13 +188,13 @@ mod tests {
         let s = &strategies[0];
         assert_eq!(s.instrument, "EURUSD");
         assert_eq!(s.money_management_strategy_id, 1);
-        // Two +30 trades compounding at risk/sl = 0.001: 1.03 -> 1.0609
-        // over exactly one year (bars 5 to 21), so annual == global.
-        assert_eq!(s.annual_roi, 6.09);
+        // Ten +30 trades compounding at risk/sl = 0.001: 1.03^10 = 1.3439
+        // over exactly one year (bars 5 to 25), so annual == global.
+        assert_eq!(s.annual_roi, 34.39);
         assert_eq!(s.max_draw_down, 0.0);
-        assert_eq!(s.annual_operation_count, 2.0);
-        assert_eq!(s.long_operation_point_ids, vec![1, 2]);
-        assert!(s.short_operation_point_ids.is_empty());
+        assert_eq!(s.annual_operation_count, 10.0);
+        assert_eq!(s.long_operation_point_ids, vec![8, 12, 16, 20, 24]);
+        assert_eq!(s.short_operation_point_ids, vec![106, 110, 114, 118, 122]);
     }
 
     #[test]
