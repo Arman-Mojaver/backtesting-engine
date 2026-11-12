@@ -54,8 +54,6 @@ pub enum IndicatorError {
     InvalidMacdFastPeriod { n: i32 },
     #[error("macd slow period must be positive, got {n}")]
     InvalidMacdSlowPeriod { n: i32 },
-    #[error("macd moving-average type must be \"ema\" or \"sma\", got \"{ma_type}\"")]
-    InvalidMacdMaType { ma_type: String },
     #[error("macd fast period must be less than slow period, got fast {fast}, slow {slow}")]
     InvalidMacdPeriodOrder { fast: i32, slow: i32 },
     #[error("rsi period must be positive, got {n}")]
@@ -1129,12 +1127,6 @@ mod tests {
             (
                 IndicatorError::InvalidMacdSlowPeriod { n: 0 },
                 "macd slow period must be positive, got 0",
-            ),
-            (
-                IndicatorError::InvalidMacdMaType {
-                    ma_type: "wma".to_string(),
-                },
-                "macd moving-average type must be \"ema\" or \"sma\", got \"wma\"",
             ),
             (
                 IndicatorError::InvalidMacdPeriodOrder { fast: 4, slow: 2 },
