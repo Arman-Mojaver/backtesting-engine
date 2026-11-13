@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
+use anyhow::Context;
 use arrow::array::{
     AsArray, Decimal128Array, Int32Array, Int32Builder, Int64Array, ListArray, ListBuilder,
     PrimitiveArray,
@@ -89,7 +90,12 @@ impl ParquetStrategyRepository {
             .base_dir
             .join(format!("instrument={instrument}"))
             .join(format!("money_management_strategy_id={mms_id}"));
-        fs::create_dir_all(&partition_dir)?;
+        fs::create_dir_all(&partition_dir).with_context(|| {
+            format!(
+                "failed to create partition directory {}",
+                partition_dir.display()
+            )
+        })?;
         Ok(partition_dir.join("strategies.parquet"))
     }
 
@@ -136,7 +142,8 @@ impl ParquetStrategyRepository {
         // file and rename. A write that fails midway is an accepted risk: the
         // command is re-run, with or without fixes, and strategies are derived
         // from PostgreSQL, so nothing is lost.
-        let file = File::create(path)?;
+        let file = File::create(path)
+            .with_context(|| format!("failed to create partition {}", path.display()))?;
         let mut writer = ArrowWriter::try_new(file, schema, Some(props))?;
         writer.write(&batch)?;
         writer.close()?;
@@ -162,14 +169,18 @@ impl ParquetStrategyRepository {
         let mut partitions_scanned: usize = 0;
         let mut dirs: Vec<PathBuf> = vec![self.base_dir.clone()];
         while let Some(dir) = dirs.pop() {
-            for entry in fs::read_dir(&dir)? {
-                let entry = entry?;
+            let entries = fs::read_dir(&dir)
+                .with_context(|| format!("failed to read directory {}", dir.display()))?;
+            for entry in entries {
+                let entry =
+                    entry.with_context(|| format!("failed to read directory {}", dir.display()))?;
                 let path = entry.path();
                 if path.is_dir() {
                     dirs.push(path);
                 } else if path.file_name().is_some_and(|n| n == "strategies.parquet") {
                     partitions_scanned = partitions_scanned.saturating_add(1);
-                    let file = File::open(&path)?;
+                    let file = File::open(&path)
+                        .with_context(|| format!("failed to open partition {}", path.display()))?;
                     let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
                     let mut reader = builder.build()?;
                     while let Some(batch) = reader.next().transpose()? {
@@ -190,7 +201,8 @@ impl ParquetStrategyRepository {
     }
 
     fn read_rows(path: &Path) -> anyhow::Result<Vec<StrategyRow>> {
-        let file = File::open(path)?;
+        let file = File::open(path)
+            .with_context(|| format!("failed to open partition {}", path.display()))?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
         let mut reader = builder.build()?;
 
@@ -576,6 +588,22 @@ mod tests {
             .unwrap();
 
         assert_eq!(read_back_ids(&repo, "USDJPY", 400), vec![3, 4]);
+    }
+
+    #[test]
+    fn write_rows_names_the_partition_directory_it_cannot_create() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
+        let blocking_file = tmp.path().join("instrument=EURUSD");
+        fs::write(&blocking_file, b"").unwrap();
+
+        let err = repo
+            .write_rows("EURUSD", 390, rows(&sample_strategies(), 1))
+            .unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains(&blocking_file.display().to_string()));
     }
 
     #[test]
