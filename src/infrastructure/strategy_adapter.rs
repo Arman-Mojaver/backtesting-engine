@@ -13,7 +13,7 @@ use arrow::datatypes::{DataType, Decimal128Type, Field, Int32Type, Int64Type, Sc
 use arrow::record_batch::RecordBatch;
 use log::debug;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-use parquet::arrow::ArrowWriter;
+use parquet::arrow::{ArrowWriter, ProjectionMask};
 use parquet::basic::{Compression, ZstdLevel};
 use parquet::file::properties::WriterProperties;
 use rustc_hash::FxHashSet;
@@ -179,15 +179,7 @@ impl ParquetStrategyRepository {
                     dirs.push(path);
                 } else if path.file_name().is_some_and(|n| n == "strategies.parquet") {
                     partitions_scanned = partitions_scanned.saturating_add(1);
-                    let file = File::open(&path)
-                        .with_context(|| format!("failed to open partition {}", path.display()))?;
-                    let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
-                    let mut reader = builder.build()?;
-                    while let Some(batch) = reader.next().transpose()? {
-                        for id in batch.column(0).as_primitive::<Int64Type>().values() {
-                            max_id = max_id.max(*id);
-                        }
-                    }
+                    max_id = max_id.max(Self::partition_max_strategy_id(&path)?);
                 }
             }
         }
@@ -197,6 +189,26 @@ impl ParquetStrategyRepository {
             max_id,
             start.elapsed()
         );
+        Ok(max_id)
+    }
+
+    fn partition_max_strategy_id(path: &Path) -> anyhow::Result<i64> {
+        let file = File::open(path)
+            .with_context(|| format!("failed to open partition {}", path.display()))?;
+        let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
+        let strategy_id_index = builder
+            .schema()
+            .index_of("strategy_id")
+            .with_context(|| format!("partition {} has no strategy_id column", path.display()))?;
+        let mask = ProjectionMask::roots(builder.parquet_schema(), [strategy_id_index]);
+        let mut reader = builder.with_projection(mask).build()?;
+
+        let mut max_id: i64 = 0;
+        while let Some(batch) = reader.next().transpose()? {
+            for id in batch.column(0).as_primitive::<Int64Type>().values() {
+                max_id = max_id.max(*id);
+            }
+        }
         Ok(max_id)
     }
 
@@ -628,5 +640,33 @@ mod tests {
             .unwrap();
 
         assert_eq!(repo.max_strategy_id().unwrap(), 8);
+    }
+
+    #[test]
+    fn max_strategy_id_finds_the_column_by_name() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
+        let partition_dir = tmp
+            .path()
+            .join("instrument=EURUSD/money_management_strategy_id=390");
+        fs::create_dir_all(&partition_dir).unwrap();
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("indicator_id", DataType::Int64, false),
+            Field::new("strategy_id", DataType::Int64, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![2001, 2002])),
+                Arc::new(Int64Array::from(vec![7, 3])),
+            ],
+        )
+        .unwrap();
+        let file = File::create(partition_dir.join("strategies.parquet")).unwrap();
+        let mut writer = ArrowWriter::try_new(file, schema, None).unwrap();
+        writer.write(&batch).unwrap();
+        writer.close().unwrap();
+
+        assert_eq!(repo.max_strategy_id().unwrap(), 7);
     }
 }
