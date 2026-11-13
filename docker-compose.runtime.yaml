@@ -18,7 +18,7 @@ services:
     platform: linux/arm64
     restart: unless-stopped
     environment:
-      - ENVIRONMENT=${ENVIRONMENT}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - RUST_LOG=${RUST_LOG}
     volumes:
       - ${PARQUET_FILES_PATH}:/app/parquet_files
