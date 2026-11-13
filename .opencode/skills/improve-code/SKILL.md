@@ -209,7 +209,7 @@ For each axis, note concrete findings only, each pointing to `file:line`. Skip a
   - consistent with the existing log style
 - **Testing: quality**
   - tests coupled to internals instead of behavior
-  - fakes vs. mocks (`src/application/fake_repositories.rs`)
+  - the project's test patterns: shared fixtures (`src/domain/fixtures.rs`) for domain logic, `tempfile`-based tests for the adapters; no fakes or mocks
   - unclear test names
   - duplicated setup that should be a helper
   - assertions too weak to catch regressions

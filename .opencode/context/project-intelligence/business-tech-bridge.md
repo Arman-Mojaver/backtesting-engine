@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.12 | Updated: 2026-11-02 -->
+<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.13 | Updated: 2026-11-13 -->
 
 # Business ↔ Tech Bridge
 
@@ -33,12 +33,12 @@
 | Test data | `domain::fixtures::*` functions | `src/domain/fixtures.rs` | Shared across all test modules |
 | Environment config | `Environment` enum + `DbConfig` + `resolve_environment()` | `src/config/environment.rs` | Single `ENVIRONMENT` resolver: absent → development, invalid → fail-fast error |
 | Parquet root directory | `parquet_root_dir(env)` | `src/config/environment.rs` | `/app/parquet_files/{env}`; strategy partitions live under its `strategy/` subdirectory |
-| Fetch strategy inputs from DB | `fetch_source_data(query)` | `src/application/source_data.rs` | `(instrument, mms_id)` → `SourceData` |
-| Generate signal groups from indicators | `create_signals` → **`create_signal_groups`** | `src/application/signal_generator.rs` | REAL indicator outputs → signal semantics; rayon + `#[cached]` keyed `(indicator_id, instrument)` |
+| Fetch strategy inputs from DB | `fetch_source_data(db_config, instrument, money_management_strategy_id)` | `src/application/source_data.rs` | `DbConfig` + `(instrument, mms_id)` → `SourceData` |
+| Generate signal groups from indicators | `create_signal_groups()` | `src/application/signal_generator.rs` | REAL indicator outputs → signal semantics; rayon + `#[cached]` keyed `(indicator_id, instrument)` |
 | Build strategies from signal groups | `create_strategies()` | `src/application/strategy_generator.rs` | One rayon pass: matched-trade count filter → real metrics → performance filter |
 | Run the full pipeline for one cell | `run_strategies()` | `src/application/strategy_runner.rs` | validate → signals → filter signal counts → strategies (filters matched ops, DD/ROI) |
 | Which indicators are already done? | `unprocessed_indicators()` | `src/domain/indicator.rs` | Set-diff DB indicator IDs vs manifest |
-| One cell's compute result | `CellOutput` | `src/application/cell_output.rs` | instrument, mms_id, strategies, processed IDs |
+| One cell's compute result | `CellOutput` | `src/application/cell_output.rs` | The `Cell`, its strategies and the computed indicator IDs |
 | Write strategies to parquet | `ParquetStrategyRepository::write_rows()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD; idempotent by indicator_id |
 | Record processed indicators | `ParquetProcessedManifest` | `src/infrastructure/processed_manifest.rs` | `processed.parquet` ledger; atomic writes; dedup per triple |
 | Commit computed cells (create, create_loop) | `StrategyPersistence::persist_cells()` | `src/infrastructure/strategy_persistence.rs` | Assign global IDs, write partitions in parallel, commit manifest once |
@@ -86,7 +86,6 @@ Business Question                              Code Path
 | New application orchestration | `src/application/{name}.rs` | See `strategy_runner.rs` / `source_data.rs` |
 | New CLI command group | `src/engine/{name}/` module dir | Follow `src/engine/strategy/` pattern: `mod.rs` (enum + `build_cli`/`parse`/`execute`) + one file per subcommand |
 | New CLI subcommand under existing group | Inside the relevant `src/engine/{group}/` | Add the variant to the enum + builder + parser + execute match |
-| New engine command group (bte binary) | `src/engine/{name}/` module dir | Follow `src/engine/strategy/` pattern: mod.rs + one file per subcommand |
 | New test fixtures | `src/domain/fixtures.rs` | Add `pub fn {name}() -> Vec<T>` |
 | New infrastructure adapter | `src/infrastructure/{name}.rs` | See `processed_manifest.rs` — expose types and functions, add `pub mod` in `mod.rs` |
 
