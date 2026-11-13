@@ -2,6 +2,7 @@
 name = "backtesting-engine"
 version = "0.1.0"
 edition = "2021"
+publish = false
 autobins = false
 autobenches = false
 
@@ -63,6 +64,7 @@ criterion = { version = "0.8", features = ["html_reports"] }
 
 [lints.rust]
 missing_debug_implementations = "warn"
+unsafe_code = "forbid"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = -1 }
