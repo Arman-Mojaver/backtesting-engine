@@ -1,4 +1,10 @@
-#![cfg_attr(test, allow(clippy::unreadable_literal))]
+#![cfg_attr(
+    test,
+    expect(
+        clippy::unreadable_literal,
+        reason = "test data keeps Unix timestamps and captured EURUSD values as copied from their source"
+    )
+)]
 
 pub mod application;
 pub mod config;
