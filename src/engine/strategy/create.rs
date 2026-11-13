@@ -23,7 +23,7 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
     let env = resolve_environment()?;
     let db_config = DbConfig::from_env(env);
     let persistence = StrategyPersistence::new(parquet_root_dir(env));
-    info!("Fetching shared data for {instrument} (mms_id={money_management_strategy_id}) ...");
+    info!("Fetching source data for {instrument} (mms_id={money_management_strategy_id}) ...");
     let fetch_start = Instant::now();
     let data = fetch_source_data(&db_config, instrument, money_management_strategy_id)?;
     info!("Source data fetched in {:?}", fetch_start.elapsed());

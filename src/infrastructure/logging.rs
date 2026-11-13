@@ -34,7 +34,7 @@ pub fn init(rust_log: Option<&str>, log_file: &Path) -> Result<()> {
         ),
         WriteLogger::new(level, config, log_file),
     ])
-    .context("Failed to initialize logger")?;
+    .context("failed to initialize logger")?;
 
     if parsed_level.is_none() && !rust_log.is_empty() {
         log::warn!("Unrecognised RUST_LOG value '{rust_log}', defaulting to {DEFAULT_LEVEL}");
@@ -58,7 +58,7 @@ fn open_log_file(path: &Path) -> Result<File> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| {
             let parent = parent.display();
-            format!("Failed to create log directory: {parent}")
+            format!("failed to create log directory {parent}")
         })?;
     }
 
@@ -68,7 +68,7 @@ fn open_log_file(path: &Path) -> Result<File> {
         .open(path)
         .with_context(|| {
             let path = path.display();
-            format!("Failed to open log file: {path}")
+            format!("failed to open log file {path}")
         })
 }
 

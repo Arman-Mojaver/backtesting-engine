@@ -297,7 +297,7 @@ impl PgStore {
 
 fn connection_diagnostics(config: &DbConfig) -> String {
     format!(
-        "Failed to connect to PostgreSQL\n  \
+        "failed to connect to PostgreSQL\n  \
          Target database: {db}\n  \
          Target host:     {host}:{port}\n  \
          Target user:     {user}\n  \
