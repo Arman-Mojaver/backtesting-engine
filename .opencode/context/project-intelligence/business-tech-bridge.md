@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.13 | Updated: 2026-11-13 -->
+<!-- Context: project-intelligence/bridge | Priority: high | Version: 1.14 | Updated: 2026-11-13 -->
 
 # Business ↔ Tech Bridge
 
@@ -25,11 +25,12 @@
 | Annual return on investment | `annual_roi` field on `Strategy` | `src/domain/strategy.rs` | Computed by `PerformanceMetrics::annual_roi()` from global ROI + time span |
 | "How deep did it draw down?" / "What is the total return?" | `performance_metrics()` → `.max_draw_down` / `.global_roi` | `src/domain/performance_metrics.rs` | Single-pass fn over an owned `Vec<&OperationPoint>` (sorts it chronologically in place), returns % |
 | "How many trades per year?" | `annual_operation_count()` | `src/domain/annual_operation_count.rs` | Pure fn over `(count: usize, start_ts: i64, end_ts: i64)` |
-| "Is the data valid?" | `validate_all()` | `src/domain/validation/combined_validation.rs` | Runs 4 checks, fails fast |
+| "Is the data valid?" | `validate_all()` | `src/domain/validation/combined_validation.rs` | Runs 5 checks, fails fast |
 | "Data must not be empty" | `validate_empty_entities()` | `src/domain/validation/empty_validation.rs` | Checks all 4 datasets |
 | "All same instrument" | `validate_same_instrument()` | `src/domain/validation/same_instrument_validation.rs` | All resampled and trade points share one instrument |
 | "All same MMS" | `validate_money_management_strategy_id_matches()` | `src/domain/validation/same_mms_validation.rs` | Checks against expected ID param |
 | "Timestamps align" | `validate_timestamps_match()` | `src/domain/validation/same_timestamp_validation.rs` | Long and short timestamps are identical sets, contained in resampled timestamps |
+| "Resampled points are in time order" | `validate_chronological_order()` | `src/domain/validation/chronological_order_validation.rs` | Resampled point timestamps strictly increase; rejects unsorted and repeated timestamps |
 | Test data | `domain::fixtures::*` functions | `src/domain/fixtures.rs` | Shared across all test modules |
 | Environment config | `Environment` enum + `DbConfig` + `resolve_environment()` | `src/config/environment.rs` | Single `ENVIRONMENT` resolver: absent → development, invalid → fail-fast error |
 | Parquet root directory | `parquet_root_dir(env)` | `src/config/environment.rs` | `/app/parquet_files/{env}`; strategy partitions live under its `strategy/` subdirectory |

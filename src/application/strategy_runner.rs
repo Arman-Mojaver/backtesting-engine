@@ -204,4 +204,23 @@ mod tests {
         assert!(chain.contains("input validation failed"));
         assert!(chain.contains("money management strategy id"));
     }
+
+    #[test]
+    fn reversed_resampled_points_stop_the_pipeline_at_validation() {
+        let mut resampled_points = pipeline_resampled_points();
+        resampled_points.reverse();
+
+        let err = run_strategies(
+            &pipeline_indicators(),
+            &resampled_points,
+            &pipeline_long_ops(),
+            &pipeline_short_ops(),
+            1,
+        )
+        .expect_err("reversed resampled points must fail validation");
+
+        let chain = format!("{err:#}");
+        assert!(chain.contains("input validation failed"));
+        assert!(chain.contains("resampled points must be in strictly increasing timestamp order"));
+    }
 }

@@ -3,6 +3,7 @@ use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
 use super::ValidationError;
+use super::chronological_order_validation;
 use super::empty_validation;
 use super::same_instrument_validation;
 use super::same_mms_validation;
@@ -39,6 +40,8 @@ pub fn validate_all(
         long_operation_points,
         short_operation_points,
     )?;
+
+    chronological_order_validation::validate_chronological_order(resampled_points)?;
 
     Ok(())
 }
@@ -127,6 +130,23 @@ mod tests {
         assert_eq!(
             validate_all(&indicators, &resampled, &long, &short, 1),
             Err(ValidationError::LongShortTimestampsDiffer { timestamp: 3000 })
+        );
+    }
+
+    #[test]
+    fn rejects_resampled_points_out_of_chronological_order() {
+        let long = op_points_ts_123();
+        let short = op_points_ts_123();
+        let indicators = indicators_default();
+        let mut resampled = resampled_points_ts_123();
+        resampled.reverse();
+
+        assert_eq!(
+            validate_all(&indicators, &resampled, &long, &short, 1),
+            Err(ValidationError::ResampledPointsNotChronological {
+                previous: 3000,
+                timestamp: 2000,
+            })
         );
     }
 }

@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/business | Priority: high | Version: 1.9 | Updated: 2026-11-02 -->
+<!-- Context: project-intelligence/business | Priority: high | Version: 1.10 | Updated: 2026-11-13 -->
 
 # Business Domain
 
@@ -43,7 +43,7 @@ Solution: A Rust engine that loads historical OHLCV candles, long/short trade re
 
 The engine is in **active development** — the strategy pipeline is real end-to-end:
 - ✅ Domain model defined (entities, repository traits)
-- ✅ Four validation rules implemented and tested (fail-fast, ordered)
+- ✅ Five validation rules implemented and tested (fail-fast, ordered)
 - ✅ Engine CLI (`bte` binary: strategy create, create_loop)
 - ✅ Environment/DB configuration (production / development / testing)
 - ✅ PostgreSQL adapters for indicators, operation points, resampled points (+ indexed batch loads)

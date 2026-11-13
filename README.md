@@ -4,7 +4,7 @@
 
 A Rust engine that generates and evaluates trading strategies against historical daily (D1)
 market data. It loads indicators, OHLCV candles, and long/short trade records from
-PostgreSQL, enforces four data-integrity invariants before computing anything, derives
+PostgreSQL, enforces five data-integrity invariants before computing anything, derives
 entry signals from real indicator mathematics, scores each candidate strategy on a
 single-pass compounding curve, and persists the survivors to partitioned, idempotent
 Parquet output.
@@ -39,9 +39,9 @@ A backtest run is scoped to one **cell**: a single `(instrument, money managemen
 strategy)` pair. For each cell, the engine:
 
 1. **Fetches** indicators, daily candles, and long/short trade records from PostgreSQL.
-2. **Validates** the data against four fail-fast invariants (non-emptiness, same
-   instrument, same money management strategy, timestamp alignment). Bad data never
-   reaches the compute path.
+2. **Validates** the data against five fail-fast invariants (non-emptiness, same
+   instrument, same money management strategy, timestamp alignment, chronological
+   resampled points). Bad data never reaches the compute path.
 3. **Computes** indicator values over the candle series and derives **signal
    timestamps** from them — zero-crossings, threshold crossings, or line crossovers,
    depending on the indicator kind.
@@ -94,7 +94,7 @@ Stage notes:
 - **Idempotency first.** Before any computation, the engine diffs the database's
   indicators against the processed manifest and computes only the unprocessed
   remainder. A fully-processed cell is skipped without touching the compute path.
-- **Validation is fail-fast and ordered.** The four invariants run in a fixed order and
+- **Validation is fail-fast and ordered.** The five invariants run in a fixed order and
   the first failure aborts the cell. Emptiness is checked first because the cross-dataset
   checks pass vacuously on empty input.
 - **Signals are real.** Each indicator's values are computed from the candle series and
@@ -125,7 +125,7 @@ All timestamps are epoch seconds.
 
 ## Validation invariants
 
-Four invariants, checked in order, failing fast:
+Five invariants, checked in order, failing fast:
 
 | # | Invariant | Rule |
 |---|---|---|
@@ -133,6 +133,7 @@ Four invariants, checked in order, failing fast:
 | 2 | Same instrument | Every candle and trade references the same instrument. |
 | 3 | Same MMS | Every trade's money management strategy matches the run's expected MMS. |
 | 4 | Timestamp alignment | Long and short trade timestamps are identical sets, and both are contained in the candle timestamps. |
+| 5 | Chronological resampled points | Resampled point timestamps are strictly increasing: an unsorted series or a repeated timestamp is rejected, never repaired. |
 
 Violations are reported as typed errors carrying the specific invariant that failed.
 

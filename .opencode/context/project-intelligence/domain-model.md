@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.17 | Updated: 2026-11-13 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.18 | Updated: 2026-11-13 -->
 
 # Domain Model — Backtesting Engine
 
@@ -267,14 +267,15 @@ Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_
 
 ## Validation Rules (Domain Invariants)
 
-Before a backtest can run, the input data must satisfy **four invariants**, checked in order by `validate_all()`:
+Before a backtest can run, the input data must satisfy **five invariants**, checked in order by `validate_all()`:
 
 1. **Non-Empty Data** (`empty_validation`) — all four datasets non-empty.
 2. **Same Instrument** (`same_instrument_validation`) — every resampled/long/short point references the same instrument (itertools `all_equal_value()` over the chained iterators; the error names the first two differing instruments).
 3. **Same Money Management Strategy** (`same_mms_validation`) — every operation point's `money_management_strategy_id` matches the expected MMS ID parameter.
 4. **Timestamp Alignment** (`same_timestamp_validation`) — long and short timestamp sets are identical; both are subsets of resampled timestamps.
+5. **Chronological Resampled Points** (`chronological_order_validation`) — resampled point timestamps are strictly increasing, so an unsorted series and a repeated timestamp are both rejected; the error names the first offending pair. Indicators and the next-resampled-point entry search (`partition_point`) rely on this order.
 
-`combined_validation::validate_all()` runs all four in order, returning early on the first failure as a `validation::ValidationError` (LongOperationPointsEmpty / ShortOperationPointsEmpty / IndicatorsEmpty / ResampledPointsEmpty / InstrumentMismatch / MoneyManagementStrategyMismatch / LongShortTimestampsDiffer / TimestampMissingFromResampled). Order is load-bearing: emptiness first — otherwise the same-X checks would vacuously pass on empty input.
+`combined_validation::validate_all()` runs all five in order, returning early on the first failure as a `validation::ValidationError` (LongOperationPointsEmpty / ShortOperationPointsEmpty / IndicatorsEmpty / ResampledPointsEmpty / InstrumentMismatch / MoneyManagementStrategyMismatch / LongShortTimestampsDiffer / TimestampMissingFromResampled / ResampledPointsNotChronological). Order is load-bearing: emptiness first — otherwise the same-X checks would vacuously pass on empty input.
 
 ---
 
@@ -313,7 +314,7 @@ src/
 │   ├── annual_operation_count.rs  # annual_operation_count() metric
 │   ├── performance_metrics.rs  # performance_metrics() -> PerformanceMetrics (single pass) + annual_roi() method
 │   ├── time_span.rs            # difference_in_years() shared by annualised metrics
-│   ├── validation/             # Domain invariant checks (4 rules + combined)
+│   ├── validation/             # Domain invariant checks (5 rules + combined)
 │   └── fixtures.rs             # #[cfg(test)] test data builders
 ├── engine/                     # The Rust CLI (`bte`); handlers resolve the environment
 │   ├── mod.rs                  # EngineCommand enum, build_cli(), parse(), execute()

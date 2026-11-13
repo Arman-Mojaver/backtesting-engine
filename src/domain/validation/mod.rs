@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+mod chronological_order_validation;
 mod combined_validation;
 mod empty_validation;
 mod same_instrument_validation;
@@ -32,6 +33,10 @@ pub enum ValidationError {
     LongShortTimestampsDiffer { timestamp: i64 },
     #[error("operation point timestamp {timestamp} has no matching resampled point")]
     TimestampMissingFromResampled { timestamp: i64 },
+    #[error(
+        "resampled points must be in strictly increasing timestamp order, timestamp {timestamp} follows {previous}"
+    )]
+    ResampledPointsNotChronological { previous: i64, timestamp: i64 },
 }
 
 #[cfg(test)]
@@ -75,6 +80,13 @@ mod tests {
             (
                 ValidationError::TimestampMissingFromResampled { timestamp: 4 },
                 "operation point timestamp 4 has no matching resampled point",
+            ),
+            (
+                ValidationError::ResampledPointsNotChronological {
+                    previous: 5,
+                    timestamp: 4,
+                },
+                "resampled points must be in strictly increasing timestamp order, timestamp 4 follows 5",
             ),
         ];
 
