@@ -1,4 +1,5 @@
 use std::env::{self, VarError};
+use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -63,7 +64,6 @@ fn resolve_from_raw(raw: Result<String, VarError>) -> Result<Environment, Invali
     }
 }
 
-#[derive(Debug)]
 pub struct DbConfig {
     pub host: String,
     pub port: u16,
@@ -102,6 +102,18 @@ impl DbConfig {
             port = self.port,
             database = self.database,
         )
+    }
+}
+
+impl fmt::Debug for DbConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DbConfig")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("user", &self.user)
+            .field("password", &"<redacted>")
+            .field("database", &self.database)
+            .finish()
     }
 }
 
@@ -198,6 +210,22 @@ mod tests {
         for (env, expected) in cases {
             assert_eq!(DbConfig::from_env(env).connection_string(), expected);
         }
+    }
+
+    #[test]
+    fn dbconfig_debug_redacts_the_password() {
+        let config = DbConfig {
+            host: "db.example".into(),
+            port: 6543,
+            user: "engine_role".into(),
+            password: "s3cret-pw".into(),
+            database: "db-staging".into(),
+        };
+
+        let debug = format!("{config:?}");
+
+        assert!(!debug.contains("s3cret-pw"), "{debug}");
+        assert!(debug.contains("db.example"), "{debug}");
     }
 
     #[test]
