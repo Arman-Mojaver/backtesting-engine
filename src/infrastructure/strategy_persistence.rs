@@ -11,16 +11,18 @@ use crate::infrastructure::processed_manifest::{
 };
 use crate::infrastructure::strategy_adapter::{ParquetStrategyRepository, StrategyRow};
 
+const STRATEGY_DIR_NAME: &str = "strategy";
+
 pub struct StrategyPersistence {
     strategies: ParquetStrategyRepository,
     manifest: ParquetProcessedManifest,
 }
 
 impl StrategyPersistence {
-    pub const fn new(base_dir: PathBuf, root_dir: PathBuf) -> Self {
+    pub fn new(parquet_root: PathBuf) -> Self {
         Self {
-            strategies: ParquetStrategyRepository::new(base_dir),
-            manifest: ParquetProcessedManifest::new(root_dir),
+            strategies: ParquetStrategyRepository::new(parquet_root.join(STRATEGY_DIR_NAME)),
+            manifest: ParquetProcessedManifest::new(parquet_root),
         }
     }
 
@@ -128,7 +130,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().to_path_buf();
         let base = root.join("strategy");
-        let persistence = StrategyPersistence::new(base.clone(), root);
+        let persistence = StrategyPersistence::new(root);
         (tmp, base, persistence)
     }
 
@@ -209,7 +211,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().to_path_buf();
         let base = root.join("strategy");
-        let persistence = StrategyPersistence::new(base.clone(), root);
+        let persistence = StrategyPersistence::new(root);
 
         let cells = vec![
             CellOutput {
@@ -267,7 +269,7 @@ mod tests {
     fn persist_cells_with_no_cells_writes_nothing() {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().to_path_buf();
-        let persistence = StrategyPersistence::new(root.join("strategy"), root.clone());
+        let persistence = StrategyPersistence::new(root.clone());
 
         persistence.persist_cells(Vec::new()).unwrap();
 

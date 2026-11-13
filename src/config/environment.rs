@@ -108,10 +108,6 @@ impl fmt::Debug for DbConfig {
 
 const PARQUET_FILES_PATH: &str = "/app/parquet_files";
 
-pub fn parquet_base_dir(env: Environment) -> PathBuf {
-    parquet_root_dir(env).join("strategy")
-}
-
 pub fn parquet_root_dir(env: Environment) -> PathBuf {
     PathBuf::from(PARQUET_FILES_PATH).join(env.as_str())
 }
@@ -259,25 +255,12 @@ mod tests {
     #[test]
     fn parquet_dirs_are_scoped_per_environment() {
         let cases = [
-            (
-                Environment::Production,
-                "/app/parquet_files/production",
-                "/app/parquet_files/production/strategy",
-            ),
-            (
-                Environment::Development,
-                "/app/parquet_files/development",
-                "/app/parquet_files/development/strategy",
-            ),
-            (
-                Environment::Testing,
-                "/app/parquet_files/testing",
-                "/app/parquet_files/testing/strategy",
-            ),
+            (Environment::Production, "/app/parquet_files/production"),
+            (Environment::Development, "/app/parquet_files/development"),
+            (Environment::Testing, "/app/parquet_files/testing"),
         ];
-        for (env, root, base) in cases {
+        for (env, root) in cases {
             assert_eq!(parquet_root_dir(env), Path::new(root));
-            assert_eq!(parquet_base_dir(env), Path::new(base));
         }
     }
 }

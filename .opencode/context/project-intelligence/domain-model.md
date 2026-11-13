@@ -251,10 +251,10 @@ PG adapters expose no extra public read methods beyond the repository traits.
 ### Parquet Strategy Repository
 Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_id={mms_id}/strategies.parquet`
 - Schema: `strategy_id` (Int64), `indicator_id` (Int32), `annual_roi`/`max_draw_down`/`annual_operation_count` (Decimal128(10,2)), `long_operation_point_ids`/`short_operation_point_ids` (List<Int32>), `money_management_strategy_id` (Int32).
-- `base_dir` resolved by `config::environment::parquet_base_dir(env)` → `/app/parquet_files/{env}/strategy`.
+- `base_dir` is `{parquet_root}/strategy`, derived by `StrategyPersistence::new(parquet_root)`; `parquet_root` resolved by `config::environment::parquet_root_dir(env)` → `/app/parquet_files/{env}`.
 - **Idempotent partitions**: `write_partition` reads existing rows and drops fresh rows whose `indicator_id` already exists — re-runs never duplicate.
 - **Append semantics**: write = read existing + append fresh + rewrite the file. `strategy_id` assigned at write time as `max_strategy_id() + 1` (global max across ALL partitions, scanned recursively). IDs are contiguous within a batch and continue across partitions and appends.
-- API: `write(instrument, mms_id, &[Strategy])` (assigns IDs), `write_rows(instrument, mms_id, Vec<StrategyRow>)` (pre-assigned IDs, used by `StrategyPersistence`), `max_strategy_id()`.
+- API: `write(instrument, mms_id, &[Strategy])` (assigns IDs), `write_rows(&Cell, Vec<StrategyRow>)` (pre-assigned IDs, used by `StrategyPersistence`), `max_strategy_id()`.
 
 ### Processed Manifest
 `{root_dir}/processed.parquet` — schema: `instrument` (Utf8), `mms_id` (Int32), `indicator_id` (Int32), `processed_at` (Int64).
@@ -326,7 +326,7 @@ src/
 │   ├── strategy_persistence.rs # StrategyPersistence (batch commit)
 │   └── logging.rs              # simplelog init
 ├── config/                     # Environment + DB configuration
-│   └── environment.rs          # Environment, DbConfig, resolve_environment(), parquet_base_dir(), parquet_root_dir()
+│   └── environment.rs          # Environment, DbConfig, resolve_environment(), parquet_root_dir()
 ├── bin/
 │   └── bte.rs            # bte binary entry: engine::build_cli() → parse() → execute()
 └── lib.rs                      # Crate root — re-exports application, config, domain, engine, infrastructure

@@ -10,9 +10,7 @@ use crate::application::cell_output::CellOutput;
 use crate::application::signal_generator::signal_group_cache_stats;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::{get_unprocessed, indicator_ids};
-use crate::config::environment::{
-    parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig,
-};
+use crate::config::environment::{parquet_root_dir, resolve_environment, DbConfig};
 use crate::domain::cell::Cell;
 use crate::domain::indicator::{Indicator, IndicatorRepository};
 use crate::domain::operation_point::{
@@ -181,7 +179,7 @@ pub fn execute() -> anyhow::Result<()> {
     let env = resolve_environment()?;
     let source = SourceIndex::load(&DbConfig::from_env(env))?;
     let cells = source.cells();
-    let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
+    let persistence = StrategyPersistence::new(parquet_root_dir(env));
     let processed_ids_per_cell = persistence
         .read_processed_ids_per_cell()
         .context("failed to read processed manifest")?;

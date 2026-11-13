@@ -8,9 +8,7 @@ use crate::application::cell_output::CellOutput;
 use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
 use crate::application::strategy_runner_utils::{get_unprocessed, indicator_ids};
-use crate::config::environment::{
-    parquet_base_dir, parquet_root_dir, resolve_environment, DbConfig,
-};
+use crate::config::environment::{parquet_root_dir, resolve_environment, DbConfig};
 use crate::domain::cell::Cell;
 use crate::infrastructure::strategy_persistence::StrategyPersistence;
 
@@ -24,7 +22,7 @@ pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::R
 fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
     let env = resolve_environment()?;
     let db_config = DbConfig::from_env(env);
-    let persistence = StrategyPersistence::new(parquet_base_dir(env), parquet_root_dir(env));
+    let persistence = StrategyPersistence::new(parquet_root_dir(env));
     info!("Fetching shared data for {instrument} (mms_id={money_management_strategy_id}) ...");
     let fetch_start = Instant::now();
     let data = fetch_source_data(&db_config, instrument, money_management_strategy_id)?;
@@ -108,7 +106,7 @@ mod tests {
     fn new_persistence() -> (TempDir, StrategyPersistence) {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().to_path_buf();
-        let persistence = StrategyPersistence::new(root.join("strategy"), root);
+        let persistence = StrategyPersistence::new(root);
         (tmp, persistence)
     }
 

@@ -32,7 +32,7 @@
 | "Timestamps align" | `validate_timestamps_match()` | `src/domain/validation/same_timestamp_validation.rs` | Long and short timestamps are identical sets, contained in resampled timestamps |
 | Test data | `domain::fixtures::*` functions | `src/domain/fixtures.rs` | Shared across all test modules |
 | Environment config | `Environment` enum + `DbConfig` + `resolve_environment()` | `src/config/environment.rs` | Single `ENVIRONMENT` resolver: absent → development, invalid → fail-fast error |
-| Parquet base directory | `parquet_base_dir(env)` / `parquet_root_dir(env)` | `src/config/environment.rs` | `/app/parquet_files/{env}/strategy` and `/app/parquet_files/{env}` |
+| Parquet root directory | `parquet_root_dir(env)` | `src/config/environment.rs` | `/app/parquet_files/{env}`; strategy partitions live under its `strategy/` subdirectory |
 | Fetch strategy inputs from DB | `fetch_source_data(query)` | `src/application/source_data.rs` | `(instrument, mms_id)` → `SourceData` |
 | Generate signal groups from indicators | `create_signals` → **`create_signal_groups`** | `src/application/signal_generator.rs` | REAL indicator outputs → signal semantics; rayon + `#[cached]` keyed `(indicator_id, instrument)` |
 | Build strategies from signal groups | `create_strategies()` | `src/application/strategy_generator.rs` | One rayon pass: matched-trade count filter → real metrics → performance filter |
