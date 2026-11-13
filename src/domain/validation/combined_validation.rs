@@ -63,13 +63,12 @@ mod tests {
 
     #[test]
     fn rejects_empty_long_operation_points() {
-        let long = op_points_empty();
         let short = op_points_default();
         let indicators = indicators_default();
         let resampled = resampled_points_default();
 
         assert_eq!(
-            validate_all(&indicators, &resampled, &long, &short, 1),
+            validate_all(&indicators, &resampled, &[], &short, 1),
             Err(ValidationError::LongOperationPointsEmpty)
         );
     }
@@ -77,12 +76,11 @@ mod tests {
     #[test]
     fn rejects_empty_short_operation_points() {
         let long = op_points_default();
-        let short = op_points_empty();
         let indicators = indicators_default();
         let resampled = resampled_points_default();
 
         assert_eq!(
-            validate_all(&indicators, &resampled, &long, &short, 1),
+            validate_all(&indicators, &resampled, &long, &[], 1),
             Err(ValidationError::ShortOperationPointsEmpty)
         );
     }

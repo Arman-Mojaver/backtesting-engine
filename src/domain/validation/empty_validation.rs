@@ -30,19 +30,13 @@ pub const fn validate_empty_entities(
 mod tests {
     use super::*;
     use crate::domain::fixtures::{
-        indicators_default, indicators_empty, op_points_default, op_points_empty,
-        resampled_points_default, resampled_points_empty,
+        indicators_default, op_points_default, resampled_points_default,
     };
 
     #[test]
     fn reports_long_operation_points_first_when_all_empty() {
         assert_eq!(
-            validate_empty_entities(
-                &indicators_empty(),
-                &resampled_points_empty(),
-                &op_points_empty(),
-                &op_points_empty()
-            ),
+            validate_empty_entities(&[], &[], &[], &[]),
             Err(ValidationError::LongOperationPointsEmpty)
         );
     }
@@ -53,7 +47,7 @@ mod tests {
             validate_empty_entities(
                 &indicators_default(),
                 &resampled_points_default(),
-                &op_points_empty(),
+                &[],
                 &op_points_default()
             ),
             Err(ValidationError::LongOperationPointsEmpty)
@@ -67,7 +61,7 @@ mod tests {
                 &indicators_default(),
                 &resampled_points_default(),
                 &op_points_default(),
-                &op_points_empty()
+                &[]
             ),
             Err(ValidationError::ShortOperationPointsEmpty)
         );
@@ -77,7 +71,7 @@ mod tests {
     fn rejects_empty_indicators() {
         assert_eq!(
             validate_empty_entities(
-                &indicators_empty(),
+                &[],
                 &resampled_points_default(),
                 &op_points_default(),
                 &op_points_default()
@@ -91,7 +85,7 @@ mod tests {
         assert_eq!(
             validate_empty_entities(
                 &indicators_default(),
-                &resampled_points_empty(),
+                &[],
                 &op_points_default(),
                 &op_points_default()
             ),

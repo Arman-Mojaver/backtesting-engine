@@ -6,10 +6,6 @@ use crate::domain::signal::IndicatorValue;
 const SECONDS_PER_DAY: i64 = 86_400;
 pub const ONE_YEAR_SECS: i64 = 365 * SECONDS_PER_DAY + SECONDS_PER_DAY / 4;
 
-pub const fn op_points_empty() -> Vec<OperationPoint> {
-    Vec::new()
-}
-
 fn winning_op(id: i32, timestamp: i64) -> OperationPoint {
     OperationPoint {
         instrument: "EURUSD".into(),
@@ -101,10 +97,6 @@ pub fn op_point(id: i32, result: i32, timestamp: i64) -> OperationPoint {
     }
 }
 
-pub const fn resampled_points_empty() -> Vec<ResampledPointD1> {
-    Vec::new()
-}
-
 fn base_resampled_point(id: i32, timestamp: i64) -> ResampledPointD1 {
     ResampledPointD1 {
         id,
@@ -180,10 +172,6 @@ pub fn resampled_points_partial_mismatch() -> Vec<ResampledPointD1> {
             ..later_resampled_point(2, 1001)
         },
     ]
-}
-
-pub const fn indicators_empty() -> Vec<Indicator> {
-    Vec::new()
 }
 
 fn ema_macd(id: i32) -> Indicator {
