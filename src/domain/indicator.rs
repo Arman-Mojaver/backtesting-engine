@@ -1,6 +1,6 @@
 use rustc_hash::FxHashSet;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndicatorParameters {
     Macd {
         slow_type: MovingAverageType,
@@ -58,7 +58,7 @@ pub enum MovingAverageType {
     Sma,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Indicator {
     pub id: i32,
     pub parameters: IndicatorParameters,
@@ -71,7 +71,7 @@ pub fn unprocessed_indicators(
     indicators
         .iter()
         .filter(|indicator| !processed_ids.contains(&indicator.id))
-        .cloned()
+        .copied()
         .collect()
 }
 
