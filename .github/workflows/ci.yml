@@ -72,6 +72,14 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
+      - name: Install cargo-machete
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-machete
+
+      - name: Check for unused dependencies
+        run: cargo machete
+
   test:
     name: Test
     needs: preflight

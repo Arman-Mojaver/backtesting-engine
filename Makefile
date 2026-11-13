@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-.PHONY: help bash logs up in down build buildr push pull pushr pullr upr inr downr fmt test lint deny ci
+.PHONY: help bash logs up in down build buildr push pull pushr pullr upr inr downr fmt test lint deny machete ci
 
 .DEFAULT_GOAL := help
 
@@ -78,4 +78,7 @@ lint: ## Check formatting and run clippy (same as CI)
 deny: ## Run supply-chain checks with cargo-deny
 	cargo deny check
 
-ci: lint test deny ## Run the CI gates locally (same as CI)
+machete: ## Check for unused dependencies with cargo-machete
+	cargo machete
+
+ci: lint test deny machete ## Run the CI gates locally (same as CI)
