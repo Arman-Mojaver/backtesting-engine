@@ -38,7 +38,7 @@ mod tests {
 
     #[test]
     fn zero_ops_zero_range_returns_zero() {
-        let result = annual_operation_count(0, 0, 1000);
+        let result = annual_operation_count(0, 1000, 1000);
         assert_eq!(result, 0.0);
     }
 
