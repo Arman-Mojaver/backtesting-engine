@@ -6,6 +6,8 @@ pub struct SignalGroup {
     pub indicator_id: i32,
     pub long_signals: Vec<i64>,
     pub short_signals: Vec<i64>,
+    /// Intentional: read only to fill `Strategy::instrument`, which is kept for
+    /// tracing. The signal cache keys on the resampled points, not on this field.
     pub instrument: String,
 }
 

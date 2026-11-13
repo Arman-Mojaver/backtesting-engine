@@ -29,6 +29,9 @@ pub struct CrossoverBuffers {
     pub upcross_short_buffer: Vec<IndicatorValue>,
 }
 
+/// Intentional: each variant's `instrument` is read only to fill
+/// `SignalGroup::instrument`, which carries it on to `Strategy::instrument`
+/// for tracing.
 #[derive(Debug, Clone, PartialEq)]
 pub enum IndicatorOutput {
     Oscillator {

@@ -26,12 +26,12 @@
 | **Risk** | The fraction of capital risked on a single trade (e.g. `0.01` = 1%). | `f64` field | `domain::operation_point` |
 | **Result** | Realized outcome of a trade in the same integer units as SL: positive for a gain, negative for a loss. The per-trade return on the curve is `result / sl`. | `i32` field | `domain::operation_point` |
 | **Timestamp** | An integer epoch (seconds) identifying when a data point or trade occurred. Used to align operation points with resampled market data. | `i64` field | multiple |
-| **Strategy** | A backtested configuration: one indicator + a set of long/short operation point IDs + a money management strategy, annotated with performance metrics. Carries its `instrument`. | `Strategy` | `domain::strategy` |
+| **Strategy** | A backtested configuration: one indicator + a set of long/short operation point IDs + a money management strategy, annotated with performance metrics. Carries its `instrument`: unread by the engine and not a stored column (the partition path holds it), kept on purpose for tracing. | `Strategy` | `domain::strategy` |
 | **Annual ROI** | Annualized return on investment for a strategy. Computed by compounding the global ROI over the time span; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` (method) |
 | **Max Draw Down** | Largest peak-to-trough decline of the cumulative-return curve, as a percentage. Computed from operation points via compounding against a running cummax; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` |
 | **Annual Operation Count** | Number of trades per year, annualized from a total count over the time span. Computed from signal-group operation counts; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_operation_count` |
 | **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 20%, min annual ROI ≥ 5%. Annual operation count ≥ 10, checked on matched trades (the stored count). Owns the threshold checks: `admits_activity()` and `admits_performance()`. | `GlobalStrategyFilter` | `domain::strategy` |
-| **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus a `signal_count()` derived from its signals. Lives in the domain layer. A cross read at the close of resampled point T is stored as the timestamp of the **next** resampled point (signals on the last one are dropped), so it selects the operation point entered after T closed. | `SignalGroup` | `domain::signal_group` |
+| **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus a `signal_count()` derived from its signals. The `instrument` only travels on to `Strategy` for tracing; the signal cache does not key on it. Lives in the domain layer. A cross read at the close of resampled point T is stored as the timestamp of the **next** resampled point (signals on the last one are dropped), so it selects the operation point entered after T closed. | `SignalGroup` | `domain::signal_group` |
 | **Cell** | One `(instrument, mms_id)` pair — the unit of work for `create_loop`. Cells are computed in parallel and persisted as one Parquet partition each. | `Cell`, `CellOutput` | `domain::cell`, `application::cell_output`, `engine::strategy::create_loop` |
 | **Parquet Strategy Repository** | Writes strategies to partitioned parquet files under `{base}/instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. Dedups fresh rows by `indicator_id` (idempotent partitions). | `ParquetStrategyRepository` | `infrastructure::strategy_adapter` |
 | **Processed Manifest** | Parquet ledger of completed `(instrument, mms_id, indicator_id)` triples with `processed_at` timestamps. Makes `create`/`create_loop` idempotent. Atomic writes (temp + rename); dedup per triple. | `ParquetProcessedManifest` | `infrastructure::processed_manifest` |
@@ -138,7 +138,7 @@ CrossoverBuffers    { upcross_long_buffer, upcross_short_buffer }
 A backtested configuration annotated with performance metrics.
 ```
 Strategy {
-    instrument:                     String    — which instrument this strategy ran on
+    instrument:                     String    — which instrument this strategy ran on (kept for tracing; nothing reads it)
     indicator_id:                   i32       — which indicator this strategy uses
     annual_roi:                     f64       — annualized return on investment (%)
     max_draw_down:                  f64       — largest peak-to-trough decline (%)
@@ -166,7 +166,7 @@ SignalGroup {
     indicator_id:     i32       — which indicator this group belongs to
     long_signals:     Vec<i64>  — long signal timestamps
     short_signals:    Vec<i64>  — short signal timestamps
-    instrument:       String    — which instrument the signals were computed on
+    instrument:       String    — which instrument the signals were computed on (only carried on to Strategy)
 }
 // Method: signal_count() -> usize — long.len() + short.len()
 // Free fn: filter_signal_groups_by_annual_ops(groups, &filter, start_ts, end_ts) -> Vec<SignalGroup>
@@ -348,7 +348,7 @@ src/
 10. **Parquet partitioning by (instrument, mms_id)**: Strategies are written as partitioned parquet files — `instrument=.../money_management_strategy_id=.../strategies.parquet`. Matches the single-instrument, single-MMS backtest constraint and enables efficient per-partition reads.
 11. **Typed indicator parameters**: `IndicatorParameters` is a 14-variant enum — the PG adapter deserializes the JSON `parameters` column with `serde_json`, selecting the variant by the `type` column.
 12. **Real metrics in the generator**: `create_strategies()` computes `performance_metrics()` → `annual_roi()`, plus `annual_operation_count`, from each strategy's referenced operation points. Parallelized with **rayon** `par_iter()`.
-13. **`SignalGroup` lives in the domain**: `SignalGroup` embeds `indicator_id`, `instrument`, and a derived `signal_count()`. The cache stores `Vec<SignalGroup>` — IDs travel with each group.
+13. **`SignalGroup` lives in the domain**: `SignalGroup` embeds `indicator_id`, `instrument`, and a derived `signal_count()`. The cache stores `Vec<SignalGroup>` — IDs travel with each group. The `instrument` chain (`IndicatorOutput` → `SignalGroup` → `Strategy`) is kept on purpose for tracing, although no production code reads `Strategy::instrument`.
 14. **Timestamps are `i64`**: All timestamps are `i64` epoch seconds. The PG adapter casts `i32` DB columns to `i64` on read.
 15. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. IDs are assigned at parquet write time (global max across all partitions + 1). Keeps the domain free of persistence concerns.
 16. **Idempotent parquet partitions**: `write_partition` dedups fresh rows by `indicator_id` against existing rows — re-runs never duplicate strategies for the same indicator.

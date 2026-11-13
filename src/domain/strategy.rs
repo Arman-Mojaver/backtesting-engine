@@ -1,5 +1,7 @@
 #[derive(Debug, Clone)]
 pub struct Strategy {
+    /// Intentional: unread by the engine and not a stored column, since the
+    /// partition path already holds it; kept to trace a strategy to its instrument.
     pub instrument: String,
     pub indicator_id: i32,
     pub annual_roi: f64,
