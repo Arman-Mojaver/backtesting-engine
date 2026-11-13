@@ -55,6 +55,7 @@ struct ProcessedRow {
 /// Ledger of the (instrument, mms_id, indicator_id) triples already
 /// computed, persisted as a single `processed.parquet` under `root_dir` so
 /// reruns only compute what is missing.
+#[derive(Debug)]
 pub struct ParquetProcessedManifest {
     root_dir: PathBuf,
 }

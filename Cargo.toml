@@ -61,6 +61,9 @@ tempfile = "3"
 # dev-only compile time.
 criterion = { version = "0.8", features = ["html_reports"] }
 
+[lints.rust]
+missing_debug_implementations = "warn"
+
 [lints.clippy]
 pedantic = { level = "deny", priority = -1 }
 # float thresholds/comparisons, PG adapter i32->i64 reads, timestamp arithmetic.

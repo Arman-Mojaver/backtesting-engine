@@ -67,6 +67,7 @@ impl StrategyRow {
     }
 }
 
+#[derive(Debug)]
 pub struct ParquetStrategyRepository {
     base_dir: PathBuf,
 }

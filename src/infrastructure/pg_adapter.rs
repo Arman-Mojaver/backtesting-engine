@@ -1,3 +1,4 @@
+use std::fmt;
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context};
@@ -270,6 +271,12 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// is single-connection.
 pub struct PgStore {
     conn: Client,
+}
+
+impl fmt::Debug for PgStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PgStore").finish_non_exhaustive()
+    }
 }
 
 impl PgStore {

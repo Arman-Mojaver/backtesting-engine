@@ -19,6 +19,7 @@ use crate::domain::operation_point::{
 use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repository};
 use crate::infrastructure::pg_adapter::PgStore;
 
+#[derive(Debug)]
 pub struct SourceIndex {
     indicators: Vec<Indicator>,
     resampled_by_instrument: FxHashMap<String, Vec<ResampledPointD1>>,
@@ -137,6 +138,7 @@ fn compute_cell(
     })
 }
 
+#[derive(Debug)]
 pub struct BatchSummary {
     pub computed: usize,
     pub skipped: usize,

@@ -1,6 +1,7 @@
 use crate::domain::cell::Cell;
 use crate::domain::strategy::Strategy;
 
+#[derive(Debug)]
 pub struct CellOutput {
     pub cell: Cell,
     pub strategies: Vec<Strategy>,

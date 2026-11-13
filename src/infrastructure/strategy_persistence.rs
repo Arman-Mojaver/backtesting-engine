@@ -13,6 +13,7 @@ use crate::infrastructure::strategy_adapter::{ParquetStrategyRepository, Strateg
 
 const STRATEGY_DIR_NAME: &str = "strategy";
 
+#[derive(Debug)]
 pub struct StrategyPersistence {
     strategies: ParquetStrategyRepository,
     manifest: ParquetProcessedManifest,
