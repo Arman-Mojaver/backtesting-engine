@@ -40,8 +40,7 @@ pub fn unix_now_secs() -> anyhow::Result<i64> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManifestEntry {
-    pub instrument: String,
-    pub mms_id: i32,
+    pub cell: Cell,
     pub indicator_ids: Vec<i32>,
 }
 
@@ -111,10 +110,10 @@ fn merge_entries(
     let mut fresh_rows: Vec<ProcessedRow> = Vec::new();
     for entry in entries {
         for &indicator_id in &entry.indicator_ids {
-            if incoming.insert((&entry.instrument, entry.mms_id, indicator_id)) {
+            if incoming.insert((&entry.cell.instrument, entry.cell.mms_id, indicator_id)) {
                 fresh_rows.push(ProcessedRow {
-                    instrument: entry.instrument.clone(),
-                    mms_id: entry.mms_id,
+                    instrument: entry.cell.instrument.clone(),
+                    mms_id: entry.cell.mms_id,
                     indicator_id,
                     processed_at,
                 });
@@ -253,8 +252,7 @@ mod tests {
 
     fn entry(instrument: &str, mms_id: i32, indicator_ids: &[i32]) -> ManifestEntry {
         ManifestEntry {
-            instrument: instrument.to_string(),
-            mms_id,
+            cell: Cell::new(instrument, mms_id),
             indicator_ids: indicator_ids.to_vec(),
         }
     }

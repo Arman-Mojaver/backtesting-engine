@@ -53,8 +53,7 @@ impl StrategyPersistence {
                 next_id = next_id.saturating_add(1);
             }
             manifest_entries.push(ManifestEntry {
-                instrument: cell_output.cell.instrument.clone(),
-                mms_id: cell_output.cell.mms_id,
+                cell: cell_output.cell.clone(),
                 indicator_ids: cell_output.computed_indicator_ids,
             });
             partition_writes.push(PartitionWrite {
