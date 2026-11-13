@@ -48,7 +48,6 @@ pub struct InvalidEnvironmentError {
 
 const ENVIRONMENT_VARIABLE: &str = "ENVIRONMENT";
 
-/// Resolves the target environment from the `ENVIRONMENT` variable.
 pub fn resolve_environment() -> Result<Environment, InvalidEnvironmentError> {
     resolve_from_raw(env::var(ENVIRONMENT_VARIABLE))
 }

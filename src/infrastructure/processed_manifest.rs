@@ -28,7 +28,6 @@ fn temp_path_for(path: &Path) -> PathBuf {
     path.with_extension(format!("parquet.tmp-{}-{seq}", std::process::id()))
 }
 
-/// Current wall-clock time as Unix seconds, for stamping `processed_at`.
 /// Fails rather than falling back to epoch 0 if the clock is before 1970.
 pub fn unix_now_secs() -> anyhow::Result<i64> {
     let secs = SystemTime::now()

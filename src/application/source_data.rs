@@ -24,8 +24,6 @@ pub fn fetch_source_data(
 ) -> anyhow::Result<SourceData> {
     debug!("connecting to {}", db_config.database);
 
-    // One connection serves all four sequential reads; the batch path
-    // (create_loop) opens one per table because its loads run in parallel.
     let mut store = PgStore::connect(db_config)?;
 
     let indicators =

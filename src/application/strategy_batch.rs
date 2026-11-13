@@ -31,8 +31,6 @@ impl SourceIndex {
     pub fn load(db_config: &DbConfig) -> anyhow::Result<Self> {
         info!("Querying DB...");
 
-        // One store (connection) per table: the four loads below run
-        // concurrently, and a sync postgres::Client is single-connection.
         let connect = || PgStore::connect(db_config);
         let mut indicator_store = connect()?;
         let mut resampled_store = connect()?;
@@ -69,7 +67,6 @@ impl SourceIndex {
         })
     }
 
-    /// The `(instrument, mms_id)` cells that have operation points.
     pub fn cells(&self) -> Vec<Cell> {
         let mut cells: Vec<Cell> = self
             .long_by_cell
