@@ -83,10 +83,6 @@ doc_markdown = "allow"
 must_use_candidate = "allow"
 similar_names = "allow"
 implicit_hasher = "allow"
-# Divisive style lints -- plain if/else and let-bindings preferred over
-# match-with-wildcard and let-else; not worth the churn here.
-single_match_else = "allow"
-manual_let_else = "allow"
 todo = "deny"
 unimplemented = "deny"
 unchecked_time_subtraction = "deny"
