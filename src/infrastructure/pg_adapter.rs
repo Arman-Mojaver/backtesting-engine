@@ -313,7 +313,8 @@ impl LongOperationPointRepository for PgStore {
             &mut self.conn,
             "long_operation_point get_all",
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
-             FROM long_operation_point",
+             FROM long_operation_point \
+             ORDER BY instrument, money_management_strategy_id",
             &[],
             |row| row_to_operation_point(row, "long_operation_point"),
         )
@@ -342,7 +343,8 @@ impl ShortOperationPointRepository for PgStore {
             &mut self.conn,
             "short_operation_point get_all",
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
-             FROM short_operation_point",
+             FROM short_operation_point \
+             ORDER BY instrument, money_management_strategy_id",
             &[],
             |row| row_to_operation_point(row, "short_operation_point"),
         )

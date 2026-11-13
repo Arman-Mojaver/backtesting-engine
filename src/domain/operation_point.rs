@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
@@ -46,19 +48,36 @@ impl OperationPoints<'_> {
     }
 }
 
+/// Keys the map once per run of consecutive same-cell points rather than once
+/// per point, so the instrument string is cloned per run.
 fn group_by_cell(points: Vec<OperationPoint>) -> FxHashMap<Cell, Vec<OperationPoint>> {
-    points
-        .into_iter()
-        .fold(FxHashMap::default(), |mut points_by_cell, point| {
-            points_by_cell
-                .entry(Cell::new(
-                    point.instrument.clone(),
-                    point.money_management_strategy_id,
-                ))
-                .or_default()
-                .push(point);
-            points_by_cell
-        })
+    let mut points_by_cell = FxHashMap::default();
+    let mut run: Vec<OperationPoint> = Vec::new();
+    for point in points {
+        if run.first().is_some_and(|first| !same_cell(first, &point)) {
+            insert_run(&mut points_by_cell, std::mem::take(&mut run));
+        }
+        run.push(point);
+    }
+    insert_run(&mut points_by_cell, run);
+    points_by_cell
+}
+
+fn same_cell(a: &OperationPoint, b: &OperationPoint) -> bool {
+    a.money_management_strategy_id == b.money_management_strategy_id && a.instrument == b.instrument
+}
+
+fn insert_run(points_by_cell: &mut FxHashMap<Cell, Vec<OperationPoint>>, run: Vec<OperationPoint>) {
+    let Some(first) = run.first() else {
+        return;
+    };
+    let cell = Cell::new(first.instrument.clone(), first.money_management_strategy_id);
+    match points_by_cell.entry(cell) {
+        Entry::Occupied(mut cell_points) => cell_points.get_mut().extend(run),
+        Entry::Vacant(cell_points) => {
+            cell_points.insert(run);
+        }
+    }
 }
 
 pub trait LongOperationPointRepository {
@@ -256,5 +275,38 @@ mod tests {
     #[test]
     fn group_by_cell_returns_empty_map_for_no_points() {
         assert!(group_by_cell(vec![]).is_empty());
+    }
+
+    #[test]
+    fn group_by_cell_merges_interleaved_cells_in_input_order() {
+        let points = vec![
+            OperationPoint {
+                instrument: "EURUSD".into(),
+                money_management_strategy_id: 1,
+                ..op_point(1, 1, 1000)
+            },
+            OperationPoint {
+                instrument: "USDCAD".into(),
+                money_management_strategy_id: 1,
+                ..op_point(2, 1, 1000)
+            },
+            OperationPoint {
+                instrument: "EURUSD".into(),
+                money_management_strategy_id: 1,
+                ..op_point(3, 1, 1001)
+            },
+        ];
+
+        let index = group_by_cell(points);
+        let ids_in = |instrument: &str, mms_id: i32| -> Vec<i32> {
+            index[&Cell::new(instrument, mms_id)]
+                .iter()
+                .map(|p| p.id)
+                .collect()
+        };
+
+        assert_eq!(index.len(), 2);
+        assert_eq!(ids_in("EURUSD", 1), vec![1, 3]);
+        assert_eq!(ids_in("USDCAD", 1), vec![2]);
     }
 }
