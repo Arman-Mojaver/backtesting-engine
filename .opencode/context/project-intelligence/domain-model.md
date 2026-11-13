@@ -32,7 +32,7 @@
 | **Annual Operation Count** | Number of trades per year, annualized from a total count over the time span. Computed from signal-group operation counts; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_operation_count` |
 | **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 20%, min annual ROI ≥ 5%. Annual operation count ≥ 10, checked on matched trades (the stored count). Owns the threshold checks: `admits_activity()` and `admits_performance()`. | `GlobalStrategyFilter` | `domain::strategy` |
 | **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus a `signal_count()` derived from its signals. The `instrument` only travels on to `Strategy` for tracing; the signal cache does not key on it. Lives in the domain layer. A cross read at the close of resampled point T is stored as the timestamp of the **next** resampled point (signals on the last one are dropped), so it selects the operation point entered after T closed. | `SignalGroup` | `domain::signal_group` |
-| **Cell** | One `(instrument, mms_id)` pair — the unit of work for `create_loop`. Cells are computed in parallel and persisted as one Parquet partition each. | `Cell`, `CellOutput` | `domain::cell`, `application::cell_output`, `engine::strategy::create_loop` |
+| **Cell** | One `(instrument, mms_id)` pair — the unit of work for `create_loop`. Cells are computed in parallel and persisted as one Parquet partition each. | `Cell`, `CellOutput` | `domain::cell`, `application::cell_output`, `application::strategy_batch` |
 | **Parquet Strategy Repository** | Writes strategies to partitioned parquet files under `{base}/instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. Dedups fresh rows by `indicator_id` (idempotent partitions). | `ParquetStrategyRepository` | `infrastructure::strategy_adapter` |
 | **Processed Manifest** | Parquet ledger of completed `(instrument, mms_id, indicator_id)` triples with `processed_at` timestamps. Makes `create`/`create_loop` idempotent. Atomic writes (temp + rename); dedup per triple. | `ParquetProcessedManifest` | `infrastructure::processed_manifest` |
 | **Strategy Persistence** | Batch commit for `create_loop`: assigns `strategy_id`s from the global max, writes partitions in parallel (rayon), commits the manifest once. | `StrategyPersistence` | `infrastructure::strategy_persistence` |
@@ -234,6 +234,7 @@ PG adapters expose no extra public read methods beyond the repository traits.
 | `create_strategies` | `application::strategy_generator` | One **rayon** `par_iter()` pass per signal group: counts matched trades and drops the group unless `admits_activity()`; builds the `Strategy` with real metrics; keeps it only if `admits_performance()`. Survivors keep input order. |
 | `run_strategies` | `application::strategy_runner` | The core use case: `validate_all` → `create_signal_groups` → `filter_signal_groups_by_annual_ops` → `create_strategies` (matched-trade and performance filters inside). |
 | `get_unprocessed` | `application::strategy_runner_utils` | Set-diff of all indicator IDs vs manifest-processed IDs. |
+| `SourceIndex`, `compute_cells`, `fail_on_total_failure` | `application::strategy_batch` | The `create_loop` batch use case: loads all four source tables once (parallel `rayon::join`), computes every cell with `par_iter`, summarises outcomes into `BatchSummary`, and flags a total failure (no cell computed, at least one failed) as systemic. |
 | `CellOutput` | `application::cell_output` | One cell's compute result: instrument, mms_id, strategies, processed indicator IDs. |
 
 ---
@@ -286,6 +287,7 @@ src/
 │   ├── cell_output.rs          # CellOutput — one (instrument, mms_id) cell's compute result
 │   ├── signal_generator.rs     # create_signal_groups() — REAL indicator-derived signals
 │   ├── source_data.rs          # fetch_source_data() — PG-backed data assembly
+│   ├── strategy_batch.rs       # SourceIndex + compute_cells() — create_loop batch use case
 │   ├── strategy_generator.rs   # create_strategies() / create_strategy() — staged filters + real metrics
 │   ├── strategy_runner.rs      # run_strategies() — validate → signals → filter → strategies
 │   └── strategy_runner_utils.rs # get_unprocessed() — manifest diffing
@@ -318,7 +320,7 @@ src/
 │   └── strategy/               # bte strategy commands
 │       ├── mod.rs              # StrategyCommand enum (create, create_loop)
 │       ├── create.rs           # strategy create — single cell pipeline
-│       └── create_loop.rs      # strategy create_loop — all cells, parallel, idempotent
+│       └── create_loop.rs      # strategy create_loop — CLI handler: load, compute, persist, report
 ├── infrastructure/             # Adapters (PG, parquet, manifest, logging)
 │   ├── pg_adapter.rs           # PG adapters implementing domain repo traits
 │   ├── strategy_adapter.rs     # ParquetStrategyRepository (partitioned, idempotent parquet writes)

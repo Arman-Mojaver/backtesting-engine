@@ -16,7 +16,7 @@
 |------|--------|----------|------------|
 | Metrics assume operations close in entry order | ROI/max_draw_down walk operation points sorted by entry timestamp; real trades have exit dates and do not necessarily close in entry order — figures are approximate until fixed | **High** | Account for `exit_date` in the compounding curve before any production use (see `notes.md`) |
 | DbConfig is hardcoded per environment | Host (`host.docker.internal`), ports, and credentials cannot be overridden by env vars | Medium | Fine for the Docker workflow; add env overrides if the engine must target arbitrary PG instances |
-| Engine CLI handlers are only partly unit-tested | `create.rs` tests its manifest lookup and `create_loop.rs` its outcome summary; the `execute` orchestration itself needs PostgreSQL and is untested | Low | Logic is pushed into tested application/infrastructure functions; add handler tests if handlers grow |
+| Engine CLI handlers are only partly unit-tested | `create.rs` tests its manifest lookup and `create_loop.rs` its failed-cell formatting; the batch logic it calls is tested in `application::strategy_batch`; the `execute` orchestration itself needs PostgreSQL and is untested | Low | Logic is pushed into tested application/infrastructure functions; add handler tests if handlers grow |
 | Parquet write cost at scale | Partition append = full file rewrite; `max_strategy_id()` scans all partitions | Low | Fine at current scale; rethink if partition counts grow by orders of magnitude |
 
 ### Technical Debt Details
