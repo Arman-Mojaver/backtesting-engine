@@ -7,7 +7,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::application::cell_output::CellOutput;
 use crate::domain::cell::Cell;
 use crate::infrastructure::processed_manifest::{
-    unix_now_secs, ManifestEntry, ParquetProcessedManifest,
+    ManifestEntry, ParquetProcessedManifest, unix_now_secs,
 };
 use crate::infrastructure::strategy_adapter::{ParquetStrategyRepository, StrategyRow};
 
@@ -230,12 +230,14 @@ mod tests {
         persistence.persist_cells(cells).unwrap();
 
         // Both partitions written.
-        assert!(base
-            .join("instrument=EURUSD/money_management_strategy_id=390/strategies.parquet")
-            .exists());
-        assert!(base
-            .join("instrument=USDJPY/money_management_strategy_id=400/strategies.parquet")
-            .exists());
+        assert!(
+            base.join("instrument=EURUSD/money_management_strategy_id=390/strategies.parquet")
+                .exists()
+        );
+        assert!(
+            base.join("instrument=USDJPY/money_management_strategy_id=400/strategies.parquet")
+                .exists()
+        );
 
         // Manifest records the full processed set, including 2003 (which had no strategy).
         let processed = persistence.read_processed_ids_per_cell().unwrap();

@@ -1,13 +1,13 @@
 use std::fmt;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use log::debug;
 use postgres::fallible_iterator::FallibleIterator;
 use postgres::types::{FromSql, ToSql};
 use postgres::{Client, Config, NoTls, Row};
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::config::environment::DbConfig;
@@ -547,9 +547,10 @@ mod tests {
     #[test]
     fn unknown_type_is_rejected() {
         let err = map_parameters("stochastic", r#"{"n": 1}"#).unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("unknown indicator type: stochastic"));
+        assert!(
+            err.to_string()
+                .contains("unknown indicator type: stochastic")
+        );
     }
 
     #[test]

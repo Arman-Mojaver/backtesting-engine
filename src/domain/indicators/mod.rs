@@ -246,9 +246,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0), rp(3, 3, 3.0), rp(4, 4, 4.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Threshold {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Threshold { buffer: buf, .. } => {
                 assert_eq!(buf.high_threshold, 70.0);
                 assert_eq!(buf.low_threshold, 30.0);
                 assert!(!buf.items.is_empty());
@@ -289,9 +287,7 @@ mod tests {
         let points = rp_macd_14();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Crossover {
-                buffers: ref bufs, ..
-            } => {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
                 // 14 points -> 10 MACD values; the 9-bar signal window leaves
                 // 2 aligned values (constant close -> 0.0).
                 assert_eq!(bufs.upcross_long_buffer.len(), 2);
@@ -317,9 +313,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Crossover {
-                buffers: ref bufs, ..
-            } => {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
                 assert!(bufs.upcross_long_buffer.is_empty());
                 assert!(bufs.upcross_short_buffer.is_empty());
             }
@@ -359,9 +353,7 @@ mod tests {
         let points = rp_ao_34();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 34 points -> 1 AO value (constant median -> 0.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -376,9 +368,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -438,9 +428,7 @@ mod tests {
         let points = rp_ac_38();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 38 points -> 1 AC value (constant median -> 0.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -455,9 +443,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -488,9 +474,7 @@ mod tests {
         let points = rp_bears_14();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 14 points, period 13 -> 1 Bears value (9.0 - 10.0 = -1.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, -1.0);
@@ -505,9 +489,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -545,9 +527,7 @@ mod tests {
         let points = rp_bulls_14();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 14 points, period 13 -> 1 Bulls value (11.0 - 10.0 = 1.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 1.0);
@@ -562,9 +542,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -603,9 +581,7 @@ mod tests {
         let points = rp_cho_5();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 5 points, slow_ma=4 -> 1 CHO value = 50.0.
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 50.0);
@@ -623,9 +599,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -678,9 +652,7 @@ mod tests {
         let points = rp_chv_5();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 5 points, smooth=2, chv=3 -> 1 CHV value = 0.0 (constant spread).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -698,9 +670,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -753,9 +723,7 @@ mod tests {
         let points = rp_dpo_7();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 7 points, period 12 -> ExtMAPeriod = 7 -> 1 DPO value
                 // (10.0 - 10.0 = 0.0).
                 assert_eq!(buf.items.len(), 1);
@@ -771,9 +739,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -812,9 +778,7 @@ mod tests {
         let points = rp_force_4();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 4 points, period 3 -> 1 Force Index value
                 // (1000 * (10.0 - 10.0) = 0.0).
                 assert_eq!(buf.items.len(), 1);
@@ -830,9 +794,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -875,9 +837,7 @@ mod tests {
         let points = rp_osma_6();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 6 points, fast=3, slow=5, signal=2 -> 1 OsMA value
                 // (constant close -> 0.0).
                 assert_eq!(buf.items.len(), 1);
@@ -897,9 +857,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -966,9 +924,7 @@ mod tests {
         let points = rp_roc_5();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 5 points, period 3 -> 2 ROC values (constant close -> 0.0).
                 assert_eq!(buf.items.len(), 2);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -983,9 +939,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -1024,9 +978,7 @@ mod tests {
         let points = rp_trix_5();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 5 points, period 2 -> 1 TRIX value (constant close -> 0.0).
                 assert_eq!(buf.items.len(), 1);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -1041,9 +993,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }
@@ -1082,9 +1032,7 @@ mod tests {
         let points = rp_vroc_5();
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
                 // 5 points, period 2 -> 4 VROC values (constant volume -> 0.0).
                 assert_eq!(buf.items.len(), 4);
                 assert_eq!(buf.items[0].value, 0.0);
@@ -1099,9 +1047,7 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let result = create_indicator_output(&params, &points).unwrap();
         match &result {
-            IndicatorOutput::Oscillator {
-                buffer: ref buf, ..
-            } => assert!(buf.items.is_empty()),
+            IndicatorOutput::Oscillator { buffer: buf, .. } => assert!(buf.items.is_empty()),
             other => panic!("expected One, got {other:?}"),
         }
     }

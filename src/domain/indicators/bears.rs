@@ -3,8 +3,8 @@
 //! `Bears[i] = low[i] - EMA(close, period)[i]`. Ported from `Bears.mq5`
 //! (`MODE_EMA` on `PRICE_CLOSE`).
 use crate::domain::cast;
-use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::ema;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;

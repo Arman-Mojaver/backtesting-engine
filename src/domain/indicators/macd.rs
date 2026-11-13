@@ -9,8 +9,8 @@
 //! default.
 use crate::domain::cast;
 use crate::domain::indicator::MovingAverageType;
-use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{CrossoverBuffers, IndicatorValue};
 use crate::empty_crossover;

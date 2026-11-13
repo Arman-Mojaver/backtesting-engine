@@ -1543,6 +1543,7 @@ The crossover is the owner's intended semantics. The period comes from the refer
 | amd64 CI images (`ubuntu-latest`, no platform pin) | 2026-09-03 | Arm64-Only Runtime Image Tuned for Apple Silicon (2026-11-01) | Images run exclusively on Apple Silicon; native arm64 builds replace emulated amd64 |
 | MACD skipped, not aborted (item 4 of "Port Indicators to Rust + Real Signal Generation") | 2026-07-26 | MACD port (`8c5f4e2`, 2026-10-12) and MACD Is a Crossover (2026-11-02) | Porting MACD removed the `UnsupportedIndicator` path; MACD is now a crossover of its line and signal line |
 | Same-indicator-type validation (`validate_same_indicator_types`, from "Adopt `itertools`") | pre-2026-09-17 | Remove the Same-Indicator-Type Invariant (2026-10-12; recorded 2026-11-02) | Mixed-type runs are intended: `create_loop` runs types together and the processed manifest tracks each indicator regardless of type |
+| Stay on edition 2021 (from "PathBuf for Filesystem Paths; Batch 4 Menu Deferrals") | 2026-11-01 | Edition 2024 (senior review #35, 2026-11-13) | The pinned toolchain 1.98.1 supports edition 2024; migration was mechanical (pattern ergonomics, rustfmt 2024 style) and no drop-order site changes behaviour |
 
 ## Onboarding Checklist
 

@@ -7,7 +7,7 @@ use rustc_hash::FxHashSet;
 use crate::application::cell_output::CellOutput;
 use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
-use crate::config::environment::{parquet_root_dir, resolve_environment, DbConfig};
+use crate::config::environment::{DbConfig, parquet_root_dir, resolve_environment};
 use crate::domain::cell::Cell;
 use crate::domain::indicator::{indicator_ids, unprocessed_indicators};
 use crate::infrastructure::strategy_persistence::StrategyPersistence;

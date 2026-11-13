@@ -6,9 +6,9 @@ use log::{error, info};
 
 use crate::application::cell_output::CellOutput;
 use crate::application::strategy_batch::{
-    compute_cells, fail_on_total_failure, BatchSummary, SourceIndex,
+    BatchSummary, SourceIndex, compute_cells, fail_on_total_failure,
 };
-use crate::config::environment::{parquet_root_dir, resolve_environment, DbConfig};
+use crate::config::environment::{DbConfig, parquet_root_dir, resolve_environment};
 use crate::domain::cell::Cell;
 use crate::infrastructure::strategy_persistence::StrategyPersistence;
 

@@ -2,7 +2,7 @@
 
 # Cargo — Rust Package Manager
 
-**Version**: Rust 2021 edition (lock file present — `Cargo.lock`)
+**Version**: Rust 2024 edition (lock file present — `Cargo.lock`)
 **Project**: `backtesting-engine` v0.1.0
 
 ---
@@ -46,7 +46,7 @@ cargo tree
 [package]
 name = "backtesting-engine"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 default-run = "backtesting-engine"
 
 [lib]

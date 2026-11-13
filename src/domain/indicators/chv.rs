@@ -3,8 +3,8 @@
 //! `CHV[i] = 100 * (SHL[i] - SHL[i - chv_period]) / SHL[i - chv_period]`
 //! with `SHL = EMA(high - low, smooth_period)`. Ported from `CHV.mq5`.
 use crate::domain::cast;
-use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::ema;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;

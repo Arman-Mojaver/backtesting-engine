@@ -18,11 +18,17 @@ pub enum ValidationError {
     IndicatorsEmpty,
     #[error("resampled points list is empty")]
     ResampledPointsEmpty,
-    #[error("instruments must match across resampled points, long operation points, and short operation points, found {expected} and {found}")]
+    #[error(
+        "instruments must match across resampled points, long operation points, and short operation points, found {expected} and {found}"
+    )]
     InstrumentMismatch { expected: String, found: String },
-    #[error("all operation points must reference money management strategy id {expected}, found {found}")]
+    #[error(
+        "all operation points must reference money management strategy id {expected}, found {found}"
+    )]
     MoneyManagementStrategyMismatch { expected: i32, found: i32 },
-    #[error("long and short operation points must share the same timestamps, timestamp {timestamp} is only on one side")]
+    #[error(
+        "long and short operation points must share the same timestamps, timestamp {timestamp} is only on one side"
+    )]
     LongShortTimestampsDiffer { timestamp: i64 },
     #[error("operation point timestamp {timestamp} has no matching resampled point")]
     TimestampMissingFromResampled { timestamp: i64 },

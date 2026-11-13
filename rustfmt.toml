@@ -1,4 +1,4 @@
 # Formatting is enforced by `cargo fmt --check` in CI — this file makes the
 # policy explicit. All settings are rustfmt defaults; the edition is restated
 # so standalone files format identically to the crate.
-edition = "2021"
+edition = "2024"

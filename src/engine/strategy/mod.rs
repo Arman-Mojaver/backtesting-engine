@@ -1,7 +1,7 @@
 mod create;
 mod create_loop;
 
-use clap::{value_parser, Arg, ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command, value_parser};
 
 pub(super) const STRATEGY: &str = "strategy";
 const CREATE: &str = "create";

@@ -1,5 +1,5 @@
-use crate::domain::signal::thresholds::level_crosses;
 use crate::domain::signal::OscillatorBuffer;
+use crate::domain::signal::thresholds::level_crosses;
 
 pub fn detect_signals(buffer: &OscillatorBuffer) -> (Vec<i64>, Vec<i64>) {
     level_crosses(&buffer.items, 0.0, 0.0)

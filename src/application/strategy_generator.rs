@@ -110,7 +110,7 @@ fn create_strategy(
 mod tests {
     use super::*;
 
-    use crate::domain::fixtures::{op_point, ONE_YEAR_SECS};
+    use crate::domain::fixtures::{ONE_YEAR_SECS, op_point};
     use crate::domain::operation_point::points_by_timestamp;
 
     fn min_ops(min_annual_operation_count: f64) -> GlobalStrategyFilter {
@@ -248,9 +248,11 @@ mod tests {
 
         let result_ids: Vec<i32> = strategies.iter().map(|s| s.indicator_id).collect();
         assert_eq!(result_ids, even_ids);
-        assert!(strategies
-            .iter()
-            .all(|s| s.long_operation_point_ids == vec![31]));
+        assert!(
+            strategies
+                .iter()
+                .all(|s| s.long_operation_point_ids == vec![31])
+        );
     }
 
     #[test]

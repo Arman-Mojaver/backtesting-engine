@@ -1,6 +1,6 @@
 use rayon::prelude::*;
 
-use cached::{cached, Cached};
+use cached::{Cached, cached};
 use log::warn;
 
 use crate::domain::indicator::Indicator;

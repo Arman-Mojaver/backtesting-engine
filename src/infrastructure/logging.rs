@@ -10,8 +10,8 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use log::LevelFilter;
 use simplelog::{
-    format_description, ColorChoice, CombinedLogger, Config, ConfigBuilder, TermLogger,
-    TerminalMode, WriteLogger,
+    ColorChoice, CombinedLogger, Config, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
+    format_description,
 };
 
 const DEFAULT_LEVEL: LevelFilter = LevelFilter::Info;

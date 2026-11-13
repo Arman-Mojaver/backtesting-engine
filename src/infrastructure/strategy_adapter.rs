@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use arrow::array::{
     AsArray, Decimal128Array, Int32Array, Int32Builder, Int64Array, ListArray, ListBuilder,
     PrimitiveArray,
@@ -440,18 +440,21 @@ mod tests {
         repo.write_rows(&Cell::new("USDJPY", 400), rows(&strategies, 5))
             .unwrap();
 
-        assert!(tmp
-            .path()
-            .join("instrument=EURUSD/money_management_strategy_id=390/strategies.parquet")
-            .exists());
-        assert!(tmp
-            .path()
-            .join("instrument=EURUSD/money_management_strategy_id=391/strategies.parquet")
-            .exists());
-        assert!(tmp
-            .path()
-            .join("instrument=USDJPY/money_management_strategy_id=400/strategies.parquet")
-            .exists());
+        assert!(
+            tmp.path()
+                .join("instrument=EURUSD/money_management_strategy_id=390/strategies.parquet")
+                .exists()
+        );
+        assert!(
+            tmp.path()
+                .join("instrument=EURUSD/money_management_strategy_id=391/strategies.parquet")
+                .exists()
+        );
+        assert!(
+            tmp.path()
+                .join("instrument=USDJPY/money_management_strategy_id=400/strategies.parquet")
+                .exists()
+        );
     }
 
     #[test]
@@ -607,9 +610,10 @@ mod tests {
             .write_rows(&Cell::new("EURUSD", 390), rows(&sample_strategies(), 1))
             .unwrap_err();
 
-        assert!(err
-            .to_string()
-            .contains(&blocking_file.display().to_string()));
+        assert!(
+            err.to_string()
+                .contains(&blocking_file.display().to_string())
+        );
     }
 
     #[test]

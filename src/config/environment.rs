@@ -39,7 +39,9 @@ impl FromStr for Environment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[error("invalid ENVIRONMENT value '{value}': expected 'production', 'development', or 'testing' (case-insensitive)")]
+#[error(
+    "invalid ENVIRONMENT value '{value}': expected 'production', 'development', or 'testing' (case-insensitive)"
+)]
 pub struct InvalidEnvironmentError {
     value: String,
 }

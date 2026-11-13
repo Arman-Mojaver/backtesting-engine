@@ -2,11 +2,11 @@ use crate::domain::indicator::Indicator;
 use crate::domain::operation_point::OperationPoint;
 use crate::domain::resampled_point::ResampledPointD1;
 
+use super::ValidationError;
 use super::empty_validation;
 use super::same_instrument_validation;
 use super::same_mms_validation;
 use super::same_timestamp_validation;
-use super::ValidationError;
 
 pub fn validate_all(
     indicators: &[Indicator],

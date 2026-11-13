@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use log::{error, info};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -11,7 +11,7 @@ use crate::application::strategy_runner::run_strategies;
 use crate::config::environment::DbConfig;
 use crate::domain::cell::Cell;
 use crate::domain::indicator::{
-    indicator_ids, unprocessed_indicators, Indicator, IndicatorRepository,
+    Indicator, IndicatorRepository, indicator_ids, unprocessed_indicators,
 };
 use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,

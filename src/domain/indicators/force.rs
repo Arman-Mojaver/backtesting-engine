@@ -4,8 +4,8 @@
 //! Ported from `Force_Index.mq5` (`MODE_SMA` on `PRICE_CLOSE`,
 //! `VOLUME_TICK`).
 use crate::domain::cast;
-use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::sma;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;

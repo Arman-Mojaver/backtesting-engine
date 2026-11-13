@@ -4,8 +4,8 @@
 //! `TRIX[k] = (EMA3[k + 1] - EMA3[k]) / EMA3[k]`. Ported from `TRIX.mq5`
 //! (`PRICE_CLOSE`).
 use crate::domain::cast;
-use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::ema;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;

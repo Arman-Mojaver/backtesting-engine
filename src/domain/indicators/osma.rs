@@ -4,8 +4,8 @@
 //! `Signal = SMA(MACD, signal_sma)`; `OsMA = MACD - Signal`. Ported from
 //! `OsMA.mq5`.
 use crate::domain::cast;
-use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::{ema, sma};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;

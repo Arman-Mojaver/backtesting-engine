@@ -4,8 +4,8 @@
 //! contributes `((close - low) - (high - close)) / (high - low) * volume`
 //! to the cumulative AD. Ported from `CHO.mq5` (`VOLUME_TICK`).
 use crate::domain::cast;
-use crate::domain::indicators::moving_averages::ema;
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::ema;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;

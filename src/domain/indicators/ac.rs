@@ -1,8 +1,8 @@
 //! Accelerator/Decelerator (AC): the rate of change of the Awesome Oscillator.
 //!
 //! `AC[k] = AO[k + 4] - SMA(AO, 5)[k]`. Ported from `Accelerator.mq5`.
-use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::sma;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 

@@ -4,8 +4,8 @@
 //! half-period shift so values line up with the bar they describe. Ported
 //! from `DPO.mq5`.
 use crate::domain::cast;
-use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::sma;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 use crate::empty_oscillator;

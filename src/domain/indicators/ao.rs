@@ -3,8 +3,8 @@
 //! `AO[i] = SMA(median, 5)[i] - SMA(median, 34)[i]` with
 //! `median = (high + low) / 2` (MQL5 `PRICE_MEDIAN`). Ported from
 //! `Awesome_Oscillator.mq5`.
-use crate::domain::indicators::moving_averages::sma;
 use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::moving_averages::sma;
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, OscillatorBuffer};
 
