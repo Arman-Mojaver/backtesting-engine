@@ -19,6 +19,7 @@ use parquet::file::properties::WriterProperties;
 use rustc_hash::FxHashSet;
 
 use crate::domain::cast;
+use crate::domain::cell::Cell;
 use crate::domain::strategy::Strategy;
 
 const METRIC_PRECISION: u8 = 10;
@@ -75,20 +76,15 @@ impl ParquetStrategyRepository {
         Self { base_dir }
     }
 
-    pub fn write_rows(
-        &self,
-        instrument: &str,
-        mms_id: i32,
-        rows: Vec<StrategyRow>,
-    ) -> anyhow::Result<()> {
-        let path = self.partition_path(instrument, mms_id);
+    pub fn write_rows(&self, cell: &Cell, rows: Vec<StrategyRow>) -> anyhow::Result<()> {
+        let path = self.partition_path(cell);
         Self::write_partition(&path, rows)
     }
 
-    fn partition_path(&self, instrument: &str, mms_id: i32) -> PathBuf {
+    fn partition_path(&self, cell: &Cell) -> PathBuf {
         self.base_dir
-            .join(format!("instrument={instrument}"))
-            .join(format!("money_management_strategy_id={mms_id}"))
+            .join(format!("instrument={}", cell.instrument))
+            .join(format!("money_management_strategy_id={}", cell.mms_id))
             .join("strategies.parquet")
     }
 
@@ -398,28 +394,19 @@ mod tests {
             .collect()
     }
 
-    fn read_back(
-        repo: &ParquetStrategyRepository,
-        instrument: &str,
-        mms_id: i32,
-    ) -> Vec<StrategyRow> {
-        ParquetStrategyRepository::read_rows(&repo.partition_path(instrument, mms_id))
-            .expect("read back")
+    fn read_back(repo: &ParquetStrategyRepository, cell: &Cell) -> Vec<StrategyRow> {
+        ParquetStrategyRepository::read_rows(&repo.partition_path(cell)).expect("read back")
     }
 
-    fn read_back_ids(repo: &ParquetStrategyRepository, instrument: &str, mms_id: i32) -> Vec<i64> {
-        read_back(repo, instrument, mms_id)
+    fn read_back_ids(repo: &ParquetStrategyRepository, cell: &Cell) -> Vec<i64> {
+        read_back(repo, cell)
             .into_iter()
             .map(|r| r.strategy_id)
             .collect()
     }
 
-    fn read_back_indicator_ids(
-        repo: &ParquetStrategyRepository,
-        instrument: &str,
-        mms_id: i32,
-    ) -> Vec<i32> {
-        read_back(repo, instrument, mms_id)
+    fn read_back_indicator_ids(repo: &ParquetStrategyRepository, cell: &Cell) -> Vec<i32> {
+        read_back(repo, cell)
             .into_iter()
             .map(|r| r.indicator_id)
             .collect()
@@ -430,7 +417,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
 
-        repo.write_rows("EURUSD", 390, rows(&sample_strategies(), 1))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&sample_strategies(), 1))
             .unwrap();
 
         let parquet_path = tmp
@@ -445,11 +432,11 @@ mod tests {
         let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
-        repo.write_rows("EURUSD", 390, rows(&strategies, 1))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&strategies, 1))
             .unwrap();
-        repo.write_rows("EURUSD", 391, rows(&strategies, 3))
+        repo.write_rows(&Cell::new("EURUSD", 391), rows(&strategies, 3))
             .unwrap();
-        repo.write_rows("USDJPY", 400, rows(&strategies, 5))
+        repo.write_rows(&Cell::new("USDJPY", 400), rows(&strategies, 5))
             .unwrap();
 
         assert!(tmp
@@ -471,10 +458,10 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
 
-        repo.write_rows("EURUSD", 390, rows(&sample_strategies(), 1))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&sample_strategies(), 1))
             .unwrap();
 
-        let back = read_back(&repo, "EURUSD", 390);
+        let back = read_back(&repo, &Cell::new("EURUSD", 390));
         assert_eq!(back.len(), 2);
         assert_eq!(back[0].strategy_id, 1);
         assert_eq!(back[0].indicator_id, 2001);
@@ -496,10 +483,10 @@ mod tests {
         strategies[1].max_draw_down = 0.004;
         strategies[1].annual_operation_count = -0.006;
 
-        repo.write_rows("EURUSD", 390, rows(&strategies, 1))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&strategies, 1))
             .unwrap();
 
-        let file = File::open(repo.partition_path("EURUSD", 390)).unwrap();
+        let file = File::open(repo.partition_path(&Cell::new("EURUSD", 390))).unwrap();
         let batch = ParquetRecordBatchReaderBuilder::try_new(file)
             .unwrap()
             .build()
@@ -526,14 +513,17 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
 
-        repo.write_rows("EURUSD", 390, rows(&sample_strategies(), 1))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&sample_strategies(), 1))
             .unwrap();
-        repo.write_rows("EURUSD", 390, rows(&[strategy(9999)], 3))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&[strategy(9999)], 3))
             .unwrap();
 
-        assert_eq!(read_back_ids(&repo, "EURUSD", 390), vec![1, 2, 3]);
         assert_eq!(
-            read_back_indicator_ids(&repo, "EURUSD", 390),
+            read_back_ids(&repo, &Cell::new("EURUSD", 390)),
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            read_back_indicator_ids(&repo, &Cell::new("EURUSD", 390)),
             vec![2001, 2002, 9999]
         );
     }
@@ -544,14 +534,14 @@ mod tests {
         let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
-        repo.write_rows("EURUSD", 390, rows(&strategies, 1))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&strategies, 1))
             .unwrap();
-        repo.write_rows("EURUSD", 390, rows(&strategies, 3))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&strategies, 3))
             .unwrap();
 
-        assert_eq!(read_back_ids(&repo, "EURUSD", 390), vec![1, 2]);
+        assert_eq!(read_back_ids(&repo, &Cell::new("EURUSD", 390)), vec![1, 2]);
         assert_eq!(
-            read_back_indicator_ids(&repo, "EURUSD", 390),
+            read_back_indicator_ids(&repo, &Cell::new("EURUSD", 390)),
             vec![2001, 2002]
         );
     }
@@ -569,18 +559,24 @@ mod tests {
             strategy(3000),
         ];
 
-        repo.write_rows("EURUSD", 390, rows(&sample_strategies(), 1))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&sample_strategies(), 1))
             .unwrap();
-        repo.write_rows("EURUSD", 390, rows(&overlapping, 3))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&overlapping, 3))
             .unwrap();
 
         // The duplicate 2002 keeps its original row (id 2); only 3000 is added.
-        assert_eq!(read_back_ids(&repo, "EURUSD", 390), vec![1, 2, 4]);
         assert_eq!(
-            read_back_indicator_ids(&repo, "EURUSD", 390),
+            read_back_ids(&repo, &Cell::new("EURUSD", 390)),
+            vec![1, 2, 4]
+        );
+        assert_eq!(
+            read_back_indicator_ids(&repo, &Cell::new("EURUSD", 390)),
             vec![2001, 2002, 3000]
         );
-        assert_eq!(read_back(&repo, "EURUSD", 390)[1].annual_roi, -5.10);
+        assert_eq!(
+            read_back(&repo, &Cell::new("EURUSD", 390))[1].annual_roi,
+            -5.10
+        );
     }
 
     #[test]
@@ -589,14 +585,14 @@ mod tests {
         let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
-        repo.write_rows("EURUSD", 390, rows(&strategies, 1))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&strategies, 1))
             .unwrap();
-        repo.write_rows("USDJPY", 400, rows(&strategies, 3))
+        repo.write_rows(&Cell::new("USDJPY", 400), rows(&strategies, 3))
             .unwrap();
-        repo.write_rows("EURUSD", 390, rows(&strategies, 5))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&strategies, 5))
             .unwrap();
 
-        assert_eq!(read_back_ids(&repo, "USDJPY", 400), vec![3, 4]);
+        assert_eq!(read_back_ids(&repo, &Cell::new("USDJPY", 400)), vec![3, 4]);
     }
 
     #[test]
@@ -607,7 +603,7 @@ mod tests {
         fs::write(&blocking_file, b"").unwrap();
 
         let err = repo
-            .write_rows("EURUSD", 390, rows(&sample_strategies(), 1))
+            .write_rows(&Cell::new("EURUSD", 390), rows(&sample_strategies(), 1))
             .unwrap_err();
 
         assert!(err
@@ -629,11 +625,11 @@ mod tests {
         let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
         let strategies = sample_strategies();
 
-        repo.write_rows("EURUSD", 390, rows(&strategies, 1))
+        repo.write_rows(&Cell::new("EURUSD", 390), rows(&strategies, 1))
             .unwrap();
-        repo.write_rows("USDJPY", 400, rows(&strategies, 7))
+        repo.write_rows(&Cell::new("USDJPY", 400), rows(&strategies, 7))
             .unwrap();
-        repo.write_rows("EURUSD", 391, rows(&strategies, 3))
+        repo.write_rows(&Cell::new("EURUSD", 391), rows(&strategies, 3))
             .unwrap();
 
         assert_eq!(repo.max_strategy_id().unwrap(), 8);
@@ -643,7 +639,7 @@ mod tests {
     fn max_strategy_id_finds_the_column_by_name() {
         let tmp = TempDir::new().unwrap();
         let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
-        let path = repo.partition_path("EURUSD", 390);
+        let path = repo.partition_path(&Cell::new("EURUSD", 390));
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         let schema = Arc::new(Schema::new(vec![
             Field::new("indicator_id", DataType::Int64, false),

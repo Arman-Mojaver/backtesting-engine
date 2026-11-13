@@ -11,12 +11,6 @@ use crate::infrastructure::processed_manifest::{
 };
 use crate::infrastructure::strategy_adapter::{ParquetStrategyRepository, StrategyRow};
 
-struct PartitionWrite {
-    instrument: String,
-    mms_id: i32,
-    rows: Vec<StrategyRow>,
-}
-
 pub struct StrategyPersistence {
     strategies: ParquetStrategyRepository,
     manifest: ParquetProcessedManifest,
@@ -44,7 +38,7 @@ impl StrategyPersistence {
         // Intentional: no inter-process lock. bte commands are not expected to
         // run concurrently.
         let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
-        let mut partition_writes: Vec<PartitionWrite> = Vec::with_capacity(cells.len());
+        let mut partition_writes: Vec<(Cell, Vec<StrategyRow>)> = Vec::with_capacity(cells.len());
         let mut manifest_entries: Vec<ManifestEntry> = Vec::with_capacity(cells.len());
         for cell_output in cells {
             let mut rows = Vec::with_capacity(cell_output.strategies.len());
@@ -56,23 +50,16 @@ impl StrategyPersistence {
                 cell: cell_output.cell.clone(),
                 indicator_ids: cell_output.computed_indicator_ids,
             });
-            partition_writes.push(PartitionWrite {
-                instrument: cell_output.cell.instrument,
-                mms_id: cell_output.cell.mms_id,
-                rows,
-            });
+            partition_writes.push((cell_output.cell, rows));
         }
 
-        partition_writes.into_par_iter().try_for_each(|write| {
-            self.strategies
-                .write_rows(&write.instrument, write.mms_id, write.rows)
-                .with_context(|| {
-                    format!(
-                        "failed to write partition {} (mms_id={})",
-                        write.instrument, write.mms_id
-                    )
-                })
-        })?;
+        partition_writes
+            .into_par_iter()
+            .try_for_each(|(cell, rows)| {
+                self.strategies
+                    .write_rows(&cell, rows)
+                    .with_context(|| format!("failed to write partition {cell}"))
+            })?;
 
         let processed_at = unix_now_secs()?;
         self.manifest.append_all(&manifest_entries, processed_at)?;
