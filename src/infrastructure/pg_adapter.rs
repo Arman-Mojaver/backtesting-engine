@@ -3,6 +3,7 @@ use std::time::Instant;
 
 use anyhow::{bail, Context};
 use log::debug;
+use postgres::fallible_iterator::FallibleIterator;
 use postgres::types::{FromSql, ToSql};
 use postgres::{Client, NoTls, Row};
 use serde::de::DeserializeOwned;
@@ -240,18 +241,25 @@ where
     F: Fn(&Row) -> anyhow::Result<T>,
 {
     let start = Instant::now();
-    let rows = conn
-        .borrow_mut()
-        .query(sql, params)
+    let mut conn = conn.borrow_mut();
+    let mut rows = conn
+        .query_raw(sql, params.iter().copied())
         .with_context(|| format!("failed to query {label}"))?;
+    let mut out = Vec::new();
+    while let Some(row) = rows
+        .next()
+        .with_context(|| format!("failed to query {label}"))?
+    {
+        out.push(map(&row)?);
+    }
     let duration = start.elapsed();
 
     debug!(
-        "query executed ({label}): {} rows in {duration:?}",
-        rows.len()
+        "query fetched and mapped ({label}): {} rows in {duration:?}",
+        out.len()
     );
 
-    rows.iter().map(map).collect()
+    Ok(out)
 }
 
 /// One PostgreSQL connection serving every repository port.
