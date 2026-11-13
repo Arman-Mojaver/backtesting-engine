@@ -134,8 +134,7 @@ fn compute_cell(
     };
 
     CellOutcome::Computed(CellOutput {
-        instrument: cell.instrument.clone(),
-        mms_id: cell.mms_id,
+        cell: cell.clone(),
         strategies,
         computed_indicator_ids: indicator_ids(&unprocessed_indicators),
     })
@@ -277,8 +276,7 @@ mod tests {
 
     fn computed_outcome(instrument: &str, mms_id: i32) -> CellOutcome {
         CellOutcome::Computed(CellOutput {
-            instrument: instrument.to_string(),
-            mms_id,
+            cell: Cell::new(instrument, mms_id),
             strategies: Vec::new(),
             computed_indicator_ids: Vec::new(),
         })
@@ -360,14 +358,11 @@ mod tests {
             computed_outcome("EURUSD", 1),
         ];
         let (computed, _) = split_outcomes(outcomes);
-        let cells: Vec<(String, i32)> = computed
+        let cells: Vec<Cell> = computed
             .into_iter()
-            .map(|cell_output| (cell_output.instrument, cell_output.mms_id))
+            .map(|cell_output| cell_output.cell)
             .collect();
-        assert_eq!(
-            cells,
-            vec![("USDJPY".to_string(), 2), ("EURUSD".to_string(), 1)]
-        );
+        assert_eq!(cells, vec![Cell::new("USDJPY", 2), Cell::new("EURUSD", 1)]);
     }
 
     #[test]
@@ -469,7 +464,7 @@ mod tests {
         let CellOutcome::Computed(output) = outcome else {
             panic!("expected the cell to be computed");
         };
-        assert_eq!((output.instrument.as_str(), output.mms_id), ("EURUSD", 1));
+        assert_eq!(output.cell, Cell::new("EURUSD", 1));
         assert_eq!(output.computed_indicator_ids, vec![2]);
     }
 

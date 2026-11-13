@@ -46,20 +46,20 @@ impl StrategyPersistence {
         let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
         let mut partition_writes: Vec<PartitionWrite> = Vec::with_capacity(cells.len());
         let mut manifest_entries: Vec<ManifestEntry> = Vec::with_capacity(cells.len());
-        for cell in cells {
-            let mut rows = Vec::with_capacity(cell.strategies.len());
-            for strategy in cell.strategies {
+        for cell_output in cells {
+            let mut rows = Vec::with_capacity(cell_output.strategies.len());
+            for strategy in cell_output.strategies {
                 rows.push(StrategyRow::from_strategy(strategy, next_id));
                 next_id = next_id.saturating_add(1);
             }
             manifest_entries.push(ManifestEntry {
-                instrument: cell.instrument.clone(),
-                mms_id: cell.mms_id,
-                indicator_ids: cell.computed_indicator_ids,
+                instrument: cell_output.cell.instrument.clone(),
+                mms_id: cell_output.cell.mms_id,
+                indicator_ids: cell_output.computed_indicator_ids,
             });
             partition_writes.push(PartitionWrite {
-                instrument: cell.instrument,
-                mms_id: cell.mms_id,
+                instrument: cell_output.cell.instrument,
+                mms_id: cell_output.cell.mms_id,
                 rows,
             });
         }
@@ -108,8 +108,7 @@ mod tests {
 
     fn cell(instrument: &str, mms_id: i32, indicator_ids: &[i32]) -> CellOutput {
         CellOutput {
-            instrument: instrument.to_string(),
-            mms_id,
+            cell: Cell::new(instrument, mms_id),
             strategies: indicator_ids
                 .iter()
                 .map(|&indicator_id| strategy(instrument, indicator_id, mms_id))
@@ -228,14 +227,12 @@ mod tests {
 
         let cells = vec![
             CellOutput {
-                instrument: "EURUSD".to_string(),
-                mms_id: 390,
+                cell: Cell::new("EURUSD", 390),
                 strategies: vec![strategy("EURUSD", 2001, 390), strategy("EURUSD", 2002, 390)],
                 computed_indicator_ids: vec![2001, 2002, 2003],
             },
             CellOutput {
-                instrument: "USDJPY".to_string(),
-                mms_id: 400,
+                cell: Cell::new("USDJPY", 400),
                 strategies: vec![strategy("USDJPY", 3001, 400)],
                 computed_indicator_ids: vec![3001],
             },

@@ -65,8 +65,7 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
 
     let persist_start = Instant::now();
     persistence.persist_cells(vec![CellOutput {
-        instrument: instrument.to_string(),
-        mms_id: money_management_strategy_id,
+        cell: Cell::new(instrument, money_management_strategy_id),
         strategies,
         computed_indicator_ids: unprocessed_ids,
     }])
@@ -115,8 +114,7 @@ mod tests {
 
     fn processed_cell(instrument: &str, mms_id: i32, indicator_ids: &[i32]) -> CellOutput {
         CellOutput {
-            instrument: instrument.to_string(),
-            mms_id,
+            cell: Cell::new(instrument, mms_id),
             strategies: Vec::new(),
             computed_indicator_ids: indicator_ids.to_vec(),
         }
