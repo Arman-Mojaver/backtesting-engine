@@ -37,7 +37,7 @@
 | Generate signal groups from indicators | `create_signals` → **`create_signal_groups`** | `src/application/signal_generator.rs` | REAL indicator outputs → signal semantics; rayon + `#[cached]` keyed `(indicator_id, instrument)` |
 | Build strategies from signal groups | `create_strategies()` | `src/application/strategy_generator.rs` | One rayon pass: matched-trade count filter → real metrics → performance filter |
 | Run the full pipeline for one cell | `run_strategies()` | `src/application/strategy_runner.rs` | validate → signals → filter signal counts → strategies (filters matched ops, DD/ROI) |
-| Which indicators are already done? | `get_unprocessed()` | `src/application/strategy_runner_utils.rs` | Set-diff DB indicator IDs vs manifest |
+| Which indicators are already done? | `unprocessed_indicators()` | `src/domain/indicator.rs` | Set-diff DB indicator IDs vs manifest |
 | One cell's compute result | `CellOutput` | `src/application/cell_output.rs` | instrument, mms_id, strategies, processed IDs |
 | Write strategies to parquet | `ParquetStrategyRepository::write_rows()` | `src/infrastructure/strategy_adapter.rs` | Partitioned by instrument + mms_id; ZSTD; idempotent by indicator_id |
 | Record processed indicators | `ParquetProcessedManifest` | `src/infrastructure/processed_manifest.rs` | `processed.parquet` ledger; atomic writes; dedup per triple |

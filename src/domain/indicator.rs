@@ -1,3 +1,5 @@
+use rustc_hash::FxHashSet;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndicatorParameters {
     Macd {
@@ -62,6 +64,73 @@ pub struct Indicator {
     pub parameters: IndicatorParameters,
 }
 
+pub fn unprocessed_indicators(
+    indicators: &[Indicator],
+    processed_ids: &FxHashSet<i32>,
+) -> Vec<Indicator> {
+    indicators
+        .iter()
+        .filter(|indicator| !processed_ids.contains(&indicator.id))
+        .cloned()
+        .collect()
+}
+
+pub fn indicator_ids(indicators: &[Indicator]) -> Vec<i32> {
+    indicators.iter().map(|indicator| indicator.id).collect()
+}
+
 pub trait IndicatorRepository {
     fn get_all(&mut self) -> anyhow::Result<Vec<Indicator>>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn indicators(ids: &[i32]) -> Vec<Indicator> {
+        ids.iter()
+            .map(|&id| Indicator {
+                id,
+                parameters: IndicatorParameters::AwesomeOscillator,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn unprocessed_indicators_with_no_indicators_returns_empty() {
+        let result = unprocessed_indicators(&[], &FxHashSet::default());
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn unprocessed_indicators_with_nothing_processed_returns_all() {
+        let result = unprocessed_indicators(&indicators(&[1, 2, 3]), &FxHashSet::default());
+        assert_eq!(indicator_ids(&result), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn unprocessed_indicators_with_all_processed_returns_empty() {
+        let mut processed = FxHashSet::default();
+        processed.insert(1);
+        processed.insert(2);
+        let result = unprocessed_indicators(&indicators(&[1, 2]), &processed);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn unprocessed_indicators_with_partial_overlap_returns_the_rest() {
+        let mut processed = FxHashSet::default();
+        processed.insert(1);
+        processed.insert(3);
+        let result = unprocessed_indicators(&indicators(&[1, 2, 3, 4]), &processed);
+        assert_eq!(indicator_ids(&result), vec![2, 4]);
+    }
+
+    #[test]
+    fn unprocessed_indicators_with_unrelated_processed_ids_returns_all() {
+        let mut processed = FxHashSet::default();
+        processed.insert(10);
+        let result = unprocessed_indicators(&indicators(&[1, 2]), &processed);
+        assert_eq!(indicator_ids(&result), vec![1, 2]);
+    }
 }

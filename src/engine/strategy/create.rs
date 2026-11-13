@@ -7,9 +7,9 @@ use rustc_hash::FxHashSet;
 use crate::application::cell_output::CellOutput;
 use crate::application::source_data::fetch_source_data;
 use crate::application::strategy_runner::run_strategies;
-use crate::application::strategy_runner_utils::{get_unprocessed, indicator_ids};
 use crate::config::environment::{parquet_root_dir, resolve_environment, DbConfig};
 use crate::domain::cell::Cell;
+use crate::domain::indicator::{indicator_ids, unprocessed_indicators};
 use crate::infrastructure::strategy_persistence::StrategyPersistence;
 
 pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
@@ -30,7 +30,7 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
 
     let processed_ids =
         read_processed_indicator_ids(&persistence, instrument, money_management_strategy_id)?;
-    let unprocessed_indicators = get_unprocessed(&data.indicators, &processed_ids);
+    let unprocessed_indicators = unprocessed_indicators(&data.indicators, &processed_ids);
     let indicator_count = data.indicators.len();
     let unprocessed_ids = indicator_ids(&unprocessed_indicators);
     let unprocessed_count = unprocessed_ids.len();

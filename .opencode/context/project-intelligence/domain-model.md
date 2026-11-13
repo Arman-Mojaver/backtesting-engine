@@ -185,6 +185,7 @@ Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` r
 | `performance_metrics` | `domain::performance_metrics` | `(ops: Vec<&OperationPoint>) -> PerformanceMetrics` | Sorts the owned ops chronologically in place (stable; ties keep input order), then ONE pass: `cumsum = 1 + Σ(cummax * result * risk/sl)` with running `cummax`. Returns `{ global_roi: (cumsum - 1) * 100, max_draw_down: deepest (cummax - cumsum)/cummax * 100 }`, each rounded to 2dp independently. Both 0.0 for empty ops. |
 | `PerformanceMetrics::annual_roi` | `domain::performance_metrics` | `(&self, start_ts: i64, end_ts: i64) -> f64` | Annualizes `self.global_roi` via compounding: `((1 + roi/100)^(1/years) - 1) * 100`, rounded to 2dp. Returns 0.0 for non-positive span. |
 | `filter_signal_groups_by_annual_ops` | `domain::signal_group` | `(groups: Vec<SignalGroup>, filter: &GlobalStrategyFilter, start_ts: i64, end_ts: i64) -> Vec<SignalGroup>` | Keeps groups with `signal_count() > 0` and `filter.admits_activity(annual_operation_count(signal_count, start, end))`. Raw signals are an upper bound on matched trades, so this never drops a passing group. |
+| `unprocessed_indicators` | `domain::indicator` | `(indicators: &[Indicator], processed_ids: &FxHashSet<i32>) -> Vec<Indicator>` | Set-diff of all indicators vs manifest-processed IDs, keeping input order. `indicator_ids` lists the IDs of a slice. |
 
 ---
 
@@ -233,7 +234,6 @@ PG adapters expose no extra public read methods beyond the repository traits.
 | `create_signal_groups` | `application::signal_generator` | Computes REAL indicator outputs (`create_indicator_output`) and converts them to `SignalGroup`s via signal semantics. Rayon `par_iter`; per-indicator memoization via `#[cached]` keyed `(indicator_id, instrument)`. Indicators that fail to compute are logged as warnings and skipped, not aborted. |
 | `create_strategies` | `application::strategy_generator` | One **rayon** `par_iter()` pass per signal group: counts matched trades and drops the group unless `admits_activity()`; builds the `Strategy` with real metrics; keeps it only if `admits_performance()`. Survivors keep input order. |
 | `run_strategies` | `application::strategy_runner` | The core use case: `validate_all` → `create_signal_groups` → `filter_signal_groups_by_annual_ops` → `create_strategies` (matched-trade and performance filters inside). |
-| `get_unprocessed` | `application::strategy_runner_utils` | Set-diff of all indicator IDs vs manifest-processed IDs. |
 | `SourceIndex`, `compute_cells`, `fail_on_total_failure` | `application::strategy_batch` | The `create_loop` batch use case: loads all four source tables once (parallel `rayon::join`), computes every cell with `par_iter`, summarises outcomes into `BatchSummary`, and flags a total failure (no cell computed, at least one failed) as systemic. |
 | `CellOutput` | `application::cell_output` | One cell's compute result: instrument, mms_id, strategies, processed indicator IDs. |
 
@@ -289,11 +289,10 @@ src/
 │   ├── source_data.rs          # fetch_source_data() — PG-backed data assembly
 │   ├── strategy_batch.rs       # SourceIndex + compute_cells() — create_loop batch use case
 │   ├── strategy_generator.rs   # create_strategies() / create_strategy() — staged filters + real metrics
-│   ├── strategy_runner.rs      # run_strategies() — validate → signals → filter → strategies
-│   └── strategy_runner_utils.rs # get_unprocessed() — manifest diffing
+│   └── strategy_runner.rs      # run_strategies() — validate → signals → filter → strategies
 ├── domain/                     # Pure domain logic — no I/O, no frameworks
 │   ├── cell.rs                 # Cell — the (instrument, mms_id) unit of work; Display + Ord
-│   ├── indicator.rs            # Indicator + IndicatorParameters (14 variants) + IndicatorRepository
+│   ├── indicator.rs            # Indicator + IndicatorParameters (14 variants) + IndicatorRepository + unprocessed_indicators()
 │   ├── indicators/             # Indicator computation: 14 indicators + dispatch + macros + moving averages
 │   │   ├── mod.rs              # create_indicator_output() dispatch, PriceField, IndicatorError
 │   │   ├── macros.rs           # indicator_values!, validate_period!, empty_oscillator!, empty_crossover!

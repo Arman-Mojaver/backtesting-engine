@@ -8,10 +8,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::application::cell_output::CellOutput;
 use crate::application::signal_generator::signal_group_cache_stats;
 use crate::application::strategy_runner::run_strategies;
-use crate::application::strategy_runner_utils::{get_unprocessed, indicator_ids};
 use crate::config::environment::DbConfig;
 use crate::domain::cell::Cell;
-use crate::domain::indicator::{Indicator, IndicatorRepository};
+use crate::domain::indicator::{
+    indicator_ids, unprocessed_indicators, Indicator, IndicatorRepository,
+};
 use crate::domain::operation_point::{
     LongOperationPointRepository, OperationPoint, ShortOperationPointRepository,
 };
@@ -110,7 +111,7 @@ fn compute_cell(
     let processed_ids = processed_ids_per_cell
         .get(cell)
         .unwrap_or(&empty_processed_ids);
-    let unprocessed_indicators = get_unprocessed(&source.indicators, processed_ids);
+    let unprocessed_indicators = unprocessed_indicators(&source.indicators, processed_ids);
     if unprocessed_indicators.is_empty() {
         return CellOutcome::AlreadyProcessed;
     }
