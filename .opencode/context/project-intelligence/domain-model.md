@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.16 | Updated: 2026-11-13 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.17 | Updated: 2026-11-13 -->
 
 # Domain Model — Backtesting Engine
 
@@ -70,7 +70,7 @@ OperationPoints {
 }
 // Methods: long_points_by_timestamp()  -> FxHashMap<i64, &OperationPoint>
 //          short_points_by_timestamp() -> FxHashMap<i64, &OperationPoint>
-//          start_end_timestamps()      -> (i64, i64)  — (min, max) of long op timestamps
+//          start_end_timestamps()      -> Option<(i64, i64)>  — (min, max) of long op timestamps; None when empty
 // Duplicate timestamps: last wins.
 ```
 
@@ -148,7 +148,7 @@ Strategy {
     money_management_strategy_id:   i32       — which MMS governs this strategy
 }
 // Note: strategy_id is NOT a domain field. IDs are assigned at persistence time
-// by ParquetStrategyRepository (global max + 1 across all partitions).
+// by StrategyPersistence::persist_cells (global max + 1 across all partitions).
 ```
 
 ### GlobalStrategyFilter
@@ -181,7 +181,7 @@ Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` r
 
 | Function | File | Signature | Behavior |
 |----------|------|-----------|----------|
-| `annual_operation_count` | `domain::annual_operation_count` | `(total_count: usize, start_ts: i64, end_ts: i64) -> f64` | `total_count / years`, where `years = (end-start)/86400/365.25` (rounded 2dp). Returns 0.0 for zero count or non-positive span. |
+| `annual_operation_count` | `domain::annual_operation_count` | `(total_count: usize, start_ts: i64, end_ts: i64) -> f64` | `total_count / years`, where `years = (end-start)/86400/365.25` (not rounded). The result is rounded to 2dp. Returns 0.0 for zero count or non-positive span. |
 | `performance_metrics` | `domain::performance_metrics` | `(ops: Vec<&OperationPoint>) -> PerformanceMetrics` | Sorts the owned ops chronologically in place (stable; ties keep input order), then ONE pass: `cumsum = 1 + Σ(cummax * result * risk/sl)` with running `cummax`. Returns `{ global_roi: (cumsum - 1) * 100, max_draw_down: deepest (cummax - cumsum)/cummax * 100 }`, each rounded to 2dp independently. Both 0.0 for empty ops. |
 | `PerformanceMetrics::annual_roi` | `domain::performance_metrics` | `(&self, start_ts: i64, end_ts: i64) -> f64` | Annualizes `self.global_roi` via compounding: `((1 + roi/100)^(1/years) - 1) * 100`, rounded to 2dp. Returns 0.0 for non-positive span. |
 | `filter_signal_groups_by_annual_ops` | `domain::signal_group` | `(groups: Vec<SignalGroup>, filter: &GlobalStrategyFilter, start_ts: i64, end_ts: i64) -> Vec<SignalGroup>` | Keeps groups with `signal_count() > 0` and `filter.admits_activity(annual_operation_count(signal_count, start, end))`. Raw signals are an upper bound on matched trades, so this never drops a passing group. |
@@ -209,7 +209,7 @@ Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` r
 
 ## Repository Traits (Ports)
 
-The domain defines repository traits — ports in a ports-and-adapters architecture:
+The domain defines repository traits — ports in a ports-and-adapters architecture. Every method takes `&mut self`: a read uses the adapter's PostgreSQL connection.
 
 | Trait | Methods | Semantics |
 |-------|---------|-----------|
@@ -218,9 +218,9 @@ The domain defines repository traits — ports in a ports-and-adapters architect
 | `ResampledPointD1Repository` | `get_all()`, `get_by_instrument(instrument)`, `index_by_instrument()` (default) | Daily candles |
 | `IndicatorRepository` | `get_all()` | Indicators |
 
-Infrastructure provides the `Pg*Adapter` (PostgreSQL) implementations. The in-memory test repos were removed (2026-08); tests use `domain::fixtures` builders + `tempfile`-based adapter tests instead. There is no dedicated money-management-strategy adapter: `create_loop` derives its cell universe from the operation-point indexes themselves (`index_by_cell()`), and the long and short tables carry the same money-management id set (written together by the upstream Backtesting-4.0 project).
+Infrastructure provides one PostgreSQL implementation: `PgStore` implements all four traits. The in-memory test repos were removed (2026-08); tests use `domain::fixtures` builders + `tempfile`-based adapter tests instead. There is no dedicated money-management-strategy adapter: `create_loop` derives its cell universe from the operation-point indexes themselves (`index_by_cell()`), and the long and short tables carry the same money-management id set (written together by the upstream Backtesting-4.0 project).
 
-PG adapters expose no extra public read methods beyond the repository traits.
+`PgStore` exposes no public read methods beyond the repository traits; `PgStore::connect(&DbConfig)` opens one connection.
 
 ---
 
@@ -230,12 +230,12 @@ PG adapters expose no extra public read methods beyond the repository traits.
 
 | Unit | File | Purpose |
 |------|------|---------|
-| `fetch_source_data` | `application::source_data` | Connects to PG via `DbConfig::from_env`, fetches indicators/resampled/long/short for one (instrument, mms_id). Rich connection diagnostics on failure. |
+| `fetch_source_data` | `application::source_data` | Takes `&DbConfig` (the `engine` handlers resolve the environment), opens one `PgStore`, and fetches indicators/resampled/long/short for one (instrument, mms_id). `PgStore::connect` adds connection diagnostics on failure. |
 | `create_signal_groups` | `application::signal_generator` | Computes REAL indicator outputs (`create_indicator_output`) and converts them to `SignalGroup`s via signal semantics. Rayon `par_iter`; per-indicator memoization via `#[cached]` keyed `(indicator_id, instrument)`. Indicators that fail to compute are logged as warnings and skipped, not aborted. |
 | `create_strategies` | `application::strategy_generator` | One **rayon** `par_iter()` pass per signal group: counts matched trades and drops the group unless `admits_activity()`; builds the `Strategy` with real metrics; keeps it only if `admits_performance()`. Survivors keep input order. |
 | `run_strategies` | `application::strategy_runner` | The core use case: `validate_all` → `create_signal_groups` → `filter_signal_groups_by_annual_ops` → `create_strategies` (matched-trade and performance filters inside). |
 | `SourceIndex`, `compute_cells`, `fail_on_total_failure` | `application::strategy_batch` | The `create_loop` batch use case: loads all four source tables once (parallel `rayon::join`), computes every cell with `par_iter`, summarises outcomes into `BatchSummary`, and flags a total failure (no cell computed, at least one failed) as systemic. |
-| `CellOutput` | `application::cell_output` | One cell's compute result: instrument, mms_id, strategies, processed indicator IDs. |
+| `CellOutput` | `application::cell_output` | One cell's compute result: the `Cell`, its strategies, and the computed indicator IDs. |
 
 ---
 
@@ -243,7 +243,7 @@ PG adapters expose no extra public read methods beyond the repository traits.
 
 | Adapter | Purpose | File |
 |---------|---------|------|
-| `Pg*Adapter` | PostgreSQL persistence (production) | `src/infrastructure/pg_adapter.rs` |
+| `PgStore` | PostgreSQL reads; implements all four repository traits | `src/infrastructure/pg_adapter.rs` |
 | `ParquetStrategyRepository` | Writes strategies to partitioned parquet files (ZSTD compression) | `src/infrastructure/strategy_adapter.rs` |
 | `ParquetProcessedManifest` | Idempotency ledger of processed (instrument, mms_id, indicator_id) triples | `src/infrastructure/processed_manifest.rs` |
 | `StrategyPersistence` | Batch commit for create_loop: ID assignment + parallel partition writes + manifest commit | `src/infrastructure/strategy_persistence.rs` |
@@ -254,12 +254,12 @@ Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_
 - Schema: `strategy_id` (Int64), `indicator_id` (Int32), `annual_roi`/`max_draw_down`/`annual_operation_count` (Decimal128(10,2)), `long_operation_point_ids`/`short_operation_point_ids` (List<Int32>), `money_management_strategy_id` (Int32).
 - `base_dir` is `{parquet_root}/strategy`, derived by `StrategyPersistence::new(parquet_root)`; `parquet_root` resolved by `config::environment::parquet_root_dir(env)` → `/app/parquet_files/{env}`.
 - **Idempotent partitions**: `write_partition` reads existing rows and drops fresh rows whose `indicator_id` already exists — re-runs never duplicate.
-- **Append semantics**: write = read existing + append fresh + rewrite the file. `strategy_id` assigned at write time as `max_strategy_id() + 1` (global max across ALL partitions, scanned recursively). IDs are contiguous within a batch and continue across partitions and appends.
-- API: `write(instrument, mms_id, &[Strategy])` (assigns IDs), `write_rows(&Cell, Vec<StrategyRow>)` (pre-assigned IDs, used by `StrategyPersistence`), `max_strategy_id()`.
+- **Append semantics**: write = read existing + append fresh + rewrite the file in place. Rows arrive with their `strategy_id` already set: `StrategyPersistence::persist_cells` assigns `max_strategy_id() + 1` onwards (global max across ALL partitions, scanned recursively). IDs are contiguous within a batch and continue across partitions and appends.
+- API: `write_rows(&Cell, Vec<StrategyRow>)` (rows carry their IDs), `max_strategy_id()`. `StrategyRow::from_strategy(Strategy, id)` builds a row.
 
 ### Processed Manifest
 `{root_dir}/processed.parquet` — schema: `instrument` (Utf8), `mms_id` (Int32), `indicator_id` (Int32), `processed_at` (Int64).
-- `read_processed_ids_per_cell()` (keyed by `Cell`), `append_all(&[ManifestEntry], processed_at)`.
+- `read_processed_ids_per_cell()` (keyed by `Cell`), `append_all(&[ManifestEntry], processed_at)`. A `ManifestEntry` holds a `Cell` and its indicator IDs.
 - Dedups on the (instrument, mms_id, indicator_id) triple; atomic writes (temp file + fsync + rename; temp file removed on failure).
 - Consumed by `strategy create` (skip processed) and `create_loop` (per-cell skip).
 
@@ -291,6 +291,7 @@ src/
 │   ├── strategy_generator.rs   # create_strategies() / create_strategy() — staged filters + real metrics
 │   └── strategy_runner.rs      # run_strategies() — validate → signals → filter → strategies
 ├── domain/                     # Pure domain logic — no I/O, no frameworks
+│   ├── cast.rs                 # the only numeric `as` casts + metric rounding (round_to)
 │   ├── cell.rs                 # Cell — the (instrument, mms_id) unit of work; Display + Ord
 │   ├── indicator.rs            # Indicator + IndicatorParameters (14 variants) + IndicatorRepository + unprocessed_indicators()
 │   ├── indicators/             # Indicator computation: 14 indicators + dispatch + macros + moving averages
@@ -313,15 +314,15 @@ src/
 │   ├── performance_metrics.rs  # performance_metrics() -> PerformanceMetrics (single pass) + annual_roi() method
 │   ├── time_span.rs            # difference_in_years() shared by annualised metrics
 │   ├── validation/             # Domain invariant checks (4 rules + combined)
-│   └── fixtures.rs             # Test data builders
-├── engine/                     # Standalone Rust CLI engine (own binary)
+│   └── fixtures.rs             # #[cfg(test)] test data builders
+├── engine/                     # The Rust CLI (`bte`); handlers resolve the environment
 │   ├── mod.rs                  # EngineCommand enum, build_cli(), parse(), execute()
 │   └── strategy/               # bte strategy commands
 │       ├── mod.rs              # StrategyCommand enum (create, create_loop)
 │       ├── create.rs           # strategy create — single cell pipeline
 │       └── create_loop.rs      # strategy create_loop — CLI handler: load, compute, persist, report
 ├── infrastructure/             # Adapters (PG, parquet, manifest, logging)
-│   ├── pg_adapter.rs           # PG adapters implementing domain repo traits
+│   ├── pg_adapter.rs           # PgStore — implements all four domain repo traits
 │   ├── strategy_adapter.rs     # ParquetStrategyRepository (partitioned, idempotent parquet writes)
 │   ├── processed_manifest.rs   # ParquetProcessedManifest (idempotency ledger)
 │   ├── strategy_persistence.rs # StrategyPersistence (batch commit)
@@ -351,7 +352,7 @@ src/
 12. **Real metrics in the generator**: `create_strategies()` computes `performance_metrics()` → `annual_roi()`, plus `annual_operation_count`, from each strategy's referenced operation points. Parallelized with **rayon** `par_iter()`.
 13. **`SignalGroup` lives in the domain**: `SignalGroup` embeds `indicator_id`, `instrument`, and a derived `signal_count()`. The cache stores `Vec<SignalGroup>` — IDs travel with each group. The `instrument` chain (`IndicatorOutput` → `SignalGroup` → `Strategy`) is kept on purpose for tracing, although no production code reads `Strategy::instrument`.
 14. **Timestamps are `i64`**: All timestamps are `i64` epoch seconds. The PG adapter casts `i32` DB columns to `i64` on read.
-15. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. IDs are assigned at parquet write time (global max across all partitions + 1). Keeps the domain free of persistence concerns.
+15. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. `StrategyPersistence::persist_cells` assigns IDs before the parquet write (global max across all partitions + 1). Keeps the domain free of persistence concerns.
 16. **Idempotent parquet partitions**: `write_partition` dedups fresh rows by `indicator_id` against existing rows — re-runs never duplicate strategies for the same indicator.
 17. **Processed manifest for idempotency**: `ParquetProcessedManifest` records completed (instrument, mms_id, indicator_id) triples; `create`/`create_loop` only compute the unprocessed remainder. Atomic writes (temp + rename).
 18. **Real signal generation**: `create_signal_groups()` computes actual indicator outputs (`create_indicator_output`) and derives signals via zero-cross / threshold / crossover semantics. All 14 indicators, MACD included, compute real outputs.

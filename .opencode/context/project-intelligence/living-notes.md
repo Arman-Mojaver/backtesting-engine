@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/notes | Priority: high | Version: 1.10 | Updated: 2026-11-02 -->
+<!-- Context: project-intelligence/notes | Priority: high | Version: 1.11 | Updated: 2026-11-13 -->
 
 # Living Notes
 
@@ -34,7 +34,7 @@
 *Resolution*: `create_signal_groups()` now computes real indicator outputs via `create_indicator_output()` (14 indicators) and derives signals via zero-cross / threshold / crossover semantics in `domain/signal/`. All 14 indicators, MACD included, compute real outputs.
 
 **~~Engine module has no unit tests~~ (PARTIALLY RESOLVED)**
-*Resolution*: The logic the engine handlers call is now tested: `application` (signal_generator 6, strategy_runner_utils 5, strategy_generator 4, strategy_runner 4), `infrastructure` (strategy_adapter 9, processed_manifest 11, strategy_persistence 6, logging 12), `engine/strategy` (create 3, create_loop 11). Each handler's `execute` orchestration needs PostgreSQL and remains untested — acceptable while the handlers stay thin.
+*Resolution*: The logic the engine handlers call is tested: the `application` use cases (signal generation, strategy generation, the strategy runner, the `create_loop` batch), the `infrastructure` parquet adapters, manifest, persistence and logging, and the helpers in `engine/strategy`. Each handler's `execute` orchestration needs PostgreSQL and remains untested — acceptable while the handlers stay thin.
 
 **~~Missing HTTP API layer~~ (DEFERRED — deliberate)**
 *Status*: Deferred (YAGNI). Actix-web scaffold removed 2026-06-04. Re-add when API consumers exist.
@@ -55,13 +55,13 @@
 ## Insights & Lessons Learned
 
 ### What Works Well
-- **`build -> parse -> execute` pattern** — Consistent across both binaries. Simple, predictable, easy to test.
+- **`build -> parse -> execute` pattern** — The one binary, `bte`, follows it at every command level. Simple, predictable, easy to test.
 - **Pure validators as free functions** — No object construction needed. Compose well in `combined_validation::validate_all()`.
 - **Pure metric functions** — `performance_metrics()` (single pass: global ROI + max draw down, owns the defensive chronological sort) and `annual_operation_count()`. Independently unit-tested, no I/O.
 - **Typed indicator parameters + dispatch** — Adding an indicator is mechanical: variant + compute fn + dispatch arm + tests. The `validate_period!` / `empty_oscillator!` / `indicator_values!` macros keep the 14 implementations uniform.
 - **Signal semantics as a separate concept** — `IndicatorOutput` (what the indicator computed) is deliberately separate from `SignalGroup` (when to trade). Oscillator/threshold/crossover semantics cover all 14 indicators with three small modules.
 - **Single-binary engine** — The engine is the entire CLI surface (`bte`); data management and the iteration table belong to the companion Python service, accessed there directly.
-- **Application layer** — `run_strategies()` keeps `engine/` CLI handlers thin and reusable across binaries.
+- **Application layer** — `run_strategies()` and the `strategy_batch` use case keep the `engine/` CLI handlers thin.
 - **Parquet partitioning by (instrument, mms_id)** — Mirrors the single-instrument/single-MMS backtest constraint; enables partition pruning.
 - **Processed manifest** — Idempotency ledger makes `create`/`create_loop` safely re-runnable.
 - **Batch parallelism in create_loop** — Load each table once (`rayon::join`), index in memory, compute cells with `par_iter`, persist in one batch. Scales without changing the per-cell logic.
@@ -70,7 +70,7 @@
 - **Exit-date modeling** — The biggest correctness gap (see Technical Debt).
 
 ### Lessons Learned
-- **Keep context files in sync with code** — After major refactors, update `.opencode/context/` immediately. Outdated context misleads AI agents. (This file was refreshed 2026-11-01 after the documentation truth-alignment sweep.)
+- **Keep context files in sync with code** — After major refactors, update `.opencode/context/` immediately. Outdated context misleads AI agents. (This file was last aligned with the code on 2026-11-13.)
 - **Delete dead code early** — Removing the server scaffold and later the in-memory repos saved maintenance and eliminated misleading references.
 - **One file per metric, except coupled metrics** — `annual_operation_count.rs` stands alone; `global_roi`/`max_draw_down`/`annual_roi` live together in `performance_metrics.rs` because they share one compounding curve (single pass).
 - **Idempotency belongs at the boundary** — Dedup by `indicator_id` at the parquet partition AND a manifest ledger at the command level: neither alone was sufficient.
@@ -78,7 +78,7 @@
 ## Patterns & Conventions
 
 ### Code Patterns Worth Preserving
-- **`build -> parse -> execute`** — Every binary follows this 3-step pattern. Lives in `cli/mod.rs` and `engine/mod.rs`.
+- **`build -> parse -> execute`** — `bte` follows this 3-step pattern. Lives in `engine/mod.rs` and `engine/strategy/mod.rs`.
 - **Pure validation functions** — `src/domain/validation/*.rs`. Each is a free function taking slices, returning `Result`. Composable.
 - **Pure metric functions** — `src/domain/performance_metrics.rs` (single-pass `PerformanceMetrics` + `annual_roi` method), `src/domain/annual_operation_count.rs`.
 - **Indicator macros** — `validate_period!`, `empty_oscillator!`, `empty_crossover!`, `indicator_values!` in `src/domain/indicators/macros.rs`.
@@ -86,7 +86,7 @@
 - **Fixture module** — `domain::fixtures.rs` provides reusable test data across all test modules. Single source of truth.
 - **Application orchestration** — `src/application/{name}.rs` — one file per use case. Keeps `engine/` thin.
 - **Parquet partition layout** — `instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. Matches backtest constraints.
-- **Atomic parquet writes** — temp file + rename (manifest); read-dedup-rewrite (partitions).
+- **Parquet writes** — the manifest is written atomically (temp file + rename); a partition is read, deduped and rewritten in place (intentional: strategies can be rebuilt from PostgreSQL).
 
 - **README stability policy** — The README contains only stable information: abstract domain concepts, CLI surface, data contracts (parquet schema), formulas, tools, and external dependencies. NO function/struct/file names, no folder trees, no test counts — anything that moves with the code lives in these context files, not the README. Rule of thumb: if a code change would force a README edit, that content belongs in `.opencode/context/` instead.
 
@@ -105,7 +105,7 @@
 | Real signal generation | Indicator outputs → SignalGroup via oscillator/threshold/crossover semantics | Arman Mojaver | Complete |
 | Processed manifest + idempotency | Ledger of (instrument, mms_id, indicator_id) triples; atomic writes | Arman Mojaver | Complete |
 | create_loop batch pipeline | All cells: load once, parallel compute, batch persist | Arman Mojaver | Complete |
-| CI workflow | fmt + clippy -D warnings + rustdoc -D warnings + tests + cargo-deny + Docker build/push (pinned 1.98.1) | Arman Mojaver | Complete |
+| CI workflow | fmt + clippy -D warnings + rustdoc -D warnings + cargo-machete + tests (nextest) + cargo-deny + Docker build/push (toolchain from `rust-toolchain.toml`, 1.98.1) | Arman Mojaver | Complete |
 | Exit-date-aware metrics | Compound on exit order, not entry order | Arman Mojaver | Pending — high priority |
 
 ## Archive (Resolved Items)
