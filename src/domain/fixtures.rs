@@ -131,6 +131,13 @@ fn later_resampled_point(id: i32, timestamp: i64) -> ResampledPointD1 {
     }
 }
 
+pub fn resampled_points_at(timestamps: &[i64]) -> Vec<ResampledPointD1> {
+    (1..)
+        .zip(timestamps)
+        .map(|(id, &timestamp)| base_resampled_point(id, timestamp))
+        .collect()
+}
+
 pub fn resampled_points_default() -> Vec<ResampledPointD1> {
     vec![
         base_resampled_point(1, 1000),

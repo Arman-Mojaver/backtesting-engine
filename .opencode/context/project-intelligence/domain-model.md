@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.15 | Updated: 2026-11-02 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.16 | Updated: 2026-11-13 -->
 
 # Domain Model — Backtesting Engine
 
@@ -10,7 +10,7 @@
 | Term | Definition | Rust Type | Module |
 |------|-----------|-----------|--------|
 | **Instrument** | A tradeable financial pair (e.g. `EURUSD`, `USDCAD`). Identifies what is being traded. | `String` field | multiple |
-| **Operation Point** | A single trade entry — a point in time where a position was opened. Contains the trade's result, take-profit, stop-loss, risk, and the money management strategy used. | `OperationPoint` | `domain::operation_point` |
+| **Operation Point** | A single trade entry — a point in time where a position was opened. Contains the trade's result, take-profit, stop-loss, risk, and the money management strategy used. An operation point stamped T is entered at the **open** of resampled point T. | `OperationPoint` | `domain::operation_point` |
 | **Operation Points (bundle)** | A paired collection of long and short operation points. Provides timestamp-keyed lookup maps for aligning trades with market data. | `OperationPoints` | `domain::operation_point` |
 | **Long Operation Point** | An operation point representing a **buy** (long) position. Stored in a separate repository from shorts. | `OperationPoint` via `LongOperationPointRepository` | `domain::operation_point` |
 | **Short Operation Point** | An operation point representing a **sell** (short) position. Stored in a separate repository from longs. | `OperationPoint` via `ShortOperationPointRepository` | `domain::operation_point` |
@@ -31,7 +31,7 @@
 | **Max Draw Down** | Largest peak-to-trough decline of the cumulative-return curve, as a percentage. Computed from operation points via compounding against a running cummax; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::performance_metrics` |
 | **Annual Operation Count** | Number of trades per year, annualized from a total count over the time span. Computed from signal-group operation counts; stored on `Strategy`. | `f64` field | `domain::strategy`, `domain::annual_operation_count` |
 | **Global Strategy Filter** | Default thresholds for keeping a strategy: max draw down ≤ 20%, min annual ROI ≥ 5%. Annual operation count ≥ 10, checked on matched trades (the stored count). Owns the threshold checks: `admits_activity()` and `admits_performance()`. | `GlobalStrategyFilter` | `domain::strategy` |
-| **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus a `signal_count()` derived from its signals. Lives in the domain layer. | `SignalGroup` | `domain::signal_group` |
+| **Signal Group** | A collection of long and short signal timestamps for a single indicator. Embeds the `indicator_id` and `instrument` it belongs to, plus a `signal_count()` derived from its signals. Lives in the domain layer. A cross read at the close of resampled point T is stored as the timestamp of the **next** resampled point (signals on the last one are dropped), so it selects the operation point entered after T closed. | `SignalGroup` | `domain::signal_group` |
 | **Cell** | One `(instrument, mms_id)` pair — the unit of work for `create_loop`. Cells are computed in parallel and persisted as one Parquet partition each. | `Cell`, `CellOutput` | `domain::cell`, `application::cell_output`, `engine::strategy::create_loop` |
 | **Parquet Strategy Repository** | Writes strategies to partitioned parquet files under `{base}/instrument={inst}/money_management_strategy_id={mms}/strategies.parquet`. Dedups fresh rows by `indicator_id` (idempotent partitions). | `ParquetStrategyRepository` | `infrastructure::strategy_adapter` |
 | **Processed Manifest** | Parquet ledger of completed `(instrument, mms_id, indicator_id)` triples with `processed_at` timestamps. Makes `create`/`create_loop` idempotent. Atomic writes (temp + rename); dedup per triple. | `ParquetProcessedManifest` | `infrastructure::processed_manifest` |
@@ -355,6 +355,7 @@ src/
 17. **Processed manifest for idempotency**: `ParquetProcessedManifest` records completed (instrument, mms_id, indicator_id) triples; `create`/`create_loop` only compute the unprocessed remainder. Atomic writes (temp + rename).
 18. **Real signal generation**: `create_signal_groups()` computes actual indicator outputs (`create_indicator_output`) and derives signals via zero-cross / threshold / crossover semantics. All 14 indicators, MACD included, compute real outputs.
 19. **Batch parallelism in `create_loop`**: All four source tables loaded once via nested `rayon::join`, indexed in memory; cells computed via `par_iter`; persistence assigns IDs once, writes partitions in parallel, commits the manifest once.
+20. **Entry timing (no look-ahead)**: indicator values at resampled point T use T's data, known only at its close, while the operation point stamped T is entered at T's open. `IndicatorOutput::create_signal_group` therefore shifts every signal to the next resampled point's timestamp before building the `SignalGroup`; `create_strategy` then matches signal and operation point timestamps as is.
 
 ---
 

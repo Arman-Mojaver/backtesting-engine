@@ -74,9 +74,9 @@ mod tests {
     use crate::domain::fixtures::op_point;
     use crate::domain::indicator::IndicatorParameters;
 
-    /// Bar spacing chosen so bars 5 and 25 are exactly one year apart:
+    /// Bar spacing chosen so bars 6 and 26 are exactly one year apart:
     /// 20 * BAR_SPACING_SECS = 31_557_600 (365.25 days). With the operation
-    /// points spanning bars 5 to 25, every annualized figure in these tests
+    /// points spanning bars 6 to 26, every annualized figure in these tests
     /// is computed over exactly one year.
     const BAR_SPACING_SECS: i64 = 1_577_880;
 
@@ -103,20 +103,21 @@ mod tests {
             .collect()
     }
 
-    const OPERATION_BARS: std::ops::RangeInclusive<i32> = 5..=25;
+    const OPERATION_BARS: std::ops::RangeInclusive<i32> = 6..=26;
     const SHORT_ID_OFFSET: i32 = 100;
 
-    /// Long and short operation points sit on every bar from 5 to 25
+    /// Long and short operation points sit on every bar from 6 to 26
     /// (validation requires identical timestamp sets), so each RSI(3)
-    /// indicator matches 10 trades in the year. Winners are placed only
-    /// where the passing RSI signals: longs on bars 0 mod 4, shorts on
-    /// bars 2 mod 4. Every other operation point loses.
+    /// indicator matches 10 trades in the year. The passing RSI crosses on
+    /// bars 0 mod 4 (long) and 2 mod 4 (short) and enters on the next bar,
+    /// so winners sit only on bars 1 mod 4 (longs) and 3 mod 4 (shorts).
+    /// Every other operation point loses.
     fn pipeline_long_ops() -> Vec<OperationPoint> {
-        pipeline_ops(0, 0)
+        pipeline_ops(1, 0)
     }
 
     fn pipeline_short_ops() -> Vec<OperationPoint> {
-        pipeline_ops(2, SHORT_ID_OFFSET)
+        pipeline_ops(3, SHORT_ID_OFFSET)
     }
 
     fn pipeline_ops(winning_bar_mod_4: i32, id_offset: i32) -> Vec<OperationPoint> {
@@ -188,12 +189,12 @@ mod tests {
         assert_eq!(s.instrument, "EURUSD");
         assert_eq!(s.money_management_strategy_id, 1);
         // Ten +30 trades compounding at risk/sl = 0.001: 1.03^10 = 1.3439
-        // over exactly one year (bars 5 to 25), so annual == global.
+        // over exactly one year (bars 6 to 26), so annual == global.
         assert_eq!(s.annual_roi, 34.39);
         assert_eq!(s.max_draw_down, 0.0);
         assert_eq!(s.annual_operation_count, 10.0);
-        assert_eq!(s.long_operation_point_ids, vec![8, 12, 16, 20, 24]);
-        assert_eq!(s.short_operation_point_ids, vec![106, 110, 114, 118, 122]);
+        assert_eq!(s.long_operation_point_ids, vec![9, 13, 17, 21, 25]);
+        assert_eq!(s.short_operation_point_ids, vec![107, 111, 115, 119, 123]);
     }
 
     #[test]

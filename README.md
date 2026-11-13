@@ -147,6 +147,12 @@ determines the signal rule:
 | Threshold | Threshold crossing | crosses **up** through the low threshold | crosses **down** through the high threshold |
 | Crossover | Difference of two lines, then zero-crossing | diff crosses − → + | diff crosses + → − |
 
+An operation point stamped T is entered at the open of resampled point T, but an
+indicator value at T is only known at T's close. So a cross read at T is stored as a
+signal on the **next** resampled point (the next timestamp in the series, not T plus one
+day), and a cross on the last resampled point is dropped. Strategies match each signal to
+the operation point with the same timestamp, so they never trade on data from the future.
+
 ## Performance metrics
 
 All metrics are pure functions of the trade sequence — no I/O, unit-tested in

@@ -76,7 +76,7 @@ fn create_signal_group(
                 return None;
             }
         };
-    Some(indicator_output.create_signal_group(indicator.id))
+    Some(indicator_output.create_signal_group(indicator.id, resampled_points))
 }
 
 pub fn instrument_of(resampled_points: &[ResampledPointD1]) -> &str {
@@ -168,7 +168,8 @@ mod tests {
         // 100 -> 82 at index 9 and recovery at 10 give
         //   line  = [0,0,0,0,0,0,0,0,-9,9,0,0,0] (ts 2000..14000)
         //   signal = SMA(line, 9) = [-1, 0, 0, 0, 0]
-        //   diff  = [-8, 9, 0, 0, 0] -> strict - to + cross at ts 11000.
+        //   diff  = [-8, 9, 0, 0, 0] -> strict - to + cross at ts 11000,
+        //   entered on the next resampled point, ts 12000.
         let closes = [
             100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 82.0, 100.0, 100.0,
             100.0, 100.0,
@@ -185,7 +186,7 @@ mod tests {
         };
         let group = create_signal_group_no_cache(&indicator, &points).unwrap();
         assert_eq!(group.indicator_id, 9001);
-        assert_eq!(group.long_signals, vec![11000]);
+        assert_eq!(group.long_signals, vec![12000]);
         assert!(group.short_signals.is_empty());
     }
 
@@ -195,7 +196,8 @@ mod tests {
         // back at 10 give
         //   line  = [0,0,0,0,0,0,0,0,9,-9,0,0,0]
         //   signal = [1, 0, 0, 0, 0]
-        //   diff  = [8, -9, 0, 0, 0] -> strict + to - cross at ts 11000.
+        //   diff  = [8, -9, 0, 0, 0] -> strict + to - cross at ts 11000,
+        //   entered on the next resampled point, ts 12000.
         let closes = [
             100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 118.0, 100.0, 100.0,
             100.0, 100.0,
@@ -212,7 +214,7 @@ mod tests {
         };
         let group = create_signal_group_no_cache(&indicator, &points).unwrap();
         assert_eq!(group.indicator_id, 9002);
-        assert_eq!(group.short_signals, vec![11000]);
+        assert_eq!(group.short_signals, vec![12000]);
         assert!(group.long_signals.is_empty());
     }
 
@@ -252,10 +254,10 @@ mod tests {
 
         assert_eq!(eurusd_groups.len(), 1);
         assert_eq!(eurusd_groups[0].instrument, "EURUSD");
-        assert_eq!(eurusd_groups[0].long_signals, vec![11000]);
+        assert_eq!(eurusd_groups[0].long_signals, vec![12000]);
         assert_eq!(gbpusd_groups.len(), 1);
         assert_eq!(gbpusd_groups[0].instrument, "GBPUSD");
-        assert_eq!(gbpusd_groups[0].short_signals, vec![11000]);
+        assert_eq!(gbpusd_groups[0].short_signals, vec![12000]);
     }
 
     #[test]
@@ -310,8 +312,9 @@ mod tests {
         // Prices 5,4,3,4 with n=2: diffs [-1,-1,+1], RSI windows:
         //   window [-1,-1] -> gain 0, loss 2 -> rs 0 -> rsi 0 (ts 3000)
         //   window [-1,+1] -> gain 1, loss 1 -> rs 1 -> rsi 50 (ts 4000)
-        // Thresholds 70/30: prev rsi 0 < low 30, curr rsi 50 > low 30 -> long.
-        let points = points_from_closes(&[5.0, 4.0, 3.0, 4.0]);
+        // Thresholds 70/30: prev rsi 0 < low 30, curr rsi 50 > low 30 -> long
+        // at ts 4000, entered on the next resampled point, ts 5000.
+        let points = points_from_closes(&[5.0, 4.0, 3.0, 4.0, 4.0]);
         let indicator = Indicator {
             id: 7001,
             parameters: IndicatorParameters::Rsi {
@@ -322,7 +325,7 @@ mod tests {
         };
         let group = create_signal_group_no_cache(&indicator, &points).unwrap();
         assert_eq!(group.indicator_id, 7001);
-        assert_eq!(group.long_signals, vec![4000]);
+        assert_eq!(group.long_signals, vec![5000]);
         assert!(group.short_signals.is_empty());
     }
 }
