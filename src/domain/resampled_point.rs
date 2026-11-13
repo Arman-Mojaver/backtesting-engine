@@ -27,10 +27,10 @@ fn group_by_instrument(points: Vec<ResampledPointD1>) -> FxHashMap<String, Vec<R
 }
 
 pub trait ResampledPointD1Repository {
-    fn get_all(&self) -> anyhow::Result<Vec<ResampledPointD1>>;
-    fn get_by_instrument(&self, instrument: &str) -> anyhow::Result<Vec<ResampledPointD1>>;
+    fn get_all(&mut self) -> anyhow::Result<Vec<ResampledPointD1>>;
+    fn get_by_instrument(&mut self, instrument: &str) -> anyhow::Result<Vec<ResampledPointD1>>;
 
-    fn index_by_instrument(&self) -> anyhow::Result<FxHashMap<String, Vec<ResampledPointD1>>> {
+    fn index_by_instrument(&mut self) -> anyhow::Result<FxHashMap<String, Vec<ResampledPointD1>>> {
         Ok(group_by_instrument(self.get_all()?))
     }
 }

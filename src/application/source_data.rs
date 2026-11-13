@@ -26,14 +26,15 @@ pub fn fetch_source_data(
 
     // One connection serves all four sequential reads; the batch path
     // (create_loop) opens one per table because its loads run in parallel.
-    let store = PgStore::connect(db_config)?;
+    let mut store = PgStore::connect(db_config)?;
 
-    let indicators = IndicatorRepository::get_all(&store).context("failed to fetch indicators")?;
-    let resampled_points = ResampledPointD1Repository::get_by_instrument(&store, instrument)
+    let indicators =
+        IndicatorRepository::get_all(&mut store).context("failed to fetch indicators")?;
+    let resampled_points = ResampledPointD1Repository::get_by_instrument(&mut store, instrument)
         .with_context(|| format!("failed to fetch resampled points for {instrument}"))?;
 
     let long_operation_points = LongOperationPointRepository::get_by_mms_id_and_instrument(
-        &store,
+        &mut store,
         money_management_strategy_id,
         instrument,
     )
@@ -45,7 +46,7 @@ pub fn fetch_source_data(
     })?;
 
     let short_operation_points = ShortOperationPointRepository::get_by_mms_id_and_instrument(
-        &store,
+        &mut store,
         money_management_strategy_id,
         instrument,
     )

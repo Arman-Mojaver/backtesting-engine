@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context};
@@ -231,7 +230,7 @@ fn row_to_indicator(row: &Row) -> anyhow::Result<Indicator> {
 }
 
 fn fetch_rows<T, F>(
-    conn: &RefCell<Client>,
+    conn: &mut Client,
     label: &str,
     sql: &str,
     params: &[&(dyn ToSql + Sync)],
@@ -241,7 +240,6 @@ where
     F: Fn(&Row) -> anyhow::Result<T>,
 {
     let start = Instant::now();
-    let mut conn = conn.borrow_mut();
     let mut rows = conn
         .query_raw(sql, params.iter().copied())
         .with_context(|| format!("failed to query {label}"))?;
@@ -271,7 +269,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// because its loads run concurrently and a sync `postgres::Client`
 /// is single-connection.
 pub struct PgStore {
-    conn: RefCell<Client>,
+    conn: Client,
 }
 
 impl PgStore {
@@ -286,9 +284,7 @@ impl PgStore {
             .application_name("bte")
             .connect(NoTls)
             .with_context(|| connection_diagnostics(config))?;
-        Ok(Self {
-            conn: RefCell::new(conn),
-        })
+        Ok(Self { conn })
     }
 }
 
@@ -312,9 +308,9 @@ fn connection_diagnostics(config: &DbConfig) -> String {
 }
 
 impl LongOperationPointRepository for PgStore {
-    fn get_all(&self) -> anyhow::Result<Vec<OperationPoint>> {
+    fn get_all(&mut self) -> anyhow::Result<Vec<OperationPoint>> {
         fetch_rows(
-            &self.conn,
+            &mut self.conn,
             "long_operation_point get_all",
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
              FROM long_operation_point",
@@ -324,12 +320,12 @@ impl LongOperationPointRepository for PgStore {
     }
 
     fn get_by_mms_id_and_instrument(
-        &self,
+        &mut self,
         mms_id: i32,
         instrument: &str,
     ) -> anyhow::Result<Vec<OperationPoint>> {
         fetch_rows(
-            &self.conn,
+            &mut self.conn,
             "long_operation_point by mms_id and instrument",
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
              FROM long_operation_point \
@@ -341,9 +337,9 @@ impl LongOperationPointRepository for PgStore {
 }
 
 impl ShortOperationPointRepository for PgStore {
-    fn get_all(&self) -> anyhow::Result<Vec<OperationPoint>> {
+    fn get_all(&mut self) -> anyhow::Result<Vec<OperationPoint>> {
         fetch_rows(
-            &self.conn,
+            &mut self.conn,
             "short_operation_point get_all",
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
              FROM short_operation_point",
@@ -353,12 +349,12 @@ impl ShortOperationPointRepository for PgStore {
     }
 
     fn get_by_mms_id_and_instrument(
-        &self,
+        &mut self,
         mms_id: i32,
         instrument: &str,
     ) -> anyhow::Result<Vec<OperationPoint>> {
         fetch_rows(
-            &self.conn,
+            &mut self.conn,
             "short_operation_point by mms_id and instrument",
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
              FROM short_operation_point \
@@ -370,9 +366,9 @@ impl ShortOperationPointRepository for PgStore {
 }
 
 impl ResampledPointD1Repository for PgStore {
-    fn get_all(&self) -> anyhow::Result<Vec<ResampledPointD1>> {
+    fn get_all(&mut self) -> anyhow::Result<Vec<ResampledPointD1>> {
         fetch_rows(
-            &self.conn,
+            &mut self.conn,
             "resampled_point_d1 get_all",
             // ORDER BY timestamp is load-bearing: indicator math assumes
             // chronological order. `high_low_order` exists in the table but
@@ -384,9 +380,9 @@ impl ResampledPointD1Repository for PgStore {
         )
     }
 
-    fn get_by_instrument(&self, instrument: &str) -> anyhow::Result<Vec<ResampledPointD1>> {
+    fn get_by_instrument(&mut self, instrument: &str) -> anyhow::Result<Vec<ResampledPointD1>> {
         fetch_rows(
-            &self.conn,
+            &mut self.conn,
             "resampled_point_d1 by instrument",
             "SELECT id, instrument, open, high, low, close, volume, timestamp \
              FROM resampled_point_d1 WHERE instrument = $1 ORDER BY timestamp",
@@ -397,9 +393,9 @@ impl ResampledPointD1Repository for PgStore {
 }
 
 impl IndicatorRepository for PgStore {
-    fn get_all(&self) -> anyhow::Result<Vec<Indicator>> {
+    fn get_all(&mut self) -> anyhow::Result<Vec<Indicator>> {
         fetch_rows(
-            &self.conn,
+            &mut self.conn,
             "indicator get_all",
             "SELECT id, type, parameters::text FROM indicator ORDER BY id",
             &[],

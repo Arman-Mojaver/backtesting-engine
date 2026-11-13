@@ -36,21 +36,21 @@ impl SourceIndex {
         // One store (connection) per table: the four loads below run
         // concurrently, and a sync postgres::Client is single-connection.
         let connect = || PgStore::connect(db_config);
-        let indicator_store = connect()?;
-        let resampled_store = connect()?;
-        let long_store = connect()?;
-        let short_store = connect()?;
+        let mut indicator_store = connect()?;
+        let mut resampled_store = connect()?;
+        let mut long_store = connect()?;
+        let mut short_store = connect()?;
 
         let load_start = Instant::now();
         let (indicators, (resampled_by_instrument, (long_by_cell, short_by_cell))) = rayon::join(
-            move || IndicatorRepository::get_all(&indicator_store),
+            move || IndicatorRepository::get_all(&mut indicator_store),
             move || {
                 rayon::join(
-                    move || ResampledPointD1Repository::index_by_instrument(&resampled_store),
+                    move || ResampledPointD1Repository::index_by_instrument(&mut resampled_store),
                     move || {
                         rayon::join(
-                            move || LongOperationPointRepository::index_by_cell(&long_store),
-                            move || ShortOperationPointRepository::index_by_cell(&short_store),
+                            move || LongOperationPointRepository::index_by_cell(&mut long_store),
+                            move || ShortOperationPointRepository::index_by_cell(&mut short_store),
                         )
                     },
                 )
