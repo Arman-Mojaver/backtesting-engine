@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use arrow::array::{
     AsArray, Decimal128Array, Int32Array, Int32Builder, Int64Array, ListArray, ListBuilder,
     PrimitiveArray,
@@ -81,22 +81,15 @@ impl ParquetStrategyRepository {
         mms_id: i32,
         rows: Vec<StrategyRow>,
     ) -> anyhow::Result<()> {
-        let path = self.partition_path(instrument, mms_id)?;
+        let path = self.partition_path(instrument, mms_id);
         Self::write_partition(&path, rows)
     }
 
-    fn partition_path(&self, instrument: &str, mms_id: i32) -> anyhow::Result<PathBuf> {
-        let partition_dir = self
-            .base_dir
+    fn partition_path(&self, instrument: &str, mms_id: i32) -> PathBuf {
+        self.base_dir
             .join(format!("instrument={instrument}"))
-            .join(format!("money_management_strategy_id={mms_id}"));
-        fs::create_dir_all(&partition_dir).with_context(|| {
-            format!(
-                "failed to create partition directory {}",
-                partition_dir.display()
-            )
-        })?;
-        Ok(partition_dir.join("strategies.parquet"))
+            .join(format!("money_management_strategy_id={mms_id}"))
+            .join("strategies.parquet")
     }
 
     fn write_partition(path: &Path, new_rows: Vec<StrategyRow>) -> anyhow::Result<()> {
@@ -137,6 +130,16 @@ impl ParquetStrategyRepository {
         let props = WriterProperties::builder()
             .set_compression(Compression::ZSTD(ZstdLevel::default()))
             .build();
+
+        let Some(partition_dir) = path.parent() else {
+            bail!("partition {} has no parent directory", path.display());
+        };
+        fs::create_dir_all(partition_dir).with_context(|| {
+            format!(
+                "failed to create partition directory {}",
+                partition_dir.display()
+            )
+        })?;
 
         // Intentional: the partition is rewritten in place, not through a temp
         // file and rename. A write that fails midway is an accepted risk: the
@@ -400,13 +403,8 @@ mod tests {
         instrument: &str,
         mms_id: i32,
     ) -> Vec<StrategyRow> {
-        let path = PathBuf::from(format!(
-            "{}/instrument={}/money_management_strategy_id={}/strategies.parquet",
-            repo.base_dir.display(),
-            instrument,
-            mms_id
-        ));
-        ParquetStrategyRepository::read_rows(&path).expect("read back")
+        ParquetStrategyRepository::read_rows(&repo.partition_path(instrument, mms_id))
+            .expect("read back")
     }
 
     fn read_back_ids(repo: &ParquetStrategyRepository, instrument: &str, mms_id: i32) -> Vec<i64> {
@@ -501,8 +499,7 @@ mod tests {
         repo.write_rows("EURUSD", 390, rows(&strategies, 1))
             .unwrap();
 
-        let path = repo.partition_path("EURUSD", 390).unwrap();
-        let file = File::open(path).unwrap();
+        let file = File::open(repo.partition_path("EURUSD", 390)).unwrap();
         let batch = ParquetRecordBatchReaderBuilder::try_new(file)
             .unwrap()
             .build()
@@ -646,10 +643,8 @@ mod tests {
     fn max_strategy_id_finds_the_column_by_name() {
         let tmp = TempDir::new().unwrap();
         let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
-        let partition_dir = tmp
-            .path()
-            .join("instrument=EURUSD/money_management_strategy_id=390");
-        fs::create_dir_all(&partition_dir).unwrap();
+        let path = repo.partition_path("EURUSD", 390);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
         let schema = Arc::new(Schema::new(vec![
             Field::new("indicator_id", DataType::Int64, false),
             Field::new("strategy_id", DataType::Int64, false),
@@ -662,7 +657,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let file = File::create(partition_dir.join("strategies.parquet")).unwrap();
+        let file = File::create(path).unwrap();
         let mut writer = ArrowWriter::try_new(file, schema, None).unwrap();
         writer.write(&batch).unwrap();
         writer.close().unwrap();
