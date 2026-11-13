@@ -44,6 +44,8 @@ pub fn signal_group_cache_stats() -> SignalGroupCacheStats {
     key = "(i32, String)",
     convert = r#"{ (indicator.id, instrument_of(resampled_points).to_owned()) }"#,
     cache_none = true,
+    // Intentional: the lines below describe how the cache locks. They stay
+    // because the no-rayon-in-the-body rule cannot be expressed in code.
     // Dedupe concurrent first computations of a key. Locks are per bucket, not
     // per key: every call (hit or miss) waits on its bucket while another key
     // there computes, so use enough buckets to keep collisions rare.

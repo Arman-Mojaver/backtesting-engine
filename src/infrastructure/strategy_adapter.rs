@@ -132,6 +132,10 @@ impl ParquetStrategyRepository {
             .set_compression(Compression::ZSTD(ZstdLevel::default()))
             .build();
 
+        // Intentional: the partition is rewritten in place, not through a temp
+        // file and rename. A write that fails midway is an accepted risk: the
+        // command is re-run, with or without fixes, and strategies are derived
+        // from PostgreSQL, so nothing is lost.
         let file = File::create(path)?;
         let mut writer = ArrowWriter::try_new(file, schema, Some(props))?;
         writer.write(&batch)?;

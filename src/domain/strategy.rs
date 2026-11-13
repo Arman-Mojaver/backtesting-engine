@@ -12,6 +12,9 @@ pub struct Strategy {
 
 #[derive(Debug, Clone)]
 pub struct GlobalStrategyFilter {
+    /// Intentional: the name holds two different "max". `draw_down_max` is the
+    /// metric itself, the maximum of the draw-down series. The leading `max`
+    /// is the project-wide (global) upper limit that metric may reach.
     pub max_draw_down_max: f64,
     pub min_annual_roi: f64,
     /// Checked twice: first on raw signal counts, a free upper bound that

@@ -41,6 +41,8 @@ impl StrategyPersistence {
 
         // strategy_id is persistence-assigned: new ids start from the global max
         // across all partitions, so they stay unique across the whole tree.
+        // Intentional: no inter-process lock. bte commands are not expected to
+        // run concurrently.
         let mut next_id = self.strategies.max_strategy_id()?.saturating_add(1);
         let mut partition_writes: Vec<PartitionWrite> = Vec::with_capacity(cells.len());
         let mut manifest_entries: Vec<ManifestEntry> = Vec::with_capacity(cells.len());

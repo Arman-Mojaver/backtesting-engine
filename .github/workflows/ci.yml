@@ -12,6 +12,10 @@
 # Images are linux/arm64 ONLY: they run exclusively on Apple Silicon. The
 # docker job builds natively on GitHub's arm64 runners — no QEMU, no
 # cross-toolchain — so the Dockerfile's target-cpu tuning stays honest.
+#
+# Intentional: lint and test run only on pushes to main, behind the Docker
+# Hub preflight. There is a single developer, so there are no pull requests
+# to gate. Revisit when a second contributor joins.
 
 name: ci
 
