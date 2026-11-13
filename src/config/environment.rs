@@ -92,17 +92,6 @@ impl DbConfig {
             database: database.into(),
         }
     }
-
-    pub fn connection_string(&self) -> String {
-        format!(
-            "postgresql://{user}:{password}@{host}:{port}/{database}",
-            user = self.user,
-            password = self.password,
-            host = self.host,
-            port = self.port,
-            database = self.database,
-        )
-    }
 }
 
 impl fmt::Debug for DbConfig {
@@ -192,23 +181,16 @@ mod tests {
     }
 
     #[test]
-    fn dbconfig_connection_string_targets_each_environment() {
+    fn dbconfig_from_env_targets_each_environment() {
         let cases = [
-            (
-                Environment::Production,
-                "postgresql://postgres:postgres@host.docker.internal:5432/db-production",
-            ),
-            (
-                Environment::Development,
-                "postgresql://postgres:postgres@host.docker.internal:54320/db-development",
-            ),
-            (
-                Environment::Testing,
-                "postgresql://postgres:postgres@host.docker.internal:54321/db-testing",
-            ),
+            (Environment::Production, 5432, "db-production"),
+            (Environment::Development, 54320, "db-development"),
+            (Environment::Testing, 54321, "db-testing"),
         ];
-        for (env, expected) in cases {
-            assert_eq!(DbConfig::from_env(env).connection_string(), expected);
+        for (env, port, database) in cases {
+            let config = DbConfig::from_env(env);
+            assert_eq!(config.port, port, "{env:?}");
+            assert_eq!(config.database, database, "{env:?}");
         }
     }
 

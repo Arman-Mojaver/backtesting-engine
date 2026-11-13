@@ -1,11 +1,11 @@
 use std::cell::RefCell;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context};
 use log::debug;
 use postgres::fallible_iterator::FallibleIterator;
 use postgres::types::{FromSql, ToSql};
-use postgres::{Client, NoTls, Row};
+use postgres::{Client, Config, NoTls, Row};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -262,6 +262,8 @@ where
     Ok(out)
 }
 
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// One PostgreSQL connection serving every repository port.
 ///
 /// The single-cell `create` path needs one of these for its sequential
@@ -274,7 +276,15 @@ pub struct PgStore {
 
 impl PgStore {
     pub fn connect(config: &DbConfig) -> anyhow::Result<Self> {
-        let conn = Client::connect(&config.connection_string(), NoTls)
+        let conn = Config::new()
+            .host(&config.host)
+            .port(config.port)
+            .user(&config.user)
+            .password(&config.password)
+            .dbname(&config.database)
+            .connect_timeout(CONNECT_TIMEOUT)
+            .application_name("bte")
+            .connect(NoTls)
             .with_context(|| connection_diagnostics(config))?;
         Ok(Self {
             conn: RefCell::new(conn),
