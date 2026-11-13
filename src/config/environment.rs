@@ -120,45 +120,26 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn environment_from_str_parses_valid_values() {
-        assert_eq!(
-            "production".parse::<Environment>().unwrap(),
-            Environment::Production
-        );
-        assert_eq!(
-            "development".parse::<Environment>().unwrap(),
-            Environment::Development
-        );
-        assert_eq!(
-            "testing".parse::<Environment>().unwrap(),
-            Environment::Testing
-        );
-        assert_eq!(
-            "Production".parse::<Environment>().unwrap(),
-            Environment::Production
-        );
+    fn environment_from_str_parses_each_variant_in_any_letter_case() {
+        let cases = [
+            ("production", Environment::Production),
+            ("development", Environment::Development),
+            ("testing", Environment::Testing),
+            ("PRODUCTION", Environment::Production),
+            ("DEVELOPMENT", Environment::Development),
+            ("TESTING", Environment::Testing),
+            ("Production", Environment::Production),
+            ("Development", Environment::Development),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(input.parse::<Environment>().unwrap(), expected, "{input}");
+        }
     }
 
     #[test]
     fn environment_from_str_fails_on_invalid_values() {
         assert!("invalid".parse::<Environment>().is_err());
         assert!("".parse::<Environment>().is_err());
-    }
-
-    #[test]
-    fn environment_from_str_is_case_insensitive_for_all_variants() {
-        assert_eq!(
-            "PRODUCTION".parse::<Environment>().unwrap(),
-            Environment::Production
-        );
-        assert_eq!(
-            "DEVELOPMENT".parse::<Environment>().unwrap(),
-            Environment::Development
-        );
-        assert_eq!(
-            "TESTING".parse::<Environment>().unwrap(),
-            Environment::Testing
-        );
     }
 
     #[test]
@@ -208,18 +189,10 @@ mod tests {
     }
 
     #[test]
-    fn resolve_from_raw_accepts_each_environment() {
+    fn resolve_from_raw_present_value_is_parsed() {
         assert_eq!(
             resolve_from_raw(Ok("production".to_owned())).unwrap(),
             Environment::Production
-        );
-        assert_eq!(
-            resolve_from_raw(Ok("Development".to_owned())).unwrap(),
-            Environment::Development
-        );
-        assert_eq!(
-            resolve_from_raw(Ok("testing".to_owned())).unwrap(),
-            Environment::Testing
         );
     }
 
