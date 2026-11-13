@@ -66,14 +66,15 @@ pullr:  ## Pull runtime image
 
 
 fmt:  ## Run rust formatter
-	cd $(PWD) && cargo fmt
+	cargo fmt
 
 test: ## Run tests
 	cargo nextest run --locked
 
-lint: ## Check formatting and run clippy (same as CI)
+lint: ## Check formatting, run clippy and build docs (same as CI)
 	cargo fmt --check
 	cargo clippy --locked --all-targets --all-features -- -D warnings
+	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --locked
 
 deny: ## Run supply-chain checks with cargo-deny
 	cargo deny check
