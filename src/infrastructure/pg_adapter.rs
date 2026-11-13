@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use anyhow::{bail, Context};
 use log::debug;
-use postgres::types::ToSql;
+use postgres::types::{FromSql, ToSql};
 use postgres::{Client, NoTls, Row};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -176,44 +176,54 @@ fn parse_moving_average_type(raw: &str) -> anyhow::Result<MovingAverageType> {
     })
 }
 
+fn column<'a, T>(row: &'a Row, table: &str, column: &str) -> anyhow::Result<T>
+where
+    T: FromSql<'a>,
+{
+    row.try_get(column)
+        .with_context(|| format!("failed to read column {table}.{column}"))
+}
+
 /// Rejects `sl <= 0`: performance metrics divide by `sl`, so a zero stop
 /// loss would yield inf/NaN and silently drop the strategy downstream.
-fn row_to_operation_point(row: &Row) -> anyhow::Result<OperationPoint> {
-    let id: i32 = row.get("id");
-    let instrument: String = row.get("instrument");
-    let sl: i32 = row.get("sl");
+fn row_to_operation_point(row: &Row, table: &str) -> anyhow::Result<OperationPoint> {
+    let id: i32 = column(row, table, "id")?;
+    let instrument: String = column(row, table, "instrument")?;
+    let sl: i32 = column(row, table, "sl")?;
     if sl <= 0 {
         bail!("operation point id {id} ({instrument}) has non-positive sl {sl}");
     }
     Ok(OperationPoint {
         id,
         instrument,
-        result: row.get("result"),
-        tp: row.get("tp"),
+        result: column(row, table, "result")?,
+        tp: column(row, table, "tp")?,
         sl,
-        risk: row.get("risk"),
-        timestamp: i64::from(row.get::<_, i32>("timestamp")),
-        money_management_strategy_id: row.get("money_management_strategy_id"),
+        risk: column(row, table, "risk")?,
+        timestamp: i64::from(column::<i32>(row, table, "timestamp")?),
+        money_management_strategy_id: column(row, table, "money_management_strategy_id")?,
     })
 }
 
-fn row_to_resampled_point(row: &Row) -> ResampledPointD1 {
-    ResampledPointD1 {
-        id: row.get("id"),
-        instrument: row.get("instrument"),
-        open: row.get("open"),
-        high: row.get("high"),
-        low: row.get("low"),
-        close: row.get("close"),
-        volume: row.get("volume"),
-        timestamp: i64::from(row.get::<_, i32>("timestamp")),
-    }
+fn row_to_resampled_point(row: &Row) -> anyhow::Result<ResampledPointD1> {
+    const TABLE: &str = "resampled_point_d1";
+    Ok(ResampledPointD1 {
+        id: column(row, TABLE, "id")?,
+        instrument: column(row, TABLE, "instrument")?,
+        open: column(row, TABLE, "open")?,
+        high: column(row, TABLE, "high")?,
+        low: column(row, TABLE, "low")?,
+        close: column(row, TABLE, "close")?,
+        volume: column(row, TABLE, "volume")?,
+        timestamp: i64::from(column::<i32>(row, TABLE, "timestamp")?),
+    })
 }
 
 fn row_to_indicator(row: &Row) -> anyhow::Result<Indicator> {
-    let id: i32 = row.get("id");
-    let raw_type: String = row.get("type");
-    let raw_params: String = row.get("parameters");
+    const TABLE: &str = "indicator";
+    let id: i32 = column(row, TABLE, "id")?;
+    let raw_type: String = column(row, TABLE, "type")?;
+    let raw_params: String = column(row, TABLE, "parameters")?;
     let parameters = map_parameters(&raw_type, &raw_params)
         .with_context(|| format!("failed to map parameters for indicator id {id}"))?;
     Ok(Indicator { id, parameters })
@@ -291,7 +301,7 @@ impl LongOperationPointRepository for PgStore {
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
              FROM long_operation_point",
             &[],
-            row_to_operation_point,
+            |row| row_to_operation_point(row, "long_operation_point"),
         )
     }
 
@@ -307,7 +317,7 @@ impl LongOperationPointRepository for PgStore {
              FROM long_operation_point \
              WHERE money_management_strategy_id = $1 AND instrument = $2",
             &[&mms_id, &instrument],
-            row_to_operation_point,
+            |row| row_to_operation_point(row, "long_operation_point"),
         )
     }
 }
@@ -320,7 +330,7 @@ impl ShortOperationPointRepository for PgStore {
             "SELECT id, instrument, result, tp, sl, risk, timestamp, money_management_strategy_id \
              FROM short_operation_point",
             &[],
-            row_to_operation_point,
+            |row| row_to_operation_point(row, "short_operation_point"),
         )
     }
 
@@ -336,7 +346,7 @@ impl ShortOperationPointRepository for PgStore {
              FROM short_operation_point \
              WHERE money_management_strategy_id = $1 AND instrument = $2",
             &[&mms_id, &instrument],
-            row_to_operation_point,
+            |row| row_to_operation_point(row, "short_operation_point"),
         )
     }
 }
@@ -352,7 +362,7 @@ impl ResampledPointD1Repository for PgStore {
             "SELECT id, instrument, open, high, low, close, volume, timestamp \
              FROM resampled_point_d1 ORDER BY timestamp",
             &[],
-            |row| Ok(row_to_resampled_point(row)),
+            row_to_resampled_point,
         )
     }
 
@@ -363,7 +373,7 @@ impl ResampledPointD1Repository for PgStore {
             "SELECT id, instrument, open, high, low, close, volume, timestamp \
              FROM resampled_point_d1 WHERE instrument = $1 ORDER BY timestamp",
             &[&instrument],
-            |row| Ok(row_to_resampled_point(row)),
+            row_to_resampled_point,
         )
     }
 }
