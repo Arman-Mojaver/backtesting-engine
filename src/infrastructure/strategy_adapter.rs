@@ -32,6 +32,8 @@ fn metric_from_decimal(raw: i128) -> f64 {
     cast::i128_to_f64(raw) / metric_scale_factor()
 }
 
+/// Intentional: no precision check. Only an op-point span of a few days could
+/// overflow it, and upstream never stores such a partly generated cell.
 fn metric_array(values: impl Iterator<Item = f64>) -> anyhow::Result<Decimal128Array> {
     let raw = values.map(|v| cast::round_f64_to_i128(v * metric_scale_factor()));
     Ok(Decimal128Array::from_iter_values(raw)
