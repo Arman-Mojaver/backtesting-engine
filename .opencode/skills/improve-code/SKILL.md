@@ -1,7 +1,7 @@
 ---
 name: improve-code
-description: Read-only review of a single Rust target (function, struct, trait, abstraction, module or file). Finds beginner- and mid-level practices, test gaps, crate misuse and readability issues, and ranks them by impact/effort against the bar of a senior production Rust engineer. Informative only, never edits code. Use when the user says "improve code", "improve this", "senior review", "how senior is this", "review this struct/function/file", or names one piece of Rust code to assess.
-argument-hint: <path | path::Item | abstraction name>
+description: Read-only review of a single Rust target (function, struct, trait, abstraction, module or file). Finds beginner- and mid-level practices, test gaps, crate misuse and readability issues, and ranks them by impact/effort against the bar of a senior production Rust engineer. With `--high-bar`, reports only catastrophic, obvious, beginner-level items and says "bar met" when there are none. Informative only, never edits code. Use when the user says "improve code", "improve this", "senior review", "how senior is this", "review this struct/function/file", or names one piece of Rust code to assess.
+argument-hint: <path | path::Item | abstraction name> [--high-bar]
 ---
 
 # Improve Code (review only)
@@ -37,9 +37,40 @@ Assess ONE target against senior production-Rust quality. Do not review the whol
     - If an intentional exception causes a concrete bug, report it under **Not recommended** as "challenges intentional exception at `file:line`", with the evidence.
     - A bare `#[allow(...)]` with no `reason` is not an intentional exception. It may be reported (e.g. "missing reason", or "switch to `#[expect]`").
 
+## Mode: `--high-bar`
+
+Active only when `$ARGUMENTS` contains `--high-bar`. Without the flag, ignore this section and run the default review. With it, every rule below overrides the matching default rule; everything not mentioned here stays as it is.
+
+- **The bar:** a senior Rust engineer reads the target and sees no catastrophic, obvious, beginner-level item.
+- **Reporting threshold.** Report a finding only if it meets ALL three:
+  - **Obvious:** a senior would notice it on a normal read, without deep analysis or a debugger.
+  - **Beginner-level:** a mid-level or senior engineer would not have written it.
+  - **Catastrophic:** it causes one of:
+    - a crash or abort in production code, including a panic hidden inside a crate call on external data
+    - silently wrong results (wrong numbers, look-ahead bias, records dropped without an error)
+    - data loss or corruption
+    - a security exposure, such as secrets in source
+    - code a reader cannot follow at a glance, such as a several-hundred-line function or `clone`/`unwrap` everywhere
+- **Everything else is below the bar.** Naming, DRY, structure, the comment budget, doc drift, minor performance, architecture polish and missing tests for working code are not reported, not even as low impact.
+- **Stopping is the expected outcome.** If nothing meets the threshold, the verdict is "Bar met" and the findings list is empty. Never fill the list to look thorough.
+- **Step 3:** the axes are where to look, not what to report. Each kept finding names the concrete failure: the input or state, and the crash, wrong result, loss or exposure it causes.
+- **Test gaps:** report a gap only when an untested path can hide a catastrophic failure.
+- **Report (step 5) changes:**
+  - **Verdict:** "Bar met" in one sentence, or "Bar not met" plus the number of findings.
+  - **Findings:** `[#] [axis] file:line: problem → concrete failure → fix (effort: S/M/L)`, worst consequence first (wrong results and data loss, then crashes, then readability). Omit the section when the bar is met.
+  - **Omit:** the comment budget, the 1-hour marker, impact ratings, **Larger refactors** and **Not recommended**.
+  - **Clippy:** "clean", or the warnings; a warning becomes a finding only if it meets the threshold.
+  - **Checklist:** replace the senior bar checklist with these, each ✅ or ❌:
+    - [ ] no look-ahead bias, off-by-one or warm-up errors in time-series logic
+    - [ ] no silently wrong numbers (NaN/inf propagation, division by zero, dropped records)
+    - [ ] no crash path in production code (`unwrap`, `panic!`, indexing, or a panicking crate call on external data)
+    - [ ] no data loss or corruption on failure
+    - [ ] no secrets or credentials in source
+    - [ ] nothing a reader cannot follow at a glance
+
 ## 1. Resolve the target
 
-- Target = `$ARGUMENTS`.
+- Target = `$ARGUMENTS`, without the `--high-bar` flag if present.
 - If it is empty or ambiguous, ask the user which function, struct, abstraction or file to review. Do not guess.
 - Find the target's definition and write down its boundary:
   - the items it owns
