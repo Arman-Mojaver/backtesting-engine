@@ -85,6 +85,9 @@ impl DbConfig {
             Environment::Development => "db-development",
             Environment::Testing => "db-testing",
         };
+        // Intentional: the host and credentials are hard-coded. The engine runs
+        // only locally, against PostgreSQL containers on the developer's machine,
+        // never on a server, so there is no secret to keep out of source.
         Self {
             host: "host.docker.internal".into(),
             port,
