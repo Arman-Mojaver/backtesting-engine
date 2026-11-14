@@ -92,7 +92,8 @@ impl ParquetStrategyRepository {
     fn write_partition(path: &Path, new_rows: Vec<StrategyRow>) -> anyhow::Result<()> {
         let start = Instant::now();
         let existing_rows: Vec<StrategyRow> = if path.exists() {
-            Self::read_rows(path)?
+            Self::read_rows(path)
+                .with_context(|| format!("failed to read partition {}", path.display()))?
         } else {
             Vec::new()
         };
@@ -122,11 +123,6 @@ impl ParquetStrategyRepository {
         combined.extend(fresh_rows);
 
         let batch = build_record_batch(&combined)?;
-        let schema = batch.schema();
-
-        let props = WriterProperties::builder()
-            .set_compression(Compression::ZSTD(ZstdLevel::default()))
-            .build();
 
         let Some(partition_dir) = path.parent() else {
             bail!("partition {} has no parent directory", path.display());
@@ -137,16 +133,8 @@ impl ParquetStrategyRepository {
                 partition_dir.display()
             )
         })?;
-
-        // Intentional: the partition is rewritten in place, not through a temp
-        // file and rename. A write that fails midway is an accepted risk: the
-        // command is re-run, with or without fixes, and strategies are derived
-        // from PostgreSQL, so nothing is lost.
-        let file = File::create(path)
-            .with_context(|| format!("failed to create partition {}", path.display()))?;
-        let mut writer = ArrowWriter::try_new(file, schema, Some(props))?;
-        writer.write(&batch)?;
-        writer.close()?;
+        Self::write_batch(path, &batch)
+            .with_context(|| format!("failed to write partition {}", path.display()))?;
 
         debug!(
             "parquet partition written ({}): {} rows ({} existing + {} fresh) in {:?}",
@@ -157,6 +145,22 @@ impl ParquetStrategyRepository {
             start.elapsed()
         );
 
+        Ok(())
+    }
+
+    fn write_batch(path: &Path, batch: &RecordBatch) -> anyhow::Result<()> {
+        let props = WriterProperties::builder()
+            .set_compression(Compression::ZSTD(ZstdLevel::default()))
+            .build();
+
+        // Intentional: the partition is rewritten in place, not through a temp
+        // file and rename. A write that fails midway is an accepted risk: the
+        // command is re-run, with or without fixes, and strategies are derived
+        // from PostgreSQL, so nothing is lost.
+        let file = File::create(path)?;
+        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))?;
+        writer.write(batch)?;
+        writer.close()?;
         Ok(())
     }
 
@@ -179,7 +183,9 @@ impl ParquetStrategyRepository {
                     dirs.push(path);
                 } else if path.file_name().is_some_and(|n| n == "strategies.parquet") {
                     partitions_scanned = partitions_scanned.saturating_add(1);
-                    max_id = max_id.max(Self::partition_max_strategy_id(&path)?);
+                    let partition_max_id = Self::partition_max_strategy_id(&path)
+                        .with_context(|| format!("failed to read partition {}", path.display()))?;
+                    max_id = max_id.max(partition_max_id);
                 }
             }
         }
@@ -193,13 +199,12 @@ impl ParquetStrategyRepository {
     }
 
     fn partition_max_strategy_id(path: &Path) -> anyhow::Result<i64> {
-        let file = File::open(path)
-            .with_context(|| format!("failed to open partition {}", path.display()))?;
+        let file = File::open(path)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
         let strategy_id_index = builder
             .schema()
             .index_of("strategy_id")
-            .with_context(|| format!("partition {} has no strategy_id column", path.display()))?;
+            .context("missing column strategy_id")?;
         let mask = ProjectionMask::roots(builder.parquet_schema(), [strategy_id_index]);
         let mut reader = builder.with_projection(mask).build()?;
 
@@ -213,8 +218,7 @@ impl ParquetStrategyRepository {
     }
 
     fn read_rows(path: &Path) -> anyhow::Result<Vec<StrategyRow>> {
-        let file = File::open(path)
-            .with_context(|| format!("failed to open partition {}", path.display()))?;
+        let file = File::open(path)?;
         let builder = ParquetRecordBatchReaderBuilder::try_new(file)?;
         let mut reader = builder.build()?;
 
@@ -411,6 +415,14 @@ mod tests {
             .into_iter()
             .map(|r| r.indicator_id)
             .collect()
+    }
+
+    fn truncated_partition(repo: &ParquetStrategyRepository, cell: &Cell) -> PathBuf {
+        repo.write_rows(cell, rows(&sample_strategies(), 1))
+            .unwrap();
+        let path = repo.partition_path(cell);
+        fs::write(&path, b"PAR1").unwrap();
+        path
     }
 
     #[test]
@@ -613,6 +625,37 @@ mod tests {
         assert!(
             err.to_string()
                 .contains(&blocking_file.display().to_string())
+        );
+    }
+
+    #[test]
+    fn write_rows_names_the_existing_partition_it_cannot_read() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
+        let cell = Cell::new("EURUSD", 390);
+        let path = truncated_partition(&repo, &cell);
+
+        let err = repo
+            .write_rows(&cell, rows(&[strategy(9999)], 3))
+            .unwrap_err();
+
+        assert!(
+            format!("{err:#}").contains(&path.display().to_string()),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn max_strategy_id_names_the_partition_it_cannot_read() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
+        let path = truncated_partition(&repo, &Cell::new("EURUSD", 390));
+
+        let err = repo.max_strategy_id().unwrap_err();
+
+        assert!(
+            format!("{err:#}").contains(&path.display().to_string()),
+            "{err:#}"
         );
     }
 

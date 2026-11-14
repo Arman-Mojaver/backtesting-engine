@@ -106,10 +106,14 @@ mod tests {
         }
     }
 
-    fn strategy_ids(base: &Path, instrument: &str, mms_id: i32) -> Vec<i64> {
-        let path = base.join(format!(
+    fn partition_path(base: &Path, instrument: &str, mms_id: i32) -> PathBuf {
+        base.join(format!(
             "instrument={instrument}/money_management_strategy_id={mms_id}/strategies.parquet"
-        ));
+        ))
+    }
+
+    fn strategy_ids(base: &Path, instrument: &str, mms_id: i32) -> Vec<i64> {
+        let path = partition_path(base, instrument, mms_id);
         let reader = ParquetRecordBatchReaderBuilder::try_new(File::open(path).unwrap())
             .unwrap()
             .build()
@@ -266,6 +270,25 @@ mod tests {
         assert!(result.is_err());
         let processed = persistence.read_processed_ids_per_cell().unwrap();
         assert!(processed.is_empty());
+    }
+
+    #[test]
+    fn persist_cells_names_the_corrupt_partition() {
+        let (_tmp, base, persistence) = new_persistence();
+        persistence
+            .persist_cells(vec![cell("EURUSD", 390, &[2001])])
+            .unwrap();
+        let corrupt_partition = partition_path(&base, "EURUSD", 390);
+        std::fs::write(&corrupt_partition, b"PAR1").unwrap();
+
+        let err = persistence
+            .persist_cells(vec![cell("USDJPY", 400, &[3001])])
+            .unwrap_err();
+
+        assert!(
+            format!("{err:#}").contains(&corrupt_partition.display().to_string()),
+            "{err:#}"
+        );
     }
 
     #[test]
