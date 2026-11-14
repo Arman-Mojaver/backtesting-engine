@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/notes | Priority: high | Version: 1.11 | Updated: 2026-11-13 -->
+<!-- Context: project-intelligence/notes | Priority: high | Version: 1.12 | Updated: 2026-11-14 -->
 
 # Living Notes
 
@@ -18,6 +18,7 @@
 | DbConfig is hardcoded per environment | Host (`host.docker.internal`), ports, and credentials cannot be overridden by env vars | Medium | Fine for the Docker workflow; add env overrides if the engine must target arbitrary PG instances |
 | Engine CLI handlers are only partly unit-tested | `create.rs` tests its manifest lookup and `create_loop.rs` its failed-cell formatting; the batch logic it calls is tested in `application::strategy_batch`; the `execute` orchestration itself needs PostgreSQL and is untested | Low | Logic is pushed into tested application/infrastructure functions; add handler tests if handlers grow |
 | Parquet write cost at scale | Partition append = full file rewrite; `max_strategy_id()` scans all partitions | Low | Fine at current scale; rethink if partition counts grow by orders of magnitude |
+| Stored strategies are not invalidated by logic, threshold or data changes | The manifest records only the `(instrument, mms_id, indicator_id)` triple, so after a change to signal, indicator, metric or validation logic, to `GlobalStrategyFilter::default()`, or to a cell's source data in PostgreSQL, `create`/`create_loop` still skip the cell and its stale strategies stay. Already happened once: every strategy persisted before the entry-timing fix ("enter signals on the next resampled point") selects different operation points than the engine does now | Medium | Reset the whole environment directory (see Gotchas). The real fix, recording an engine/logic/threshold version in the manifest, is not planned yet |
 
 ### Technical Debt Details
 
@@ -96,6 +97,7 @@
 - **Parquet dirs are environment-scoped** — `/app/parquet_files/{env}/strategy` (partitions) and `/app/parquet_files/{env}/processed.parquet` (manifest). Host-mounted via `PARQUET_FILES_PATH`.
 - **DB config is hardcoded per environment** — `host.docker.internal` with ports 5432/54320/54321 for production/development/testing. No env override.
 - **Metrics are entry-order approximations** — See Technical Debt (exit dates) before quoting ROI/DD numbers.
+- **A logic, threshold or data change needs a Parquet reset** — After changing signal, indicator, metric or validation logic, `GlobalStrategyFilter::default()`, or a cell's source data in PostgreSQL, delete the whole `/app/parquet_files/{env}` directory (host: `$PARQUET_FILES_PATH/{env}`) and run `bte strategy create_loop`. The same procedure recovers a corrupt partition. It also removes any manifest temp file left by a killed run. Strategy IDs restart at 1 (`first_persist_starts_ids_at_one`), and only that environment is reset. Never delete half of it: without the manifest, each partition keeps its existing row per `indicator_id` and drops the fresh one, so the old strategies win (`re_persisting_a_cell_keeps_original_ids`); without the partitions, or after deleting one corrupt partition, the manifest still lists their indicators, so nothing is recomputed and those strategies are lost.
 
 ## Active Projects
 

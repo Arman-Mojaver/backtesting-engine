@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.18 | Updated: 2026-11-13 -->
+<!-- Context: project-intelligence/domain-model | Priority: critical | Version: 1.19 | Updated: 2026-11-14 -->
 
 # Domain Model — Backtesting Engine
 
@@ -262,6 +262,7 @@ Partition layout: `{base_dir}/instrument={instrument}/money_management_strategy_
 - `read_processed_ids_per_cell()` (keyed by `Cell`), `append_all(&[ManifestEntry], processed_at)`. A `ManifestEntry` holds a `Cell` and its indicator IDs.
 - Dedups on the (instrument, mms_id, indicator_id) triple; atomic writes (temp file + fsync + rename; temp file removed on failure).
 - Consumed by `strategy create` (skip processed) and `create_loop` (per-cell skip).
+- **Not tracked:** the engine's logic (signal, indicator, metric and validation rules), the `GlobalStrategyFilter` defaults, and the source data in PostgreSQL. "Idempotent" means "never computed twice", not "up to date": after any of those changes, a listed cell still holds its stale strategies. The manifest and the partitions must be reset together, by deleting the whole `/app/parquet_files/{env}` directory and running `create_loop`; strategy IDs then restart at 1, and only that environment is reset. Deleting only the manifest keeps the old rows (partitions dedup by `indicator_id`); deleting only the partitions recomputes nothing. See the living notes gotcha.
 
 ---
 

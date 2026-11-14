@@ -246,6 +246,9 @@ A single Parquet ledger next to the partitions records every completed
 `(instrument, MMS, indicator)` triple with a completion timestamp. It is the engine's
 idempotency ledger: `create` and `create_loop` compute only what it doesn't list,
 appends are deduplicated on the triple, and writes are atomic (temp file + rename).
+It does not track the engine version, the filter thresholds or the source data, so a
+cell it lists can hold stale strategies (see
+[Known limitations](#known-limitations), item 8).
 
 ## Configuration
 
@@ -366,6 +369,32 @@ Honest list — read before trusting the numbers:
    magnitude.
 7. **Command handlers are thin wrappers over tested logic; the wrappers themselves
    have no direct tests.**
+8. **Stored strategies are not recomputed when their inputs change.** The processed
+   manifest records only which `(instrument, MMS, indicator)` triples are done, not how
+   or from what. After any of these changes, the stored strategies are stale and every
+   re-run still skips them:
+   - the engine's logic: signal semantics, indicator math, metric formulas, validation
+     rules;
+   - the default filter bars;
+   - the source data in PostgreSQL for a cell: new or corrected resampled points or
+     operation points, or an indicator whose parameters were edited under the same id.
+
+   To recompute, delete the whole environment directory of the
+   [output layout](#output-format), `parquet_files/{environment}/` (on the host, under
+   `PARQUET_FILES_PATH`), then run `bte strategy create_loop`. That removes the strategy
+   partitions and the processed manifest together. A corrupt partition is recovered the
+   same way. Consequences:
+   - Strategy IDs start again at 1, so an ID stored outside the engine no longer points
+     at the same strategy.
+   - A reset is per environment: resetting `development` never touches `production`. A
+     single cell cannot be reset, because one manifest covers every cell.
+
+   Never delete half of the tree:
+   - **Only the manifest:** the cells are recomputed, but each partition keeps the row
+     it already holds for an indicator and drops the fresh one. The old strategies
+     survive, including ones that no longer pass the filter.
+   - **Only the partitions, or one corrupt partition:** the manifest still lists their
+     indicators as processed, so nothing is recomputed and those strategies are lost.
 
 ## Ecosystem
 
