@@ -327,6 +327,7 @@ src/
 │   ├── pg_adapter.rs           # PgStore — implements all four domain repo traits
 │   ├── strategy_adapter.rs     # ParquetStrategyRepository (partitioned, idempotent parquet writes)
 │   ├── processed_manifest.rs   # ParquetProcessedManifest (idempotency ledger)
+│   ├── parquet_columns.rs      # checked column reads: a mistyped file is an error, never a panic
 │   ├── strategy_persistence.rs # StrategyPersistence (batch commit)
 │   └── logging.rs              # simplelog init
 ├── config/                     # Environment + DB configuration

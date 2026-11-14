@@ -5,10 +5,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{Context, bail};
-use arrow::array::{
-    AsArray, Decimal128Array, Int32Array, Int32Builder, Int64Array, ListArray, ListBuilder,
-    PrimitiveArray,
-};
+use arrow::array::{Decimal128Array, Int32Array, Int32Builder, Int64Array, ListArray, ListBuilder};
 use arrow::datatypes::{DataType, Decimal128Type, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
 use log::debug;
@@ -21,6 +18,7 @@ use rustc_hash::FxHashSet;
 use crate::domain::cast;
 use crate::domain::cell::Cell;
 use crate::domain::strategy::Strategy;
+use crate::infrastructure::parquet_columns::{list_column, list_items, primitive_column};
 
 const METRIC_PRECISION: u8 = 10;
 const METRIC_SCALE: i8 = 2;
@@ -210,7 +208,7 @@ impl ParquetStrategyRepository {
 
         let mut max_id: i64 = 0;
         while let Some(batch) = reader.next().transpose()? {
-            for id in batch.column(0).as_primitive::<Int64Type>().values() {
+            for id in primitive_column::<Int64Type>(&batch, "strategy_id")?.values() {
                 max_id = max_id.max(*id);
             }
         }
@@ -230,38 +228,18 @@ impl ParquetStrategyRepository {
     }
 }
 
-fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
-    let schema = batch.schema();
-    let col = |name: &str| -> anyhow::Result<usize> {
-        schema
-            .index_of(name)
-            .map_err(|e| anyhow::anyhow!("missing column {name}: {e}"))
-    };
+const LONG_IDS: &str = "long_operation_point_ids";
+const SHORT_IDS: &str = "short_operation_point_ids";
 
-    let strategy_ids = batch
-        .column(col("strategy_id")?)
-        .as_primitive::<Int64Type>();
-    let indicator_ids = batch
-        .column(col("indicator_id")?)
-        .as_primitive::<Int32Type>();
-    let rois = batch
-        .column(col("annual_roi")?)
-        .as_primitive::<Decimal128Type>();
-    let draw_downs = batch
-        .column(col("max_draw_down")?)
-        .as_primitive::<Decimal128Type>();
-    let op_counts = batch
-        .column(col("annual_operation_count")?)
-        .as_primitive::<Decimal128Type>();
-    let long_ids = batch
-        .column(col("long_operation_point_ids")?)
-        .as_list::<i32>();
-    let short_ids = batch
-        .column(col("short_operation_point_ids")?)
-        .as_list::<i32>();
-    let mms_ids = batch
-        .column(col("money_management_strategy_id")?)
-        .as_primitive::<Int32Type>();
+fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
+    let strategy_ids = primitive_column::<Int64Type>(batch, "strategy_id")?;
+    let indicator_ids = primitive_column::<Int32Type>(batch, "indicator_id")?;
+    let rois = primitive_column::<Decimal128Type>(batch, "annual_roi")?;
+    let draw_downs = primitive_column::<Decimal128Type>(batch, "max_draw_down")?;
+    let op_counts = primitive_column::<Decimal128Type>(batch, "annual_operation_count")?;
+    let long_ids = list_column(batch, LONG_IDS)?;
+    let short_ids = list_column(batch, SHORT_IDS)?;
+    let mms_ids = primitive_column::<Int32Type>(batch, "money_management_strategy_id")?;
 
     let n = batch.num_rows();
     let mut out = Vec::with_capacity(n);
@@ -272,18 +250,12 @@ fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
             annual_roi: metric_from_decimal(rois.value(i)),
             max_draw_down: metric_from_decimal(draw_downs.value(i)),
             annual_operation_count: metric_from_decimal(op_counts.value(i)),
-            long_operation_point_ids: decode_list_value(long_ids, i),
-            short_operation_point_ids: decode_list_value(short_ids, i),
+            long_operation_point_ids: list_items::<Int32Type>(long_ids, i, LONG_IDS)?,
+            short_operation_point_ids: list_items::<Int32Type>(short_ids, i, SHORT_IDS)?,
             money_management_strategy_id: mms_ids.value(i),
         });
     }
     Ok(out)
-}
-
-fn decode_list_value(list: &ListArray, i: usize) -> Vec<i32> {
-    let values = list.value(i);
-    let prim: &PrimitiveArray<Int32Type> = values.as_primitive();
-    prim.values().iter().copied().collect()
 }
 
 fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
@@ -294,12 +266,12 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
         Field::new("max_draw_down", METRIC_TYPE, false),
         Field::new("annual_operation_count", METRIC_TYPE, false),
         Field::new(
-            "long_operation_point_ids",
+            LONG_IDS,
             DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
             false,
         ),
         Field::new(
-            "short_operation_point_ids",
+            SHORT_IDS,
             DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
             false,
         ),
@@ -349,6 +321,7 @@ fn build_list_column(rows: &[StrategyRow], extract: fn(&StrategyRow) -> &[i32]) 
 mod tests {
     use super::*;
     use crate::domain::strategy::Strategy;
+    use arrow::array::{ArrayRef, AsArray, Int64Builder};
     use tempfile::TempDir;
 
     fn strategy(indicator_id: i32) -> Strategy {
@@ -707,5 +680,108 @@ mod tests {
         writer.close().unwrap();
 
         assert_eq!(repo.max_strategy_id().unwrap(), 7);
+    }
+
+    fn write_raw_partition(
+        repo: &ParquetStrategyRepository,
+        cell: &Cell,
+        columns: Vec<(&str, ArrayRef)>,
+    ) {
+        let path = repo.partition_path(cell);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let batch = RecordBatch::try_from_iter(columns).unwrap();
+        let file = File::create(path).unwrap();
+        let mut writer = ArrowWriter::try_new(file, batch.schema(), None).unwrap();
+        writer.write(&batch).unwrap();
+        writer.close().unwrap();
+    }
+
+    fn metric(raw: i128) -> ArrayRef {
+        Arc::new(
+            Decimal128Array::from(vec![raw])
+                .with_precision_and_scale(METRIC_PRECISION, METRIC_SCALE)
+                .unwrap(),
+        )
+    }
+
+    #[test]
+    fn write_rows_errors_when_existing_partition_has_mistyped_column() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
+        let cell = Cell::new("EURUSD", 390);
+        write_raw_partition(
+            &repo,
+            &cell,
+            vec![
+                ("strategy_id", Arc::new(Int64Array::from(vec![1]))),
+                ("indicator_id", Arc::new(Int64Array::from(vec![2001]))),
+            ],
+        );
+
+        let err = repo
+            .write_rows(&cell, rows(&[strategy(9999)], 2))
+            .unwrap_err();
+
+        assert!(
+            format!("{err:#}").contains("column indicator_id is not Int32"),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn write_rows_errors_when_existing_partition_has_mistyped_list_items() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
+        let cell = Cell::new("EURUSD", 390);
+        let wide_ids = || -> ArrayRef {
+            let mut builder = ListBuilder::new(Int64Builder::new());
+            builder.values().append_slice(&[1, 2]);
+            builder.append(true);
+            Arc::new(builder.finish())
+        };
+        write_raw_partition(
+            &repo,
+            &cell,
+            vec![
+                ("strategy_id", Arc::new(Int64Array::from(vec![1]))),
+                ("indicator_id", Arc::new(Int32Array::from(vec![2001]))),
+                ("annual_roi", metric(1234)),
+                ("max_draw_down", metric(567)),
+                ("annual_operation_count", metric(1520)),
+                (LONG_IDS, wide_ids()),
+                (SHORT_IDS, wide_ids()),
+                (
+                    "money_management_strategy_id",
+                    Arc::new(Int32Array::from(vec![390])),
+                ),
+            ],
+        );
+
+        let err = repo
+            .write_rows(&cell, rows(&[strategy(9999)], 2))
+            .unwrap_err();
+
+        assert!(
+            format!("{err:#}").contains("column long_operation_point_ids items are not Int32"),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn max_strategy_id_errors_when_strategy_id_is_mistyped() {
+        let tmp = TempDir::new().unwrap();
+        let repo = ParquetStrategyRepository::new(tmp.path().to_path_buf());
+        write_raw_partition(
+            &repo,
+            &Cell::new("EURUSD", 390),
+            vec![("strategy_id", Arc::new(Int32Array::from(vec![7])))],
+        );
+
+        let err = repo.max_strategy_id().unwrap_err();
+
+        assert!(
+            format!("{err:#}").contains("column strategy_id is not Int64"),
+            "{err:#}"
+        );
     }
 }

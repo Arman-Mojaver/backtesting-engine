@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
-use arrow::array::{ArrayRef, AsArray, Int32Array, Int64Array, PrimitiveArray, StringArray};
-use arrow::datatypes::{ArrowPrimitiveType, DataType, Field, Int32Type, Int64Type, Schema};
+use arrow::array::{Int32Array, Int64Array, StringArray};
+use arrow::datatypes::{DataType, Field, Int32Type, Int64Type, Schema};
 use arrow::record_batch::RecordBatch;
 use log::{info, warn};
 use parquet::arrow::ArrowWriter;
@@ -18,6 +18,7 @@ use parquet::file::properties::WriterProperties;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::domain::cell::Cell;
+use crate::infrastructure::parquet_columns::{primitive_column, string_column};
 
 static TEMP_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
 
@@ -71,7 +72,8 @@ impl ParquetProcessedManifest {
     fn read_all(&self) -> anyhow::Result<Vec<ProcessedRow>> {
         let path = self.path();
         match File::open(&path) {
-            Ok(file) => read_parquet(file),
+            Ok(file) => read_parquet(file)
+                .with_context(|| format!("failed to read manifest {}", path.display())),
             Err(e) if e.kind() == ErrorKind::NotFound => Ok(Vec::new()),
             Err(e) => Err(e).with_context(|| format!("failed to open manifest {}", path.display())),
         }
@@ -182,27 +184,6 @@ fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<ProcessedRow>> {
     Ok(out)
 }
 
-fn column<'a>(batch: &'a RecordBatch, name: &str) -> anyhow::Result<&'a ArrayRef> {
-    batch
-        .column_by_name(name)
-        .with_context(|| format!("manifest is missing column {name}"))
-}
-
-fn string_column<'a>(batch: &'a RecordBatch, name: &str) -> anyhow::Result<&'a StringArray> {
-    column(batch, name)?
-        .as_string_opt::<i32>()
-        .with_context(|| format!("manifest column {name} is not Utf8"))
-}
-
-fn primitive_column<'a, T: ArrowPrimitiveType>(
-    batch: &'a RecordBatch,
-    name: &str,
-) -> anyhow::Result<&'a PrimitiveArray<T>> {
-    column(batch, name)?
-        .as_primitive_opt::<T>()
-        .with_context(|| format!("manifest column {name} is not {}", T::DATA_TYPE))
-}
-
 fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
     let schema = Arc::new(Schema::new(vec![
         Field::new("instrument", DataType::Utf8, false),
@@ -245,6 +226,7 @@ fn write_parquet(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arrow::array::ArrayRef;
     use tempfile::TempDir;
 
     const FIRST_RUN_AT: i64 = 1_700_000_000;
