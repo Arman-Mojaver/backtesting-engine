@@ -39,6 +39,12 @@ pub enum IndicatorParameters {
     ForceIndex {
         period: i32,
     },
+    Mfi {
+        period: i32,
+        /// MFI levels on its 0–100 scale, e.g. 80 overbought and 20 oversold.
+        high_threshold: i32,
+        low_threshold: i32,
+    },
     OsMa {
         fast_ema: i32,
         slow_ema: i32,

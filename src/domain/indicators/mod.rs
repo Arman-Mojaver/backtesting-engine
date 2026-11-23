@@ -14,6 +14,7 @@ pub mod dpo;
 pub mod force;
 pub mod macd;
 pub mod macros;
+pub mod mfi;
 pub mod moving_averages;
 pub mod osma;
 pub mod roc;
@@ -86,6 +87,14 @@ pub enum IndicatorError {
     InvalidDpoPeriod { n: i32 },
     #[error("force index period must be positive, got {n}")]
     InvalidForcePeriod { n: i32 },
+    #[error("money flow index period must be positive, got {n}")]
+    InvalidMfiPeriod { n: i32 },
+    #[error(
+        "money flow index low threshold must be less than high threshold, got high {high}, low {low}"
+    )]
+    InvalidMfiThresholdOrder { high: i32, low: i32 },
+    #[error("money flow index threshold must be between 0 and 100, got {value}")]
+    InvalidMfiThresholdRange { value: i32 },
     #[error("osma fast period must be positive, got {n}")]
     InvalidOsMaFastPeriod { n: i32 },
     #[error("osma slow period must be positive, got {n}")]
@@ -197,6 +206,14 @@ pub fn create_indicator_output(
         } => {
             let buffer = osma::compute(points, *fast_ema, *slow_ema, *signal_sma)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Mfi {
+            period,
+            high_threshold,
+            low_threshold,
+        } => {
+            let buffer = mfi::compute(points, *period, *high_threshold, *low_threshold)?;
+            Ok(IndicatorOutput::Threshold { instrument, buffer })
         }
         IndicatorParameters::Roc { period } => {
             let buffer = roc::compute(points, *period)?;
@@ -1064,6 +1081,40 @@ mod tests {
         assert_eq!(err, IndicatorError::InvalidTemaPeriod { n: 0 });
     }
 
+    #[test]
+    fn mfi_dispatch_returns_threshold_variant() {
+        let params = IndicatorParameters::Mfi {
+            period: 2,
+            high_threshold: 80,
+            low_threshold: 20,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0), rp(3, 3, 3.0), rp(4, 4, 4.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Threshold { buffer: buf, .. } => {
+                // 4 points, period 2 -> 2 values from bar 3 (rising price -> 100).
+                assert_eq!(buf.high_threshold, 80.0);
+                assert_eq!(buf.low_threshold, 20.0);
+                assert_eq!(buf.items.len(), 2);
+                assert_eq!(buf.items[0].timestamp, 3);
+                assert_eq!(buf.items[0].value, 100.0);
+            }
+            other => panic!("expected Threshold, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mfi_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Mfi {
+            period: 0,
+            high_threshold: 80,
+            low_threshold: 20,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidMfiPeriod { n: 0 });
+    }
+
     /// 5 points with constant close -> exactly 1 TRIX value
     /// (period 2 -> needs 5 points = 3*2 - 1).
     fn rp_trix_5() -> Vec<ResampledPointD1> {
@@ -1241,6 +1292,18 @@ mod tests {
             (
                 IndicatorError::InvalidForcePeriod { n: 0 },
                 "force index period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidMfiPeriod { n: 0 },
+                "money flow index period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidMfiThresholdOrder { high: 20, low: 80 },
+                "money flow index low threshold must be less than high threshold, got high 20, low 80",
+            ),
+            (
+                IndicatorError::InvalidMfiThresholdRange { value: 101 },
+                "money flow index threshold must be between 0 and 100, got 101",
             ),
             (
                 IndicatorError::InvalidOsMaFastPeriod { n: 0 },

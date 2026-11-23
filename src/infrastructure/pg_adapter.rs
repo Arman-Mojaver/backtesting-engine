@@ -38,6 +38,14 @@ struct RsiParams {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct MfiParams {
+    period: i32,
+    high_threshold: i32,
+    low_threshold: i32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PeriodParams {
     period: i32,
 }
@@ -148,6 +156,14 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
         "force" => {
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
             IndicatorParameters::ForceIndex { period: p.period }
+        }
+        "mfi" => {
+            let p = parse_params::<MfiParams>(indicator_type, json_text)?;
+            IndicatorParameters::Mfi {
+                period: p.period,
+                high_threshold: p.high_threshold,
+                low_threshold: p.low_threshold,
+            }
         }
         "osma" => {
             let p = parse_params::<OsMaParams>(indicator_type, json_text)?;
@@ -467,6 +483,23 @@ mod tests {
             params,
             IndicatorParameters::Rsi {
                 n: 10,
+                high_threshold: 80,
+                low_threshold: 20,
+            }
+        );
+    }
+
+    #[test]
+    fn mfi_params_parse_from_db_json_shape() {
+        let params = map_parameters(
+            "mfi",
+            r#"{"period": 14, "high_threshold": 80, "low_threshold": 20}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            params,
+            IndicatorParameters::Mfi {
+                period: 14,
                 high_threshold: 80,
                 low_threshold: 20,
             }
