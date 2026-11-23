@@ -20,14 +20,14 @@ use crate::domain::resampled_point::{ResampledPointD1, ResampledPointD1Repositor
 use crate::infrastructure::pg_adapter::PgStore;
 
 #[derive(Debug)]
-pub struct SourceIndex {
+pub struct GroupedSourceData {
     indicators: Vec<Indicator>,
     resampled_by_instrument: FxHashMap<String, Vec<ResampledPointD1>>,
     long_by_cell: FxHashMap<Cell, Vec<OperationPoint>>,
     short_by_cell: FxHashMap<Cell, Vec<OperationPoint>>,
 }
 
-impl SourceIndex {
+impl GroupedSourceData {
     pub fn load(db_config: &DbConfig) -> anyhow::Result<Self> {
         info!("Querying DB...");
 
@@ -42,11 +42,23 @@ impl SourceIndex {
             move || IndicatorRepository::get_all(&mut indicator_store),
             move || {
                 rayon::join(
-                    move || ResampledPointD1Repository::index_by_instrument(&mut resampled_store),
+                    move || {
+                        ResampledPointD1Repository::get_all_grouped_by_instrument(
+                            &mut resampled_store,
+                        )
+                    },
                     move || {
                         rayon::join(
-                            move || LongOperationPointRepository::index_by_cell(&mut long_store),
-                            move || ShortOperationPointRepository::index_by_cell(&mut short_store),
+                            move || {
+                                LongOperationPointRepository::get_all_grouped_by_cell(
+                                    &mut long_store,
+                                )
+                            },
+                            move || {
+                                ShortOperationPointRepository::get_all_grouped_by_cell(
+                                    &mut short_store,
+                                )
+                            },
                         )
                     },
                 )
@@ -101,7 +113,7 @@ enum CellOutcome {
 }
 
 fn compute_cell(
-    source: &SourceIndex,
+    source: &GroupedSourceData,
     cell: &Cell,
     processed_ids_per_cell: &FxHashMap<Cell, FxHashSet<i32>>,
 ) -> CellOutcome {
@@ -169,7 +181,7 @@ fn split_outcomes(outcomes: Vec<CellOutcome>) -> (Vec<CellOutput>, BatchSummary)
 }
 
 pub fn compute_cells(
-    source: &SourceIndex,
+    source: &GroupedSourceData,
     cells: &[Cell],
     processed_ids_per_cell: &FxHashMap<Cell, FxHashSet<i32>>,
 ) -> (Vec<CellOutput>, BatchSummary) {
@@ -340,11 +352,11 @@ mod tests {
         Cell::new("EURUSD", 1)
     }
 
-    fn source_index(
+    fn grouped_source_data(
         indicators: Vec<Indicator>,
         resampled_points: Vec<ResampledPointD1>,
-    ) -> SourceIndex {
-        SourceIndex {
+    ) -> GroupedSourceData {
+        GroupedSourceData {
             indicators,
             resampled_by_instrument: FxHashMap::from_iter([(
                 "EURUSD".to_string(),
@@ -362,7 +374,7 @@ mod tests {
     #[test]
     fn cells_are_sorted_union_of_long_and_short_without_duplicates() {
         let cell = |instrument: &str, mms_id| (Cell::new(instrument, mms_id), Vec::new());
-        let source = SourceIndex {
+        let source = GroupedSourceData {
             indicators: Vec::new(),
             resampled_by_instrument: FxHashMap::default(),
             long_by_cell: FxHashMap::from_iter([cell("USDJPY", 1), cell("EURUSD", 2)]),
@@ -381,7 +393,7 @@ mod tests {
 
     #[test]
     fn compute_cell_computes_only_unprocessed_indicators() {
-        let source = source_index(
+        let source = grouped_source_data(
             fixtures::indicators_default(),
             fixtures::resampled_points_default(),
         );
@@ -397,7 +409,7 @@ mod tests {
 
     #[test]
     fn compute_cell_skips_cell_whose_indicators_are_all_processed() {
-        let source = source_index(
+        let source = grouped_source_data(
             fixtures::indicators_default(),
             fixtures::resampled_points_default(),
         );
@@ -409,7 +421,7 @@ mod tests {
 
     #[test]
     fn compute_cell_reports_failed_cell_when_instrument_has_no_resampled_points() {
-        let source = source_index(fixtures::indicators_default(), Vec::new());
+        let source = grouped_source_data(fixtures::indicators_default(), Vec::new());
 
         let outcome = compute_cell(&source, &eurusd_cell(), &FxHashMap::default());
 
@@ -421,7 +433,7 @@ mod tests {
 
     #[test]
     fn compute_cell_with_no_indicators_is_already_processed() {
-        let source = source_index(Vec::new(), fixtures::resampled_points_default());
+        let source = grouped_source_data(Vec::new(), fixtures::resampled_points_default());
 
         let outcome = compute_cell(&source, &eurusd_cell(), &FxHashMap::default());
 

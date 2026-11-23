@@ -30,7 +30,9 @@ pub trait ResampledPointD1Repository {
     fn get_all(&mut self) -> anyhow::Result<Vec<ResampledPointD1>>;
     fn get_by_instrument(&mut self, instrument: &str) -> anyhow::Result<Vec<ResampledPointD1>>;
 
-    fn index_by_instrument(&mut self) -> anyhow::Result<FxHashMap<String, Vec<ResampledPointD1>>> {
+    fn get_all_grouped_by_instrument(
+        &mut self,
+    ) -> anyhow::Result<FxHashMap<String, Vec<ResampledPointD1>>> {
         Ok(group_by_instrument(self.get_all()?))
     }
 }
@@ -59,15 +61,15 @@ mod tests {
             point(2, "USDCAD", 2000),
             point(3, "EURUSD", 3000),
         ];
-        let index = group_by_instrument(points);
+        let grouped = group_by_instrument(points);
 
         let timestamps = |instrument: &str| -> Vec<i64> {
-            index[instrument]
+            grouped[instrument]
                 .iter()
                 .map(|point| point.timestamp)
                 .collect()
         };
-        assert_eq!(index.len(), 2);
+        assert_eq!(grouped.len(), 2);
         assert_eq!(timestamps("EURUSD"), vec![1000, 3000]);
         assert_eq!(timestamps("USDCAD"), vec![2000]);
     }

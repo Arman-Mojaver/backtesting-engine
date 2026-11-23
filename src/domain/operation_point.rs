@@ -88,7 +88,7 @@ pub trait LongOperationPointRepository {
         instrument: &str,
     ) -> anyhow::Result<Vec<OperationPoint>>;
 
-    fn index_by_cell(&mut self) -> anyhow::Result<FxHashMap<Cell, Vec<OperationPoint>>> {
+    fn get_all_grouped_by_cell(&mut self) -> anyhow::Result<FxHashMap<Cell, Vec<OperationPoint>>> {
         Ok(group_by_cell(self.get_all()?))
     }
 }
@@ -101,7 +101,7 @@ pub trait ShortOperationPointRepository {
         instrument: &str,
     ) -> anyhow::Result<Vec<OperationPoint>>;
 
-    fn index_by_cell(&mut self) -> anyhow::Result<FxHashMap<Cell, Vec<OperationPoint>>> {
+    fn get_all_grouped_by_cell(&mut self) -> anyhow::Result<FxHashMap<Cell, Vec<OperationPoint>>> {
         Ok(group_by_cell(self.get_all()?))
     }
 }
@@ -258,15 +258,15 @@ mod tests {
             },
         ];
 
-        let index = group_by_cell(points);
+        let grouped = group_by_cell(points);
         let ids_in = |instrument: &str, mms_id: i32| -> Vec<i32> {
-            index[&Cell::new(instrument, mms_id)]
+            grouped[&Cell::new(instrument, mms_id)]
                 .iter()
                 .map(|p| p.id)
                 .collect()
         };
 
-        assert_eq!(index.len(), 3);
+        assert_eq!(grouped.len(), 3);
         assert_eq!(ids_in("EURUSD", 1), vec![1, 2]);
         assert_eq!(ids_in("EURUSD", 2), vec![3]);
         assert_eq!(ids_in("USDCAD", 1), vec![4]);
@@ -297,15 +297,15 @@ mod tests {
             },
         ];
 
-        let index = group_by_cell(points);
+        let grouped = group_by_cell(points);
         let ids_in = |instrument: &str, mms_id: i32| -> Vec<i32> {
-            index[&Cell::new(instrument, mms_id)]
+            grouped[&Cell::new(instrument, mms_id)]
                 .iter()
                 .map(|p| p.id)
                 .collect()
         };
 
-        assert_eq!(index.len(), 2);
+        assert_eq!(grouped.len(), 2);
         assert_eq!(ids_in("EURUSD", 1), vec![1, 3]);
         assert_eq!(ids_in("USDCAD", 1), vec![2]);
     }

@@ -6,7 +6,7 @@ use log::{error, info};
 
 use crate::application::cell_output::CellOutput;
 use crate::application::strategy_batch::{
-    BatchSummary, SourceIndex, compute_cells, fail_on_total_failure,
+    BatchSummary, GroupedSourceData, compute_cells, fail_on_total_failure,
 };
 use crate::config::environment::{DbConfig, parquet_root_dir, resolve_environment};
 use crate::domain::cell::Cell;
@@ -19,7 +19,7 @@ fn format_failed_cells(failed_cells: &[Cell]) -> String {
 pub fn execute() -> anyhow::Result<()> {
     let command_start = Instant::now();
     let env = resolve_environment()?;
-    let source = SourceIndex::load(&DbConfig::from_env(env))?;
+    let source = GroupedSourceData::load(&DbConfig::from_env(env))?;
     let cells = source.cells();
     let persistence = StrategyPersistence::new(parquet_root_dir(env));
     let processed_ids_per_cell = persistence

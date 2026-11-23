@@ -10,10 +10,10 @@
 |-----------------|---------------------|------|-------|
 | A trade (long or short) | `OperationPoint` struct | `src/domain/operation_point.rs` | Direction determined by repository, not a field |
 | Long/short trade bundle | `OperationPoints` struct | `src/domain/operation_point.rs` | Pairs long+short; `*_points_by_timestamp()` lookup maps |
-| Long trades collection | `LongOperationPointRepository` trait | `src/domain/operation_point.rs` | Port — impl in infrastructure; `index_by_cell()` default method |
-| Short trades collection | `ShortOperationPointRepository` trait | `src/domain/operation_point.rs` | Port — impl in infrastructure; `index_by_cell()` default method |
+| Long trades collection | `LongOperationPointRepository` trait | `src/domain/operation_point.rs` | Port — impl in infrastructure; `get_all_grouped_by_cell()` default method |
+| Short trades collection | `ShortOperationPointRepository` trait | `src/domain/operation_point.rs` | Port — impl in infrastructure; `get_all_grouped_by_cell()` default method |
 | Daily market candle | `ResampledPointD1` struct | `src/domain/resampled_point.rs` | OHLCV + instrument + timestamp |
-| Market data collection | `ResampledPointD1Repository` trait | `src/domain/resampled_point.rs` | Port — `get_all()`, `get_by_instrument()`, `index_by_instrument()` |
+| Market data collection | `ResampledPointD1Repository` trait | `src/domain/resampled_point.rs` | Port — `get_all()`, `get_by_instrument()`, `get_all_grouped_by_instrument()` |
 | Technical indicator | `Indicator` struct | `src/domain/indicator.rs` | Has `id` and typed `parameters` |
 | Indicator parameters | `IndicatorParameters` enum | `src/domain/indicator.rs` | 14 variants: Macd, Rsi, AO, AC, Bears, Bulls, CHO, CHV, DPO, Force, OsMa, Roc, Trix, Vroc |
 | Indicator computation | `create_indicator_output()` | `src/domain/indicators/mod.rs` | Dispatches params → `IndicatorOutput`; all 14 indicators compute (MACD as a crossover of its line and signal line) |

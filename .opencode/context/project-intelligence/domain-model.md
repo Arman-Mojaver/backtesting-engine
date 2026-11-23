@@ -213,12 +213,12 @@ The domain defines repository traits — ports in a ports-and-adapters architect
 
 | Trait | Methods | Semantics |
 |-------|---------|-----------|
-| `LongOperationPointRepository` | `get_all()`, `get_by_mms_id_and_instrument(mms_id, instrument)`, `index_by_cell()` (default) | Long (buy) trades; `index_by_cell` groups by `Cell` |
-| `ShortOperationPointRepository` | `get_all()`, `get_by_mms_id_and_instrument(mms_id, instrument)`, `index_by_cell()` (default) | Short (sell) trades |
-| `ResampledPointD1Repository` | `get_all()`, `get_by_instrument(instrument)`, `index_by_instrument()` (default) | Daily candles |
+| `LongOperationPointRepository` | `get_all()`, `get_by_mms_id_and_instrument(mms_id, instrument)`, `get_all_grouped_by_cell()` (default) | Long (buy) trades; `get_all_grouped_by_cell` groups by `Cell` |
+| `ShortOperationPointRepository` | `get_all()`, `get_by_mms_id_and_instrument(mms_id, instrument)`, `get_all_grouped_by_cell()` (default) | Short (sell) trades |
+| `ResampledPointD1Repository` | `get_all()`, `get_by_instrument(instrument)`, `get_all_grouped_by_instrument()` (default) | Daily candles |
 | `IndicatorRepository` | `get_all()` | Indicators |
 
-Infrastructure provides one PostgreSQL implementation: `PgStore` implements all four traits. The in-memory test repos were removed (2026-08); tests use `domain::fixtures` builders + `tempfile`-based adapter tests instead. There is no dedicated money-management-strategy adapter: `create_loop` derives its cell universe from the operation-point indexes themselves (`index_by_cell()`), and the long and short tables carry the same money-management id set (written together by the upstream Backtesting-4.0 project).
+Infrastructure provides one PostgreSQL implementation: `PgStore` implements all four traits. The in-memory test repos were removed (2026-08); tests use `domain::fixtures` builders + `tempfile`-based adapter tests instead. There is no dedicated money-management-strategy adapter: `create_loop` derives its cell universe from the grouped operation points themselves (`get_all_grouped_by_cell()`), and the long and short tables carry the same money-management id set (written together by the upstream Backtesting-4.0 project).
 
 `PgStore` exposes no public read methods beyond the repository traits; `PgStore::connect(&DbConfig)` opens one connection.
 
@@ -234,7 +234,7 @@ Infrastructure provides one PostgreSQL implementation: `PgStore` implements all 
 | `create_signal_groups` | `application::signal_generator` | Computes REAL indicator outputs (`create_indicator_output`) and converts them to `SignalGroup`s via signal semantics. Rayon `par_iter`; per-indicator memoization via `#[cached]` keyed `(indicator_id, instrument)`. Indicators that fail to compute are logged as warnings and skipped, not aborted. |
 | `create_strategies` | `application::strategy_generator` | One **rayon** `par_iter()` pass per signal group: counts matched trades and drops the group unless `admits_activity()`; builds the `Strategy` with real metrics; keeps it only if `admits_performance()`. Survivors keep input order. |
 | `run_strategies` | `application::strategy_runner` | The core use case: `validate_all` → `create_signal_groups` → `filter_signal_groups_by_annual_ops` → `create_strategies` (matched-trade and performance filters inside). |
-| `SourceIndex`, `compute_cells`, `fail_on_total_failure` | `application::strategy_batch` | The `create_loop` batch use case: loads all four source tables once (parallel `rayon::join`), computes every cell with `par_iter`, summarises outcomes into `BatchSummary`, and flags a total failure (no cell computed, at least one failed) as systemic. |
+| `GroupedSourceData`, `compute_cells`, `fail_on_total_failure` | `application::strategy_batch` | The `create_loop` batch use case: loads all four source tables once (parallel `rayon::join`), computes every cell with `par_iter`, summarises outcomes into `BatchSummary`, and flags a total failure (no cell computed, at least one failed) as systemic. |
 | `CellOutput` | `application::cell_output` | One cell's compute result: the `Cell`, its strategies, and the computed indicator IDs. |
 
 ---
@@ -289,7 +289,7 @@ src/
 │   ├── cell_output.rs          # CellOutput — one (instrument, mms_id) cell's compute result
 │   ├── signal_generator.rs     # create_signal_groups() — REAL indicator-derived signals
 │   ├── source_data.rs          # fetch_source_data() — PG-backed data assembly
-│   ├── strategy_batch.rs       # SourceIndex + compute_cells() — create_loop batch use case
+│   ├── strategy_batch.rs       # GroupedSourceData + compute_cells() — create_loop batch use case
 │   ├── strategy_generator.rs   # create_strategies() / create_strategy() — staged filters + real metrics
 │   └── strategy_runner.rs      # run_strategies() — validate → signals → filter → strategies
 ├── domain/                     # Pure domain logic — no I/O, no frameworks
@@ -303,8 +303,8 @@ src/
 │   │   ├── rsi.rs, ao.rs, ac.rs, bears.rs, bulls.rs, cho.rs, chv.rs,
 │   │   ├── dpo.rs, force.rs, osma.rs, roc.rs, trix.rs, vroc.rs
 │   │   └── test_support.rs     # #[cfg(test)] shared test helpers
-│   ├── operation_point.rs      # OperationPoint + OperationPoints + long/short repo traits (+ index_by_cell)
-│   ├── resampled_point.rs      # ResampledPointD1 + repo trait (+ index_by_instrument)
+│   ├── operation_point.rs      # OperationPoint + OperationPoints + long/short repo traits (+ get_all_grouped_by_cell)
+│   ├── resampled_point.rs      # ResampledPointD1 + repo trait (+ get_all_grouped_by_instrument)
 │   ├── signal/                 # Signal semantics: IndicatorOutput → SignalGroup
 │   │   ├── mod.rs              # IndicatorOutput enum + create_signal_group()
 │   │   ├── oscillator.rs       # zero-cross signals
