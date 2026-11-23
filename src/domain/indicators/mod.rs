@@ -16,6 +16,7 @@ pub mod force;
 pub mod macd;
 pub mod macros;
 pub mod mfi;
+pub mod momentum;
 pub mod moving_averages;
 pub mod osma;
 pub mod roc;
@@ -105,6 +106,8 @@ pub enum IndicatorError {
     InvalidMfiThresholdOrder { high: i32, low: i32 },
     #[error("money flow index threshold must be between 0 and 100, got {value}")]
     InvalidMfiThresholdRange { value: i32 },
+    #[error("momentum period must be positive, got {n}")]
+    InvalidMomentumPeriod { n: i32 },
     #[error("osma fast period must be positive, got {n}")]
     InvalidOsMaFastPeriod { n: i32 },
     #[error("osma slow period must be positive, got {n}")]
@@ -247,6 +250,10 @@ pub fn create_indicator_output(
             low_threshold,
         } => {
             let buffer = mfi::compute(points, *period, *high_threshold, *low_threshold)?;
+            Ok(IndicatorOutput::Threshold { instrument, buffer })
+        }
+        IndicatorParameters::Momentum { period } => {
+            let buffer = momentum::compute(points, *period)?;
             Ok(IndicatorOutput::Threshold { instrument, buffer })
         }
         IndicatorParameters::Roc { period } => {
@@ -1236,6 +1243,32 @@ mod tests {
     }
 
     #[test]
+    fn momentum_dispatch_returns_threshold_variant() {
+        let params = IndicatorParameters::Momentum { period: 2 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0), rp(3, 3, 4.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Threshold { buffer: buf, .. } => {
+                // 3 points, period 2 -> 1 value at bar 3: 4 * 100 / 1 = 400.
+                assert_eq!(buf.high_threshold, 100.0);
+                assert_eq!(buf.low_threshold, 100.0);
+                assert_eq!(buf.items.len(), 1);
+                assert_eq!(buf.items[0].timestamp, 3);
+                assert_eq!(buf.items[0].value, 400.0);
+            }
+            other => panic!("expected Threshold, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn momentum_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Momentum { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidMomentumPeriod { n: 0 });
+    }
+
+    #[test]
     fn stochastic_dispatch_returns_threshold_variant() {
         let params = IndicatorParameters::Stochastic {
             k_period: 2,
@@ -1500,6 +1533,10 @@ mod tests {
             (
                 IndicatorError::InvalidMfiThresholdRange { value: 101 },
                 "money flow index threshold must be between 0 and 100, got 101",
+            ),
+            (
+                IndicatorError::InvalidMomentumPeriod { n: 0 },
+                "momentum period must be positive, got 0",
             ),
             (
                 IndicatorError::InvalidOsMaFastPeriod { n: 0 },

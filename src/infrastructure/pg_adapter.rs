@@ -189,6 +189,10 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
                 low_threshold: p.low_threshold,
             }
         }
+        "momentum" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::Momentum { period: p.period }
+        }
         "osma" => {
             let p = parse_params::<OsMaParams>(indicator_type, json_text)?;
             IndicatorParameters::OsMa {
@@ -644,6 +648,7 @@ mod tests {
                 IndicatorParameters::DetrendedPriceOscillator { period: 105 },
             ),
             ("force", IndicatorParameters::ForceIndex { period: 105 }),
+            ("momentum", IndicatorParameters::Momentum { period: 105 }),
             ("roc", IndicatorParameters::Roc { period: 105 }),
             ("rvi", IndicatorParameters::Rvi { period: 105 }),
             ("vroc", IndicatorParameters::Vroc { period: 105 }),

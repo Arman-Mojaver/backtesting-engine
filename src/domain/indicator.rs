@@ -48,6 +48,9 @@ pub enum IndicatorParameters {
         high_threshold: i32,
         low_threshold: i32,
     },
+    Momentum {
+        period: i32,
+    },
     OsMa {
         fast_ema: i32,
         slow_ema: i32,
