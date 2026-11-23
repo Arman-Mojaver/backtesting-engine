@@ -28,6 +28,7 @@ pub fn filter_signal_groups_by_annual_ops(
     signal_groups
         .into_iter()
         .filter(|signal_group| {
+            // Intentional: skips annual_operation_count for empty groups (performance)
             signal_group.signal_count() > 0
                 && filter.admits_activity(annual_operation_count(
                     signal_group.signal_count(),
