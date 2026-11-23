@@ -2,7 +2,16 @@ use crate::domain::cast;
 
 const SECONDS_PER_YEAR: f64 = 365.25 * 86_400.0;
 
+// Year ~5138 in seconds but early 1973 in milliseconds, so any realistic
+// millisecond timestamp lands above it while every realistic second one stays below.
+const MAX_SECONDS_TIMESTAMP: i64 = 100_000_000_000;
+
 pub fn difference_in_years(start_timestamp: i64, end_timestamp: i64) -> Option<f64> {
+    debug_assert!(
+        start_timestamp.unsigned_abs() < MAX_SECONDS_TIMESTAMP.unsigned_abs()
+            && end_timestamp.unsigned_abs() < MAX_SECONDS_TIMESTAMP.unsigned_abs(),
+        "timestamps {start_timestamp}..{end_timestamp} look like milliseconds, expected seconds"
+    );
     let seconds = end_timestamp.saturating_sub(start_timestamp);
     if seconds <= 0 {
         return None;
@@ -42,8 +51,14 @@ mod tests {
     }
 
     #[test]
-    fn difference_in_years_saturates_on_extreme_timestamps() {
-        let years = difference_in_years(i64::MIN, i64::MAX);
-        assert!(years.is_some_and(|years| years.is_finite() && years > 0.0));
+    #[should_panic(expected = "look like milliseconds")]
+    fn difference_in_years_rejects_millisecond_end_timestamp() {
+        difference_in_years(0, 1_700_000_000_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "look like milliseconds")]
+    fn difference_in_years_rejects_millisecond_start_timestamp() {
+        difference_in_years(1_600_000_000_000, 1_700_000_000);
     }
 }
