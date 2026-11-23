@@ -22,7 +22,7 @@ pub fn create_strategies(
     signal_groups
         .par_iter()
         .filter(|sg| {
-            let count = matched_trade_count(sg, &long_map, &short_map);
+            let count = matched_operation_count(sg, &long_map, &short_map);
             filter.admits_activity(annual_operation_count(
                 count,
                 start_timestamp,
@@ -43,7 +43,7 @@ pub fn create_strategies(
         .collect()
 }
 
-fn matched_trade_count(
+fn matched_operation_count(
     signal_group: &SignalGroup,
     long_map: &FxHashMap<i64, &OperationPoint>,
     short_map: &FxHashMap<i64, &OperationPoint>,
@@ -129,12 +129,12 @@ mod tests {
         }
     }
 
-    // Sorted trades +30 (ts 1000), -20 (ts 2000), +30 (ts 3000) with
+    // Sorted operations +30 (ts 1000), -20 (ts 2000), +30 (ts 3000) with
     // risk 0.02 / sl 20 compound 1.03 -> 1.0094 -> 1.0403: global ROI
     // 4.03 and max draw down 2.0 (the 1.03 -> 1.0094 dip). The span is
     // exactly one year, so annual ROI equals global ROI and the annual
     // operation count is 3 / 1 = 3.
-    fn three_trade_strategy() -> Strategy {
+    fn three_operation_strategy() -> Strategy {
         let long_ops = vec![op_point(11, 30, 1000), op_point(13, 30, 3000)];
         let short_ops = vec![op_point(12, -20, 2000)];
         let long_map = points_by_timestamp(&long_ops);
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn signals_resolve_to_matching_operation_points_in_signal_order() {
-        let strategy = three_trade_strategy();
+        let strategy = three_operation_strategy();
 
         assert_eq!(strategy.indicator_id, 7);
         assert_eq!(strategy.instrument, "EURUSD");
@@ -157,7 +157,7 @@ mod tests {
 
     #[test]
     fn metrics_wire_through_from_the_resolved_operations() {
-        let strategy = three_trade_strategy();
+        let strategy = three_operation_strategy();
 
         assert_eq!(strategy.annual_roi, 4.03);
         assert_eq!(strategy.max_draw_down, 2.0);
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn unresolved_signal_timestamps_are_dropped() {
         // Only ts 1000 resolves; ts 9999 has no operation point. Metrics
-        // come from the resolved trades only: a single +30 -> ROI 3.0.
+        // come from the resolved operations only: a single +30 -> ROI 3.0.
         let long_ops = vec![op_point(11, 30, 1000)];
         let long_map = points_by_timestamp(&long_ops);
         let short_map = points_by_timestamp(&[]);
@@ -271,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn group_with_enough_signals_but_too_few_matched_trades_is_dropped() {
+    fn group_with_enough_signals_but_too_few_matched_operations_is_dropped() {
         let long_ops: Vec<OperationPoint> =
             (1..=10).map(|ts| op_point(ts, 30, i64::from(ts))).collect();
         let short_ops: Vec<OperationPoint> = (1..=10)
@@ -303,7 +303,7 @@ mod tests {
 
     // Mirrors the real data shape: operation points cover a contiguous run
     // of bars, trimmed at the start (ATR warm-up) and at the end (not enough
-    // data left to resolve a trade), while signals span every bar.
+    // data left to resolve an operation), while signals span every bar.
     const WARM_UP_BARS: [i64; 4] = [1, 2, 3, 4];
     const TRIMMED_TAIL_BARS: [i64; 4] = [25, 26, 27, 28];
 
