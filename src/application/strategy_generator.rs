@@ -4,7 +4,7 @@ use rayon::prelude::*;
 
 use crate::domain::annual_operation_count::annual_operation_count;
 use crate::domain::operation_point::{OperationPoint, OperationPoints};
-use crate::domain::performance_metrics::performance_metrics;
+use crate::domain::performance_metrics::PerformanceMetrics;
 use crate::domain::signal_group::SignalGroup;
 use crate::domain::strategy::{GlobalStrategyFilter, Strategy};
 
@@ -91,7 +91,7 @@ fn create_strategy(
         annual_operation_count(total_count, start_timestamp, end_timestamp);
 
     let all_ops: Vec<&OperationPoint> = long_ops.into_iter().chain(short_ops).collect();
-    let metrics = performance_metrics(all_ops);
+    let metrics = PerformanceMetrics::from_operation_points(all_ops);
     let annual_roi = metrics.annual_roi(start_timestamp, end_timestamp);
 
     Strategy {

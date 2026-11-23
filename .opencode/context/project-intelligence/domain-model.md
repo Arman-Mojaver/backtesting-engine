@@ -177,12 +177,12 @@ SignalGroup {
 
 ## Domain Metric Functions (Pure)
 
-Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` returns a `PerformanceMetrics` struct (both curve-derived metrics in one pass); the others are free functions over plain values.
+Pure functions in `domain/` — no I/O, no frameworks. `PerformanceMetrics::from_operation_points()` builds a `PerformanceMetrics` struct (both curve-derived metrics in one pass); the others are free functions over plain values.
 
 | Function | File | Signature | Behavior |
 |----------|------|-----------|----------|
 | `annual_operation_count` | `domain::annual_operation_count` | `(total_count: usize, start_ts: i64, end_ts: i64) -> f64` | `total_count / years`, where `years = (end-start)/86400/365.25` (not rounded). The result is rounded to 2dp. Returns 0.0 for zero count or non-positive span. |
-| `performance_metrics` | `domain::performance_metrics` | `(ops: Vec<&OperationPoint>) -> PerformanceMetrics` | Sorts the owned ops chronologically in place (stable; ties keep input order), then ONE pass: `cumsum = 1 + Σ(cummax * result * risk/sl)` with running `cummax`. Returns `{ global_roi: (cumsum - 1) * 100, max_draw_down: deepest (cummax - cumsum)/cummax * 100 }`, each rounded to 2dp independently. Both 0.0 for empty ops. |
+| `PerformanceMetrics::from_operation_points` | `domain::performance_metrics` | `(ops: Vec<&OperationPoint>) -> Self` | Sorts the owned ops chronologically in place (stable; ties keep input order), then ONE pass: `cumsum = 1 + Σ(cummax * result * risk/sl)` with running `cummax`. Returns `{ global_roi: (cumsum - 1) * 100, max_draw_down: deepest (cummax - cumsum)/cummax * 100 }`, each rounded to 2dp independently. Both 0.0 for empty ops. |
 | `PerformanceMetrics::annual_roi` | `domain::performance_metrics` | `(&self, start_ts: i64, end_ts: i64) -> f64` | Annualizes `self.global_roi` via compounding: `((1 + roi/100)^(1/years) - 1) * 100`, rounded to 2dp. Returns 0.0 for non-positive span. |
 | `filter_signal_groups_by_annual_ops` | `domain::signal_group` | `(groups: Vec<SignalGroup>, filter: &GlobalStrategyFilter, start_ts: i64, end_ts: i64) -> Vec<SignalGroup>` | Keeps groups with `signal_count() > 0` and `filter.admits_activity(annual_operation_count(signal_count, start, end))`. Raw signals are an upper bound on matched trades, so this never drops a passing group. |
 | `unprocessed_indicators` | `domain::indicator` | `(indicators: &[Indicator], processed_ids: &FxHashSet<i32>) -> Vec<Indicator>` | Set-diff of all indicators vs manifest-processed IDs, keeping input order. `indicator_ids` lists the IDs of a slice. |
@@ -313,7 +313,7 @@ src/
 │   ├── signal_group.rs         # SignalGroup + filter_signal_groups_by_annual_ops()
 │   ├── strategy.rs             # Strategy + GlobalStrategyFilter (admits_activity / admits_performance)
 │   ├── annual_operation_count.rs  # annual_operation_count() metric
-│   ├── performance_metrics.rs  # performance_metrics() -> PerformanceMetrics (single pass) + annual_roi() method
+│   ├── performance_metrics.rs  # PerformanceMetrics::from_operation_points() (single pass) + annual_roi() method
 │   ├── time_span.rs            # difference_in_years() shared by annualised metrics
 │   ├── validation/             # Domain invariant checks (5 rules + combined)
 │   └── fixtures.rs             # #[cfg(test)] test data builders
@@ -348,11 +348,11 @@ src/
 5. **Ports-and-adapters**: Repository traits live in the domain; implementations live in infrastructure. The domain has zero dependencies on infrastructure.
 6. **Single-binary engine layout**: `bte` (`src/bin/bte.rs`) is the sole Rust CLI; it follows the `build -> parse -> execute` pattern and returns `anyhow::Result<()>`. The previous `ct` operator frontend (which forwarded engine commands via Docker exec and Python CLI commands via the `api` container) was removed in the commit that dropped `src/cli/` and `src/main.rs` — data CRUD and the iteration table are now reached exclusively in the companion Python service.
 7. **Application layer**: `src/application/` orchestrates domain + infrastructure. Keeps `engine/` CLI handlers thin. One file per use case.
-8. **Metrics as pure domain functions**: `performance_metrics()` takes an owned `Vec<&OperationPoint>` (sorted in place, no copy) and returns `PerformanceMetrics` (`global_roi` + `max_draw_down`) computed in a single pass over the shared compounding curve, sorting its input chronologically itself (stable; ties keep input order). `annual_roi` is a method on `PerformanceMetrics`. No I/O — composable and unit-tested in isolation.
+8. **Metrics as pure domain functions**: `PerformanceMetrics::from_operation_points()` takes an owned `Vec<&OperationPoint>` (sorted in place, no copy) and returns `PerformanceMetrics` (`global_roi` + `max_draw_down`) computed in a single pass over the shared compounding curve, sorting its input chronologically itself (stable; ties keep input order). `annual_roi` is a method on `PerformanceMetrics`. No I/O — composable and unit-tested in isolation.
 9. **Staged filtering**: each check runs at the earliest stage where its input exists. (1) `filter_signal_groups_by_annual_ops()` on raw signal counts (free, upper bound); (2) inside `create_strategies`, on matched-trade counts (hash lookups, no allocation), before any metrics; (3) inside the same parallel pass, on max draw down + annual ROI (expensive). All thresholds and checks live on `GlobalStrategyFilter` (`admits_activity`, `admits_performance`); `GlobalStrategyFilter::default()` encodes the baseline quality bar (DD ≤ 20%, ROI ≥ 5%, ops ≥ 10/yr).
 10. **Parquet partitioning by (instrument, mms_id)**: Strategies are written as partitioned parquet files — `instrument=.../money_management_strategy_id=.../strategies.parquet`. Matches the single-instrument, single-MMS backtest constraint and enables efficient per-partition reads.
 11. **Typed indicator parameters**: `IndicatorParameters` is a 14-variant enum — the PG adapter deserializes the JSON `parameters` column with `serde_json`, selecting the variant by the `type` column.
-12. **Real metrics in the generator**: `create_strategies()` computes `performance_metrics()` → `annual_roi()`, plus `annual_operation_count`, from each strategy's referenced operation points. Parallelized with **rayon** `par_iter()`.
+12. **Real metrics in the generator**: `create_strategies()` computes `PerformanceMetrics::from_operation_points()` → `annual_roi()`, plus `annual_operation_count`, from each strategy's referenced operation points. Parallelized with **rayon** `par_iter()`.
 13. **`SignalGroup` lives in the domain**: `SignalGroup` embeds `indicator_id`, `instrument`, and a derived `signal_count()`. The cache stores `Vec<SignalGroup>` — IDs travel with each group. The `instrument` chain (`IndicatorOutput` → `SignalGroup` → `Strategy`) is kept on purpose for tracing, although no production code reads `Strategy::instrument`.
 14. **Timestamps are `i64`**: All timestamps are `i64` epoch seconds. The PG adapter casts `i32` DB columns to `i64` on read.
 15. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. `StrategyPersistence::persist_cells` assigns IDs before the parquet write (global max across all partitions + 1). Keeps the domain free of persistence concerns.
@@ -374,5 +374,5 @@ src/
 - **When discussing strategies**: Use "strategy" (a configured indicator + op-point sets + MMS + metrics). Reference "annual ROI", "max draw down", "annual operation count" by name.
 - **When discussing batch runs**: Use "cell" for one (instrument, mms_id) pair; "manifest" for the processed ledger.
 - **When adding new entities**: Follow the pattern — struct + repository trait in domain, adapter in infrastructure, fixtures in `domain::fixtures`.
-- **When adding new metrics**: Follow `annual_operation_count` (free function) or `performance_metrics` (struct-returning single-pass fn + method) — pure function in `domain/`, unit-tested in the same file. Curve-coupled metrics belong together in one pass (see `performance_metrics.rs`); standalone metrics get their own file.
+- **When adding new metrics**: Follow `annual_operation_count` (free function) or `PerformanceMetrics` (single-pass `from_operation_points` constructor + method) — pure function in `domain/`, unit-tested in the same file. Curve-coupled metrics belong together in one pass (see `performance_metrics.rs`); standalone metrics get their own file.
 - **When adding new indicators**: Add an `IndicatorParameters` variant, a compute function in `domain/indicators/` (use `validate_period!` / `empty_oscillator!` / `indicator_values!` macros), a dispatch arm in `create_indicator_output`, and tests. See `rsi.rs` / `bears.rs`.

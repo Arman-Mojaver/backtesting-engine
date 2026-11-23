@@ -8,37 +8,38 @@ pub struct PerformanceMetrics {
     pub max_draw_down: f64,
 }
 
-pub fn performance_metrics(mut operation_points: Vec<&OperationPoint>) -> PerformanceMetrics {
-    operation_points.sort_by_key(|op| op.timestamp);
-
-    let mut cumsum: f64 = 1.0;
-    let mut cummax: f64 = 1.0;
-
-    let mut max_dd: f64 = 0.0;
-
-    for point in operation_points {
-        // The PG adapter rejects sl <= 0, so the division below stays finite.
-        debug_assert!(
-            point.sl > 0,
-            "operation point {} has sl {}",
-            point.id,
-            point.sl
-        );
-        let contribution = cummax * f64::from(point.result) * (point.risk / f64::from(point.sl));
-        cumsum += contribution;
-        cummax = cummax.max(cumsum);
-
-        let draw_down = (cummax - cumsum) / cummax;
-        max_dd = max_dd.max(draw_down);
-    }
-
-    PerformanceMetrics {
-        global_roi: rounded_percent(cumsum - 1.0),
-        max_draw_down: rounded_percent(max_dd),
-    }
-}
-
 impl PerformanceMetrics {
+    pub fn from_operation_points(mut operation_points: Vec<&OperationPoint>) -> Self {
+        operation_points.sort_by_key(|op| op.timestamp);
+
+        let mut cumsum: f64 = 1.0;
+        let mut cummax: f64 = 1.0;
+
+        let mut max_dd: f64 = 0.0;
+
+        for point in operation_points {
+            // The PG adapter rejects sl <= 0, so the division below stays finite.
+            debug_assert!(
+                point.sl > 0,
+                "operation point {} has sl {}",
+                point.id,
+                point.sl
+            );
+            let contribution =
+                cummax * f64::from(point.result) * (point.risk / f64::from(point.sl));
+            cumsum += contribution;
+            cummax = cummax.max(cumsum);
+
+            let draw_down = (cummax - cumsum) / cummax;
+            max_dd = max_dd.max(draw_down);
+        }
+
+        Self {
+            global_roi: rounded_percent(cumsum - 1.0),
+            max_draw_down: rounded_percent(max_dd),
+        }
+    }
+
     pub fn annual_roi(&self, start_timestamp: i64, end_timestamp: i64) -> f64 {
         let Some(years) = difference_in_years(start_timestamp, end_timestamp) else {
             return 0.0;
@@ -79,7 +80,7 @@ mod tests {
     }
 
     fn metrics(ops: &[OperationPoint]) -> PerformanceMetrics {
-        performance_metrics(ops.iter().collect())
+        PerformanceMetrics::from_operation_points(ops.iter().collect())
     }
 
     // Fixture for the `annual_roi` method: only `global_roi` is relevant there.
@@ -92,7 +93,7 @@ mod tests {
 
     #[test]
     fn empty_ops_returns_zero() {
-        let m = performance_metrics(Vec::new());
+        let m = PerformanceMetrics::from_operation_points(Vec::new());
         assert_eq!(m.global_roi, 0.0);
         assert_eq!(m.max_draw_down, 0.0);
     }

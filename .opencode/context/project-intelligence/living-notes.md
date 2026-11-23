@@ -24,7 +24,7 @@
 
 **Exit-date ordering in metrics**
 *Priority*: High
-*Impact*: `performance_metrics()` sorts operation points by entry timestamp and compounds in that order. Real trades close at `exit_date`, which is not necessarily in entry order. ROI and max draw down are approximations until this is modeled.
+*Impact*: `PerformanceMetrics::from_operation_points()` sorts operation points by entry timestamp and compounds in that order. Real trades close at `exit_date`, which is not necessarily in entry order. ROI and max draw down are approximations until this is modeled.
 *Root Cause*: The domain `OperationPoint` has no `exit_date` field; the compounding curve was built on entry timestamps.
 *Proposed Solution*: Add `exit_date` to `OperationPoint` (DB + domain + adapter), sort/compound on exit order.
 *Effort*: Medium
@@ -58,7 +58,7 @@
 ### What Works Well
 - **`build -> parse -> execute` pattern** — The one binary, `bte`, follows it at every command level. Simple, predictable, easy to test.
 - **Pure validators as free functions** — No object construction needed. Compose well in `combined_validation::validate_all()`.
-- **Pure metric functions** — `performance_metrics()` (single pass: global ROI + max draw down, owns the defensive chronological sort) and `annual_operation_count()`. Independently unit-tested, no I/O.
+- **Pure metric functions** — `PerformanceMetrics::from_operation_points()` (single pass: global ROI + max draw down, owns the defensive chronological sort) and `annual_operation_count()`. Independently unit-tested, no I/O.
 - **Typed indicator parameters + dispatch** — Adding an indicator is mechanical: variant + compute fn + dispatch arm + tests. The `validate_period!` / `empty_oscillator!` / `indicator_values!` macros keep the 14 implementations uniform.
 - **Signal semantics as a separate concept** — `IndicatorOutput` (what the indicator computed) is deliberately separate from `SignalGroup` (when to trade). Oscillator/threshold/crossover semantics cover all 14 indicators with three small modules.
 - **Single-binary engine** — The engine is the entire CLI surface (`bte`); data management and the iteration table belong to the companion Python service, accessed there directly.

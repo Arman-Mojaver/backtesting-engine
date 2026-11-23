@@ -49,7 +49,7 @@ The engine is in **active development** — the strategy pipeline is real end-to
 - ✅ PostgreSQL adapters for indicators, operation points, resampled points (+ indexed batch loads)
 - ✅ `Strategy` entity + `GlobalStrategyFilter` with `admits_activity()` / `admits_performance()` (DD ≤ 20%, ROI ≥ 5%, ops ≥ 10/yr on matched trades)
 - ✅ Application layer (`fetch_source_data`, `create_signal_groups`, `create_strategies`, `run_strategies`)
-- ✅ Performance metrics: single-pass `performance_metrics()` (global ROI + max draw down), `annual_roi()`, `annual_operation_count()` — pure domain functions
+- ✅ Performance metrics: single-pass `PerformanceMetrics::from_operation_points()` (global ROI + max draw down), `annual_roi()`, `annual_operation_count()` — pure domain functions
 - ✅ Real metrics computed in the strategy generator (rayon-parallelized)
 - ✅ **Real signal generation** — 14 indicators computed from candle data (RSI, AO, AC, Bears, Bulls, CHO, CHV, DPO, Force, OsMa, MACD, ROC, TRIX, VROC) with zero-cross / threshold / crossover signal semantics
 - ✅ Two-stage filtering: signal groups by annual op count, then strategies by DD + ROI
