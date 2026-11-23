@@ -30,6 +30,9 @@ pub enum IndicatorParameters {
         smooth_period: i32,
         chv_period: i32,
     },
+    Dema {
+        period: i32,
+    },
     DetrendedPriceOscillator {
         period: i32,
     },

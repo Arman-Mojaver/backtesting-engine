@@ -9,6 +9,7 @@ pub mod bears;
 pub mod bulls;
 pub mod cho;
 pub mod chv;
+pub mod dema;
 pub mod dpo;
 pub mod force;
 pub mod macd;
@@ -78,6 +79,8 @@ pub enum IndicatorError {
     InvalidChvSmoothPeriod { n: i32 },
     #[error("chaikin volatility period must be positive, got {n}")]
     InvalidChvPeriod { n: i32 },
+    #[error("dema period must be positive, got {n}")]
+    InvalidDemaPeriod { n: i32 },
     #[error("detrended price oscillator period must be positive, got {n}")]
     InvalidDpoPeriod { n: i32 },
     #[error("force index period must be positive, got {n}")]
@@ -165,6 +168,13 @@ pub fn create_indicator_output(
         } => {
             let buffer = chv::compute(points, *smooth_period, *chv_period)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Dema { period } => {
+            let buffers = dema::compute(points, *period)?;
+            Ok(IndicatorOutput::Crossover {
+                instrument,
+                buffers,
+            })
         }
         IndicatorParameters::DetrendedPriceOscillator { period } => {
             let buffer = dpo::compute(points, *period)?;
@@ -952,6 +962,50 @@ mod tests {
         assert_eq!(err, IndicatorError::InvalidRocPeriod { n: 0 });
     }
 
+    #[test]
+    fn dema_dispatch_returns_crossover_buffers() {
+        let params = IndicatorParameters::Dema { period: 2 };
+        let points = vec![
+            rp(1, 1, 10.0),
+            rp(2, 2, 10.0),
+            rp(3, 3, 10.0),
+            rp(4, 4, 10.0),
+        ];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                // 4 points, period 2 -> 2 values from bar 3 (constant close -> 10.0).
+                assert_eq!(bufs.upcross_long_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer[0].value, 10.0);
+                assert_eq!(bufs.upcross_short_buffer[0].timestamp, 3);
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dema_dispatch_with_insufficient_data_yields_empty_buffers() {
+        let params = IndicatorParameters::Dema { period: 14 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                assert!(bufs.upcross_long_buffer.is_empty());
+                assert!(bufs.upcross_short_buffer.is_empty());
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn dema_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Dema { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidDemaPeriod { n: 0 });
+    }
+
     /// 5 points with constant close -> exactly 1 TRIX value
     /// (period 2 -> needs 5 points = 3*2 - 1).
     fn rp_trix_5() -> Vec<ResampledPointD1> {
@@ -1117,6 +1171,10 @@ mod tests {
             (
                 IndicatorError::InvalidChvPeriod { n: 0 },
                 "chaikin volatility period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidDemaPeriod { n: 0 },
+                "dema period must be positive, got 0",
             ),
             (
                 IndicatorError::InvalidDpoPeriod { n: 0 },

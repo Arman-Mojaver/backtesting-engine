@@ -137,6 +137,10 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
                 chv_period: p.chv_period,
             }
         }
+        "dema" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::Dema { period: p.period }
+        }
         "dpo" => {
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
             IndicatorParameters::DetrendedPriceOscillator { period: p.period }
@@ -504,6 +508,9 @@ mod tests {
 
         let trix = map_parameters("trix", r#"{"period": 14}"#).unwrap();
         assert_eq!(trix, IndicatorParameters::Trix { period: 14 });
+
+        let dema = map_parameters("dema", r#"{"period": 14}"#).unwrap();
+        assert_eq!(dema, IndicatorParameters::Dema { period: 14 });
     }
 
     #[test]
