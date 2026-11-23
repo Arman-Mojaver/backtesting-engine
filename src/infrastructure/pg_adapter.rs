@@ -76,6 +76,13 @@ struct VidyaParams {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct IchimokuParams {
+    tenkan_period: i32,
+    kijun_period: i32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct AmaParams {
     period: i32,
     fast_period: i32,
@@ -211,6 +218,13 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
         "frama" => {
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
             IndicatorParameters::Frama { period: p.period }
+        }
+        "ichimoku" => {
+            let p = parse_params::<IchimokuParams>(indicator_type, json_text)?;
+            IndicatorParameters::Ichimoku {
+                tenkan_period: p.tenkan_period,
+                kijun_period: p.kijun_period,
+            }
         }
         "mfi" => {
             let p = parse_params::<MfiParams>(indicator_type, json_text)?;
@@ -691,6 +705,16 @@ mod tests {
             }
         );
 
+        let ichimoku =
+            map_parameters("ichimoku", r#"{"tenkan_period": 9, "kijun_period": 26}"#).unwrap();
+        assert_eq!(
+            ichimoku,
+            IndicatorParameters::Ichimoku {
+                tenkan_period: 9,
+                kijun_period: 26,
+            }
+        );
+
         let vidya = map_parameters("vidya", r#"{"cmo_period": 9, "ema_period": 12}"#).unwrap();
         assert_eq!(
             vidya,
@@ -745,8 +769,11 @@ mod tests {
 
     #[test]
     fn unknown_type_is_rejected() {
-        let err = map_parameters("ichimoku", r#"{"n": 1}"#).unwrap_err();
-        assert!(err.to_string().contains("unknown indicator type: ichimoku"));
+        let err = map_parameters("alligator", r#"{"n": 1}"#).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("unknown indicator type: alligator")
+        );
     }
 
     #[test]

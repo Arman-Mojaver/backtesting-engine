@@ -53,6 +53,10 @@ pub enum IndicatorParameters {
     Frama {
         period: i32,
     },
+    Ichimoku {
+        tenkan_period: i32,
+        kijun_period: i32,
+    },
     Mfi {
         period: i32,
         /// MFI levels on its 0–100 scale, e.g. 80 overbought and 20 oversold.

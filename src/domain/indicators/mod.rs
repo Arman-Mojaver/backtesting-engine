@@ -16,6 +16,7 @@ pub mod dema;
 pub mod dpo;
 pub mod force;
 pub mod frama;
+pub mod ichimoku;
 pub mod macd;
 pub mod macros;
 pub mod mfi;
@@ -114,6 +115,10 @@ pub enum IndicatorError {
     InvalidForcePeriod { n: i32 },
     #[error("frama period must be positive, got {n}")]
     InvalidFramaPeriod { n: i32 },
+    #[error("ichimoku tenkan period must be positive, got {n}")]
+    InvalidIchimokuTenkanPeriod { n: i32 },
+    #[error("ichimoku kijun period must be positive, got {n}")]
+    InvalidIchimokuKijunPeriod { n: i32 },
     #[error("money flow index period must be positive, got {n}")]
     InvalidMfiPeriod { n: i32 },
     #[error(
@@ -276,6 +281,16 @@ pub fn create_indicator_output(
         }
         IndicatorParameters::Frama { period } => {
             let buffers = frama::compute(points, *period)?;
+            Ok(IndicatorOutput::Crossover {
+                instrument,
+                buffers,
+            })
+        }
+        IndicatorParameters::Ichimoku {
+            tenkan_period,
+            kijun_period,
+        } => {
+            let buffers = ichimoku::compute(points, *tenkan_period, *kijun_period)?;
             Ok(IndicatorOutput::Crossover {
                 instrument,
                 buffers,
@@ -1225,6 +1240,7 @@ mod tests {
                 assert_eq!(bufs.upcross_short_buffer.len(), 2);
                 assert_eq!(bufs.upcross_short_buffer[0].value, 10.0);
                 assert_eq!(bufs.upcross_short_buffer[0].timestamp, 3);
+                assert_eq!(bufs.upcross_short_buffer[0].value, 10.0);
             }
             other => panic!("expected Crossover, got {other:?}"),
         }
@@ -1292,6 +1308,36 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidFramaPeriod { n: 0 });
+    }
+
+    #[test]
+    fn ichimoku_dispatch_returns_crossover_buffers() {
+        let params = IndicatorParameters::Ichimoku {
+            tenkan_period: 1,
+            kijun_period: 2,
+        };
+        let points = vec![rp(1, 1, 10.0), rp(2, 2, 10.0), rp(3, 3, 10.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                // 3 points, kijun 2 -> 1 value at bar 3.
+                assert_eq!(bufs.upcross_long_buffer.len(), 1);
+                assert_eq!(bufs.upcross_short_buffer.len(), 1);
+                assert_eq!(bufs.upcross_short_buffer[0].timestamp, 3);
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ichimoku_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Ichimoku {
+            tenkan_period: 9,
+            kijun_period: 0,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidIchimokuKijunPeriod { n: 0 });
     }
 
     #[test]
@@ -1757,6 +1803,14 @@ mod tests {
             (
                 IndicatorError::InvalidFramaPeriod { n: 0 },
                 "frama period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidIchimokuTenkanPeriod { n: 0 },
+                "ichimoku tenkan period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidIchimokuKijunPeriod { n: 0 },
+                "ichimoku kijun period must be positive, got 0",
             ),
             (
                 IndicatorError::InvalidMfiPeriod { n: 0 },
