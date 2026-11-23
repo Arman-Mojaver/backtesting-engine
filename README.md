@@ -230,7 +230,6 @@ Column layout (the data contract for downstream readers):
 | `annual_operation_count` | `Decimal128(10, 2)` |
 | `long_operation_point_ids` | `List<Int32>` |
 | `short_operation_point_ids` | `List<Int32>` |
-| `money_management_strategy_id` | `Int32` |
 
 Write semantics:
 

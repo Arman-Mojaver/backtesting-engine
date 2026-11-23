@@ -49,7 +49,6 @@ pub struct StrategyRow {
     annual_operation_count: f64,
     long_operation_point_ids: Vec<i32>,
     short_operation_point_ids: Vec<i32>,
-    money_management_strategy_id: i32,
 }
 
 impl StrategyRow {
@@ -62,7 +61,6 @@ impl StrategyRow {
             annual_operation_count: s.annual_operation_count,
             long_operation_point_ids: s.long_operation_point_ids,
             short_operation_point_ids: s.short_operation_point_ids,
-            money_management_strategy_id: s.money_management_strategy_id,
         }
     }
 }
@@ -241,7 +239,6 @@ fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
     let op_counts = primitive_column::<Decimal128Type>(batch, "annual_operation_count")?;
     let long_ids = list_column(batch, LONG_IDS)?;
     let short_ids = list_column(batch, SHORT_IDS)?;
-    let mms_ids = primitive_column::<Int32Type>(batch, "money_management_strategy_id")?;
 
     let n = batch.num_rows();
     let mut out = Vec::with_capacity(n);
@@ -254,7 +251,6 @@ fn decode_batch(batch: &RecordBatch) -> anyhow::Result<Vec<StrategyRow>> {
             annual_operation_count: metric_from_decimal(op_counts.value(i)),
             long_operation_point_ids: list_items::<Int32Type>(long_ids, i, LONG_IDS)?,
             short_operation_point_ids: list_items::<Int32Type>(short_ids, i, SHORT_IDS)?,
-            money_management_strategy_id: mms_ids.value(i),
         });
     }
     Ok(out)
@@ -277,7 +273,6 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
             DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
             false,
         ),
-        Field::new("money_management_strategy_id", DataType::Int32, false),
     ]));
 
     let strategy_ids: Int64Array = rows.iter().map(|r| r.strategy_id).collect();
@@ -285,10 +280,6 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
     let rois = metric_array(rows.iter().map(|r| r.annual_roi))?;
     let draw_downs = metric_array(rows.iter().map(|r| r.max_draw_down))?;
     let op_counts = metric_array(rows.iter().map(|r| r.annual_operation_count))?;
-    let mms_ids: Int32Array = rows
-        .iter()
-        .map(|r| r.money_management_strategy_id)
-        .collect();
 
     let long_ids = build_list_column(rows, |r| &r.long_operation_point_ids);
     let short_ids = build_list_column(rows, |r| &r.short_operation_point_ids);
@@ -303,7 +294,6 @@ fn build_record_batch(rows: &[StrategyRow]) -> anyhow::Result<RecordBatch> {
             Arc::new(op_counts),
             Arc::new(long_ids),
             Arc::new(short_ids),
-            Arc::new(mms_ids),
         ],
     )?)
 }
@@ -461,7 +451,6 @@ mod tests {
         assert_eq!(back[0].annual_operation_count, 15.2);
         assert_eq!(back[0].long_operation_point_ids, vec![1, 2, 3]);
         assert_eq!(back[0].short_operation_point_ids, vec![4, 5]);
-        assert_eq!(back[0].money_management_strategy_id, 390);
         assert_eq!(back[1].annual_roi, -5.10);
     }
 
@@ -752,10 +741,6 @@ mod tests {
                 ("annual_operation_count", metric(1520)),
                 (LONG_IDS, wide_ids()),
                 (SHORT_IDS, wide_ids()),
-                (
-                    "money_management_strategy_id",
-                    Arc::new(Int32Array::from(vec![390])),
-                ),
             ],
         );
 
