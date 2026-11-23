@@ -128,6 +128,11 @@ fn merge_entries(
 }
 
 fn write_atomically(path: &Path, rows: &[ProcessedRow]) -> anyhow::Result<()> {
+    if let Some(root_dir) = path.parent() {
+        fs::create_dir_all(root_dir).with_context(|| {
+            format!("failed to create manifest directory {}", root_dir.display())
+        })?;
+    }
     let temp_path = temp_path_for(path);
     let result = write_parquet(&temp_path, rows).and_then(|()| {
         fs::rename(&temp_path, path).with_context(|| {
@@ -278,6 +283,20 @@ mod tests {
         assert_eq!(rows[0].indicator_id, 2001);
         assert_eq!(rows[0].processed_at, FIRST_RUN_AT);
         assert_eq!(rows[1].indicator_id, 2002);
+    }
+
+    #[test]
+    fn append_all_creates_a_missing_root_dir() {
+        let tmp = TempDir::new().expect("tempdir");
+        let manifest = ParquetProcessedManifest::new(tmp.path().join("alpha"));
+
+        manifest
+            .append_all(&[entry("EURUSD", 390, &[2001])], FIRST_RUN_AT)
+            .expect("append");
+
+        let rows = read_cell(&manifest, "EURUSD", 390).expect("read");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].indicator_id, 2001);
     }
 
     #[test]
