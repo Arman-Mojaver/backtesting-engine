@@ -5,7 +5,7 @@
 //! and negative when it fell. `MFI = 100 - 100 / (1 + positive / negative)`
 //! over the last `period` flows. Ported from `MFI.mq5` (`VOLUME_TICK`).
 use crate::domain::cast;
-use crate::domain::indicators::IndicatorError;
+use crate::domain::indicators::{IndicatorError, typical_price};
 use crate::domain::resampled_point::ResampledPointD1;
 use crate::domain::signal::{IndicatorValue, ThresholdBuffer};
 use crate::validate_period;
@@ -60,10 +60,6 @@ pub fn compute(
         high_threshold: f64::from(high_threshold),
         low_threshold: f64::from(low_threshold),
     })
-}
-
-fn typical_price(point: &ResampledPointD1) -> f64 {
-    (point.high + point.low + point.close) / 3.0
 }
 
 fn compute_mfi_point(window: &[MoneyFlow]) -> IndicatorValue {

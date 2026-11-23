@@ -15,8 +15,8 @@
 | Daily market candle | `ResampledPointD1` struct | `src/domain/resampled_point.rs` | OHLCV + instrument + timestamp |
 | Market data collection | `ResampledPointD1Repository` trait | `src/domain/resampled_point.rs` | Port — `get_all()`, `get_by_instrument()`, `index_by_instrument()` |
 | Technical indicator | `Indicator` struct | `src/domain/indicator.rs` | Has `id` and typed `parameters` |
-| Indicator parameters | `IndicatorParameters` enum | `src/domain/indicator.rs` | 19 variants: Macd, Rsi, AO, AC, Bears, Bulls, CHO, CHV, Dema, DPO, Force, Mfi, OsMa, Roc, Rvi, Stochastic, Tema, Trix, Vroc |
-| Indicator computation | `create_indicator_output()` | `src/domain/indicators/mod.rs` | Dispatches params → `IndicatorOutput`; all 19 indicators compute (MFI and Stochastic as threshold oscillators like RSI, MACD and RVI as crossovers of their line and signal line, DEMA and TEMA as crossovers of the close and their line) |
+| Indicator parameters | `IndicatorParameters` enum | `src/domain/indicator.rs` | 20 variants: Macd, Rsi, AO, AC, Bears, Bulls, Cci, CHO, CHV, Dema, DPO, Force, Mfi, OsMa, Roc, Rvi, Stochastic, Tema, Trix, Vroc |
+| Indicator computation | `create_indicator_output()` | `src/domain/indicators/mod.rs` | Dispatches params → `IndicatorOutput`; all 20 indicators compute (MFI and Stochastic as threshold oscillators like RSI, MACD and RVI as crossovers of their line and signal line, DEMA and TEMA as crossovers of the close and their line) |
 | Indicator math (one per indicator) | `rsi.rs`, `ao.rs`, … | `src/domain/indicators/` | Shared MAs in `moving_averages.rs`; macros in `macros.rs` |
 | Indicator output → signals | `IndicatorOutput::create_signal_group()` | `src/domain/signal/mod.rs` | Oscillator/threshold/crossover semantics |
 | Money management strategy | `money_management_strategy_id` field | `src/domain/operation_point.rs`, `src/domain/strategy.rs` | Integer ID, no dedicated struct yet |

@@ -22,6 +22,9 @@ pub enum IndicatorParameters {
     BullsPower {
         period: i32,
     },
+    Cci {
+        period: i32,
+    },
     ChaikinOscillator {
         fast_ma: i32,
         slow_ma: i32,

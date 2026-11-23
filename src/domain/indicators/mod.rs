@@ -7,6 +7,7 @@ pub mod ac;
 pub mod ao;
 pub mod bears;
 pub mod bulls;
+pub mod cci;
 pub mod cho;
 pub mod chv;
 pub mod dema;
@@ -53,6 +54,10 @@ impl PriceField {
     }
 }
 
+pub fn typical_price(point: &ResampledPointD1) -> f64 {
+    (point.high + point.low + point.close) / 3.0
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum IndicatorError {
     #[error("macd fast period must be positive, got {n}")]
@@ -71,6 +76,8 @@ pub enum IndicatorError {
     InvalidBearsPeriod { n: i32 },
     #[error("bulls power period must be positive, got {n}")]
     InvalidBullsPeriod { n: i32 },
+    #[error("commodity channel index period must be positive, got {n}")]
+    InvalidCciPeriod { n: i32 },
     #[error("chaikin oscillator fast period must be positive, got {n}")]
     InvalidChoFastPeriod { n: i32 },
     #[error("chaikin oscillator slow period must be positive, got {n}")]
@@ -185,6 +192,10 @@ pub fn create_indicator_output(
         }
         IndicatorParameters::BullsPower { period } => {
             let buffer = bulls::compute(points, *period)?;
+            Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Cci { period } => {
+            let buffer = cci::compute(points, *period)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
         }
         IndicatorParameters::ChaikinOscillator { fast_ma, slow_ma } => {
@@ -695,6 +706,30 @@ mod tests {
         let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
         let err = create_indicator_output(&params, &points).unwrap_err();
         assert_eq!(err, IndicatorError::InvalidChoSlowPeriod { n: 0 });
+    }
+
+    #[test]
+    fn cci_dispatch_returns_oscillator_variant() {
+        let params = IndicatorParameters::Cci { period: 3 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0), rp(3, 3, 3.0), rp(4, 4, 4.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Oscillator { buffer: buf, .. } => {
+                // 4 points, period 3 -> 2 values from bar 3 (steady rise -> 100).
+                assert_eq!(buf.items.len(), 2);
+                assert_eq!(buf.items[0].timestamp, 3);
+                assert!((buf.items[0].value - 100.0).abs() < 1e-9);
+            }
+            other => panic!("expected Oscillator, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cci_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Cci { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidCciPeriod { n: 0 });
     }
 
     /// 5 points with constant high-low spread -> exactly one CHV value
@@ -1365,6 +1400,10 @@ mod tests {
             (
                 IndicatorError::InvalidBullsPeriod { n: 0 },
                 "bulls power period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidCciPeriod { n: 0 },
+                "commodity channel index period must be positive, got 0",
             ),
             (
                 IndicatorError::InvalidChoFastPeriod { n: 0 },

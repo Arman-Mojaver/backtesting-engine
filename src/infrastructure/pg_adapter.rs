@@ -143,6 +143,10 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
             IndicatorParameters::BullsPower { period: p.period }
         }
+        "cci" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::Cci { period: p.period }
+        }
         "cho" => {
             let p = parse_params::<ChoParams>(indicator_type, json_text)?;
             IndicatorParameters::ChaikinOscillator {
@@ -601,6 +605,7 @@ mod tests {
         let cases = [
             ("bears", IndicatorParameters::BearsPower { period: 105 }),
             ("bulls", IndicatorParameters::BullsPower { period: 105 }),
+            ("cci", IndicatorParameters::Cci { period: 105 }),
             (
                 "dpo",
                 IndicatorParameters::DetrendedPriceOscillator { period: 105 },
