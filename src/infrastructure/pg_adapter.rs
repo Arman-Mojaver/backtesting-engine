@@ -55,6 +55,14 @@ struct StochasticParams {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct WprParams {
+    period: i32,
+    high_threshold: i32,
+    low_threshold: i32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PeriodParams {
     period: i32,
 }
@@ -217,6 +225,14 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
         "vroc" => {
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
             IndicatorParameters::Vroc { period: p.period }
+        }
+        "wpr" => {
+            let p = parse_params::<WprParams>(indicator_type, json_text)?;
+            IndicatorParameters::Wpr {
+                period: p.period,
+                high_threshold: p.high_threshold,
+                low_threshold: p.low_threshold,
+            }
         }
         _ => bail!("unknown indicator type: {indicator_type}"),
     })
@@ -549,6 +565,23 @@ mod tests {
                 slowing: 3,
                 high_threshold: 80,
                 low_threshold: 20,
+            }
+        );
+    }
+
+    #[test]
+    fn wpr_params_parse_from_db_json_shape() {
+        let params = map_parameters(
+            "wpr",
+            r#"{"period": 14, "high_threshold": -20, "low_threshold": -80}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            params,
+            IndicatorParameters::Wpr {
+                period: 14,
+                high_threshold: -20,
+                low_threshold: -80,
             }
         );
     }

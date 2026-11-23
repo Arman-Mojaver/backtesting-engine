@@ -75,6 +75,12 @@ pub enum IndicatorParameters {
     Vroc {
         period: i32,
     },
+    Wpr {
+        period: i32,
+        /// %R levels on its -100–0 scale, e.g. -20 overbought and -80 oversold.
+        high_threshold: i32,
+        low_threshold: i32,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -28,6 +28,7 @@ pub mod tema;
 pub mod test_support;
 pub mod trix;
 pub mod vroc;
+pub mod wpr;
 
 use thiserror::Error;
 
@@ -132,6 +133,14 @@ pub enum IndicatorError {
     InvalidTrixPeriod { n: i32 },
     #[error("volume rate of change period must be positive, got {n}")]
     InvalidVrocPeriod { n: i32 },
+    #[error("williams percent range period must be positive, got {n}")]
+    InvalidWprPeriod { n: i32 },
+    #[error(
+        "williams percent range low threshold must be less than high threshold, got high {high}, low {low}"
+    )]
+    InvalidWprThresholdOrder { high: i32, low: i32 },
+    #[error("williams percent range threshold must be between -100 and 0, got {value}")]
+    InvalidWprThresholdRange { value: i32 },
     #[error("not enough data points to compute indicator: saw {points}, required {required}")]
     NotEnoughData { points: usize, required: usize },
 }
@@ -275,6 +284,14 @@ pub fn create_indicator_output(
         IndicatorParameters::Vroc { period } => {
             let buffer = vroc::compute(points, *period)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Wpr {
+            period,
+            high_threshold,
+            low_threshold,
+        } => {
+            let buffer = wpr::compute(points, *period, *high_threshold, *low_threshold)?;
+            Ok(IndicatorOutput::Threshold { instrument, buffer })
         }
     }
 }
@@ -1363,6 +1380,41 @@ mod tests {
         assert_eq!(err, IndicatorError::InvalidVrocPeriod { n: 0 });
     }
 
+    #[test]
+    fn wpr_dispatch_returns_threshold_variant() {
+        let params = IndicatorParameters::Wpr {
+            period: 3,
+            high_threshold: -20,
+            low_threshold: -80,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0), rp(3, 3, 3.0), rp(4, 4, 4.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Threshold { buffer: buf, .. } => {
+                // 4 points, period 3 -> 2 values from bar 3
+                // (close at the highest high -> 0).
+                assert_eq!(buf.high_threshold, -20.0);
+                assert_eq!(buf.low_threshold, -80.0);
+                assert_eq!(buf.items.len(), 2);
+                assert_eq!(buf.items[0].timestamp, 3);
+                assert_eq!(buf.items[0].value, 0.0);
+            }
+            other => panic!("expected Threshold, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn wpr_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Wpr {
+            period: 0,
+            high_threshold: -20,
+            low_threshold: -80,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidWprPeriod { n: 0 });
+    }
+
     // One table asserting every variant's Display output; splitting it
     // to satisfy the line-count lint would scatter one concern across fns.
     #[test]
@@ -1500,6 +1552,21 @@ mod tests {
             (
                 IndicatorError::InvalidVrocPeriod { n: 0 },
                 "volume rate of change period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidWprPeriod { n: 0 },
+                "williams percent range period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidWprThresholdOrder {
+                    high: -80,
+                    low: -20,
+                },
+                "williams percent range low threshold must be less than high threshold, got high -80, low -20",
+            ),
+            (
+                IndicatorError::InvalidWprThresholdRange { value: 20 },
+                "williams percent range threshold must be between -100 and 0, got 20",
             ),
             (
                 IndicatorError::NotEnoughData {

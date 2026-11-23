@@ -61,6 +61,17 @@ mod tests {
     }
 
     #[test]
+    fn negative_levels_detect_zone_exits_like_wpr() {
+        // WPR's -80 oversold and -20 overbought levels on its -100..0 scale.
+        let result = detect_signals(&buf(
+            &[iv(1, -90.0), iv(2, -70.0), iv(3, -10.0), iv(4, -30.0)],
+            -20.0,
+            -80.0,
+        ));
+        assert_eq!(result, expected(&[2], &[4]));
+    }
+
+    #[test]
     fn two_values_between_thresholds_no_cross() {
         let result = detect_signals(&buf(
             &[iv(1700006400, 50.0), iv(1700092800, 55.0)],
