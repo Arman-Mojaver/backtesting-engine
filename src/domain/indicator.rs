@@ -83,6 +83,10 @@ pub enum IndicatorParameters {
     Trix {
         period: i32,
     },
+    Vidya {
+        cmo_period: i32,
+        ema_period: i32,
+    },
     Vroc {
         period: i32,
     },

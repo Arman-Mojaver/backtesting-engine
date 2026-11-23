@@ -69,6 +69,13 @@ struct PeriodParams {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct VidyaParams {
+    cmo_period: i32,
+    ema_period: i32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct AmaParams {
     period: i32,
     fast_period: i32,
@@ -245,6 +252,13 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
         "trix" => {
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
             IndicatorParameters::Trix { period: p.period }
+        }
+        "vidya" => {
+            let p = parse_params::<VidyaParams>(indicator_type, json_text)?;
+            IndicatorParameters::Vidya {
+                cmo_period: p.cmo_period,
+                ema_period: p.ema_period,
+            }
         }
         "vroc" => {
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
@@ -667,6 +681,15 @@ mod tests {
                 period: 10,
                 fast_period: 2,
                 slow_period: 30,
+            }
+        );
+
+        let vidya = map_parameters("vidya", r#"{"cmo_period": 9, "ema_period": 12}"#).unwrap();
+        assert_eq!(
+            vidya,
+            IndicatorParameters::Vidya {
+                cmo_period: 9,
+                ema_period: 12,
             }
         );
     }

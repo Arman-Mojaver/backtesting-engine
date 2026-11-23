@@ -30,6 +30,7 @@ pub mod tema;
 #[cfg(test)]
 pub mod test_support;
 pub mod trix;
+pub mod vidya;
 pub mod vroc;
 pub mod wpr;
 
@@ -146,6 +147,10 @@ pub enum IndicatorError {
     InvalidTemaPeriod { n: i32 },
     #[error("trix period must be positive, got {n}")]
     InvalidTrixPeriod { n: i32 },
+    #[error("vidya cmo period must be positive, got {n}")]
+    InvalidVidyaCmoPeriod { n: i32 },
+    #[error("vidya ema period must be positive, got {n}")]
+    InvalidVidyaEmaPeriod { n: i32 },
     #[error("volume rate of change period must be positive, got {n}")]
     InvalidVrocPeriod { n: i32 },
     #[error("williams percent range period must be positive, got {n}")]
@@ -317,6 +322,16 @@ pub fn create_indicator_output(
         IndicatorParameters::Trix { period } => {
             let buffer = trix::compute(points, *period)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Vidya {
+            cmo_period,
+            ema_period,
+        } => {
+            let buffers = vidya::compute(points, *cmo_period, *ema_period)?;
+            Ok(IndicatorOutput::Crossover {
+                instrument,
+                buffers,
+            })
         }
         IndicatorParameters::Vroc { period } => {
             let buffer = vroc::compute(points, *period)?;
@@ -1479,6 +1494,43 @@ mod tests {
         assert_eq!(err, IndicatorError::InvalidTrixPeriod { n: 0 });
     }
 
+    #[test]
+    fn vidya_dispatch_returns_crossover_buffers() {
+        let params = IndicatorParameters::Vidya {
+            cmo_period: 2,
+            ema_period: 2,
+        };
+        let points = vec![
+            rp(1, 1, 10.0),
+            rp(2, 2, 10.0),
+            rp(3, 3, 10.0),
+            rp(4, 4, 10.0),
+            rp(5, 5, 10.0),
+        ];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                // 5 points, cmo 2 + ema 2 -> 2 values from bar 4 (constant close -> 10.0).
+                assert_eq!(bufs.upcross_long_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer[0].value, 10.0);
+                assert_eq!(bufs.upcross_short_buffer[0].timestamp, 4);
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn vidya_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Vidya {
+            cmo_period: 9,
+            ema_period: 0,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidVidyaEmaPeriod { n: 0 });
+    }
+
     /// 5 points with constant volume -> 4 VROC values
     /// (period 2 -> lookback 1 -> needs 2 points, 5 points -> 4 VROC values).
     fn rp_vroc_5() -> Vec<ResampledPointD1> {
@@ -1725,6 +1777,14 @@ mod tests {
             (
                 IndicatorError::InvalidTrixPeriod { n: 0 },
                 "trix period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidVidyaCmoPeriod { n: 0 },
+                "vidya cmo period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidVidyaEmaPeriod { n: 0 },
+                "vidya ema period must be positive, got 0",
             ),
             (
                 IndicatorError::InvalidVrocPeriod { n: 0 },
