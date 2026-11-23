@@ -14,6 +14,7 @@ pub mod chv;
 pub mod dema;
 pub mod dpo;
 pub mod force;
+pub mod frama;
 pub mod macd;
 pub mod macros;
 pub mod mfi;
@@ -107,6 +108,8 @@ pub enum IndicatorError {
     InvalidDpoPeriod { n: i32 },
     #[error("force index period must be positive, got {n}")]
     InvalidForcePeriod { n: i32 },
+    #[error("frama period must be positive, got {n}")]
+    InvalidFramaPeriod { n: i32 },
     #[error("money flow index period must be positive, got {n}")]
     InvalidMfiPeriod { n: i32 },
     #[error(
@@ -255,6 +258,13 @@ pub fn create_indicator_output(
         IndicatorParameters::ForceIndex { period } => {
             let buffer = force::compute(points, *period)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Frama { period } => {
+            let buffers = frama::compute(points, *period)?;
+            Ok(IndicatorOutput::Crossover {
+                instrument,
+                buffers,
+            })
         }
         IndicatorParameters::OsMa {
             fast_ema,
@@ -1199,6 +1209,37 @@ mod tests {
     }
 
     #[test]
+    fn frama_dispatch_returns_crossover_buffers() {
+        let params = IndicatorParameters::Frama { period: 2 };
+        let points = vec![
+            rp(1, 1, 10.0),
+            rp(2, 2, 10.0),
+            rp(3, 3, 10.0),
+            rp(4, 4, 10.0),
+            rp(5, 5, 10.0),
+        ];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                // 5 points, period 2 -> 2 values from bar 4 (constant close -> 10.0).
+                assert_eq!(bufs.upcross_long_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer[0].value, 10.0);
+                assert_eq!(bufs.upcross_short_buffer[0].timestamp, 4);
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn frama_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Frama { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidFramaPeriod { n: 0 });
+    }
+
+    #[test]
     fn dema_dispatch_returns_crossover_buffers() {
         let params = IndicatorParameters::Dema { period: 2 };
         let points = vec![
@@ -1616,6 +1657,10 @@ mod tests {
             (
                 IndicatorError::InvalidForcePeriod { n: 0 },
                 "force index period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidFramaPeriod { n: 0 },
+                "frama period must be positive, got 0",
             ),
             (
                 IndicatorError::InvalidMfiPeriod { n: 0 },

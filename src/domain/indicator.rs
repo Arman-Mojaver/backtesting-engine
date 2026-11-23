@@ -47,6 +47,9 @@ pub enum IndicatorParameters {
     ForceIndex {
         period: i32,
     },
+    Frama {
+        period: i32,
+    },
     Mfi {
         period: i32,
         /// MFI levels on its 0–100 scale, e.g. 80 overbought and 20 oversold.

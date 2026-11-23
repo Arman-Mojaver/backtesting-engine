@@ -16,7 +16,7 @@
 | **Short Operation Point** | An operation point representing a **sell** (short) position. Stored in a separate repository from longs. | `OperationPoint` via `ShortOperationPointRepository` | `domain::operation_point` |
 | **Resampled Point (D1)** | An OHLCV candlestick bar resampled to the **daily (D1)** timeframe. | `ResampledPointD1` | `domain::resampled_point` |
 | **Indicator** | A technical indicator applied to market data. Has an `id` and typed `parameters`. | `Indicator` | `domain::indicator` |
-| **Indicator Parameters** | Typed parameters for an indicator — a 23-variant enum: `Macd`, `Rsi`, `AwesomeOscillator`, `AcceleratorDecelerator`, `Ama`, `BearsPower`, `BullsPower`, `Cci`, `ChaikinOscillator`, `ChaikinVolatility`, `Dema`, `DetrendedPriceOscillator`, `ForceIndex`, `Mfi`, `Momentum`, `OsMa`, `Roc`, `Rvi`, `Stochastic`, `Tema`, `Trix`, `Vroc`, `Wpr`. | `IndicatorParameters` | `domain::indicator` |
+| **Indicator Parameters** | Typed parameters for an indicator — a 24-variant enum: `Macd`, `Rsi`, `AwesomeOscillator`, `AcceleratorDecelerator`, `Ama`, `BearsPower`, `BullsPower`, `Cci`, `ChaikinOscillator`, `ChaikinVolatility`, `Dema`, `DetrendedPriceOscillator`, `ForceIndex`, `Frama`, `Mfi`, `Momentum`, `OsMa`, `Roc`, `Rvi`, `Stochastic`, `Tema`, `Trix`, `Vroc`, `Wpr`. | `IndicatorParameters` | `domain::indicator` |
 | **Moving Average Type** | The moving average behind one MACD line: `Ema` or `Sma`. The PG adapter maps the companion's `"ema"`/`"sma"` strings to it and rejects any other value when loading. | `MovingAverageType` | `domain::indicator` |
 | **Indicator Type** | The category/kind of a technical indicator (e.g. `macd`, `rsi`). Not a domain-struct field: lives in the database `type` column, which the PG adapter reads to select the `IndicatorParameters` variant. | `type` DB column | `infrastructure::pg_adapter` |
 | **Indicator Output** | The computed result of an indicator over a candle series — `Oscillator`, `Threshold`, or `Crossover` — carrying timestamped values. Converted to a `SignalGroup` by signal semantics. | `IndicatorOutput` | `domain::signal` |
@@ -94,7 +94,7 @@ A technical indicator used in the strategy being backtested.
 ```
 Indicator {
     id:          i32                 — unique identifier
-    parameters:  IndicatorParameters — 23-variant typed enum (see below)
+    parameters:  IndicatorParameters — 24-variant typed enum (see below)
 }
 IndicatorParameters ::= Macd { slow_type: MovingAverageType, slow_n, fast_type: MovingAverageType, fast_n }
                       | Rsi { n, high_threshold, low_threshold }
@@ -109,6 +109,7 @@ IndicatorParameters ::= Macd { slow_type: MovingAverageType, slow_n, fast_type: 
                       | Dema { period }
                       | DetrendedPriceOscillator { period }
                       | ForceIndex { period }
+                      | Frama { period }
                       | Mfi { period, high_threshold, low_threshold }
                       | Momentum { period }
                       | OsMa { fast_ema, slow_ema, signal_sma }
@@ -214,11 +215,12 @@ Pure functions in `domain/` — no I/O, no frameworks. `performance_metrics()` r
 | Dema | Crossover | the close crossed against `2*EMA(close) - EMA(EMA(close))` (`dema.rs`): DEMA is a price overlay, so it has no zero line to cross. |
 | Rvi | Crossover | RVI line `sum(body) / sum(range)` over `period` bars, each bar's body `close - open` and range `high - low` first smoothed 1-2-2-1 over four bars, crossed against its signal line, the same 1-2-2-1 average of the RVI line (`rvi.rs`). |
 | Ama | Crossover | the close crossed against Kaufman's adaptive MA of the open (`ama.rs`, `PRICE_OPEN` as in `AMA.mq5`): the efficiency ratio over `period` bars blends the fast and slow EMA constants. Like DEMA, a price overlay with no zero line to cross. |
+| Frama | Crossover | the close crossed against Ehlers' fractal adaptive MA (`frama.rs`): the fractal dimension of the last `2 * period` high-low ranges sets `alpha = exp(-4.6 * (D - 1))`. A window with no range inside its halves reads as dimension 1 instead of MQL5's `log(0)`. Like DEMA, a price overlay with no zero line to cross. |
 | Tema | Crossover | the close crossed against `3*EMA(close) - 3*EMA(EMA(close)) + EMA(EMA(EMA(close)))` (`tema.rs`): like DEMA, a price overlay with no zero line to cross. |
 
 - `IndicatorError` has typed per-indicator period variants and `NotEnoughData`.
 - Period validation is uniform via the `validate_period!` macro (non-positive period → typed error).
-- Insufficient data yields an **empty buffer**, not an error (`empty_oscillator!` macro; the MACD, AMA, DEMA and TEMA crossover buffers use `empty_crossover!`).
+- Insufficient data yields an **empty buffer**, not an error (`empty_oscillator!` macro; the MACD, AMA, DEMA, FrAMA and TEMA crossover buffers use `empty_crossover!`).
 - Shared moving-average math lives in `domain/indicators/moving_averages.rs`.
 - `PriceField` (Open/High/Low/Close) selects which candle component an indicator consumes.
 
@@ -312,13 +314,13 @@ src/
 ├── domain/                     # Pure domain logic — no I/O, no frameworks
 │   ├── cast.rs                 # the only numeric `as` casts + metric rounding (round_to)
 │   ├── cell.rs                 # Cell — the (instrument, mms_id) unit of work; Display + Ord
-│   ├── indicator.rs            # Indicator + IndicatorParameters (23 variants) + IndicatorRepository + unprocessed_indicators()
-│   ├── indicators/             # Indicator computation: 23 indicators + dispatch + macros + moving averages
+│   ├── indicator.rs            # Indicator + IndicatorParameters (24 variants) + IndicatorRepository + unprocessed_indicators()
+│   ├── indicators/             # Indicator computation: 24 indicators + dispatch + macros + moving averages
 │   │   ├── mod.rs              # create_indicator_output() dispatch, PriceField, IndicatorError
 │   │   ├── macros.rs           # indicator_values!, validate_period!, empty_oscillator!, empty_crossover!
 │   │   ├── moving_averages.rs  # shared MA math
 │   │   ├── rsi.rs, ao.rs, ac.rs, ama.rs, bears.rs, bulls.rs, cci.rs, cho.rs, chv.rs,
-│   │   ├── dema.rs, dpo.rs, force.rs, mfi.rs, momentum.rs, osma.rs, roc.rs, rvi.rs, stochastic.rs, tema.rs, trix.rs, vroc.rs, wpr.rs
+│   │   ├── dema.rs, dpo.rs, force.rs, frama.rs, mfi.rs, momentum.rs, osma.rs, roc.rs, rvi.rs, stochastic.rs, tema.rs, trix.rs, vroc.rs, wpr.rs
 │   │   └── test_support.rs     # #[cfg(test)] shared test helpers
 │   ├── operation_point.rs      # OperationPoint + OperationPoints + long/short repo traits (+ index_by_cell)
 │   ├── resampled_point.rs      # ResampledPointD1 + repo trait (+ index_by_instrument)
@@ -368,14 +370,14 @@ src/
 8. **Metrics as pure domain functions**: `performance_metrics()` takes an owned `Vec<&OperationPoint>` (sorted in place, no copy) and returns `PerformanceMetrics` (`global_roi` + `max_draw_down`) computed in a single pass over the shared compounding curve, sorting its input chronologically itself (stable; ties keep input order). `annual_roi` is a method on `PerformanceMetrics`. No I/O — composable and unit-tested in isolation.
 9. **Staged filtering**: each check runs at the earliest stage where its input exists. (1) `filter_signal_groups_by_annual_ops()` on raw signal counts (free, upper bound); (2) inside `create_strategies`, on matched-trade counts (hash lookups, no allocation), before any metrics; (3) inside the same parallel pass, on max draw down + annual ROI (expensive). All thresholds and checks live on `GlobalStrategyFilter` (`admits_activity`, `admits_performance`); `GlobalStrategyFilter::default()` encodes the baseline quality bar (DD ≤ 20%, ROI ≥ 5%, ops ≥ 10/yr).
 10. **Parquet partitioning by (instrument, mms_id)**: Strategies are written as partitioned parquet files — `instrument=.../money_management_strategy_id=.../strategies.parquet`. Matches the single-instrument, single-MMS backtest constraint and enables efficient per-partition reads.
-11. **Typed indicator parameters**: `IndicatorParameters` is a 23-variant enum — the PG adapter deserializes the JSON `parameters` column with `serde_json`, selecting the variant by the `type` column.
+11. **Typed indicator parameters**: `IndicatorParameters` is a 24-variant enum — the PG adapter deserializes the JSON `parameters` column with `serde_json`, selecting the variant by the `type` column.
 12. **Real metrics in the generator**: `create_strategies()` computes `performance_metrics()` → `annual_roi()`, plus `annual_operation_count`, from each strategy's referenced operation points. Parallelized with **rayon** `par_iter()`.
 13. **`SignalGroup` lives in the domain**: `SignalGroup` embeds `indicator_id`, `instrument`, and a derived `signal_count()`. The cache stores `Vec<SignalGroup>` — IDs travel with each group. The `instrument` chain (`IndicatorOutput` → `SignalGroup` → `Strategy`) is kept on purpose for tracing, although no production code reads `Strategy::instrument`.
 14. **Timestamps are `i64`**: All timestamps are `i64` epoch seconds. The PG adapter casts `i32` DB columns to `i64` on read.
 15. **`strategy_id` is persistence-assigned, not domain-owned**: The `Strategy` struct has no `strategy_id` field. `StrategyPersistence::persist_cells` assigns IDs before the parquet write (global max across all partitions + 1). Keeps the domain free of persistence concerns.
 16. **Idempotent parquet partitions**: `write_partition` dedups fresh rows by `indicator_id` against existing rows — re-runs never duplicate strategies for the same indicator.
 17. **Processed manifest for idempotency**: `ParquetProcessedManifest` records completed (instrument, mms_id, indicator_id) triples; `create`/`create_loop` only compute the unprocessed remainder. Atomic writes (temp + rename).
-18. **Real signal generation**: `create_signal_groups()` computes actual indicator outputs (`create_indicator_output`) and derives signals via zero-cross / threshold / crossover semantics. All 23 indicators, MACD, AMA, DEMA, RVI and TEMA included, compute real outputs.
+18. **Real signal generation**: `create_signal_groups()` computes actual indicator outputs (`create_indicator_output`) and derives signals via zero-cross / threshold / crossover semantics. All 24 indicators, MACD, AMA, DEMA, FrAMA, RVI and TEMA included, compute real outputs.
 19. **Batch parallelism in `create_loop`**: All four source tables loaded once via nested `rayon::join`, indexed in memory; cells computed via `par_iter`; persistence assigns IDs once, writes partitions in parallel, commits the manifest once.
 20. **Entry timing (no look-ahead)**: indicator values at resampled point T use T's data, known only at its close, while the operation point stamped T is entered at T's open. `IndicatorOutput::create_signal_group` therefore shifts every signal to the next resampled point's timestamp before building the `SignalGroup`; `create_strategy` then matches signal and operation point timestamps as is.
 
