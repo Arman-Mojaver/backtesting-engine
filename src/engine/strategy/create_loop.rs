@@ -27,15 +27,17 @@ pub fn execute() -> anyhow::Result<()> {
         .context("failed to read processed manifest")?;
 
     let (computed, summary) = compute_cells(&source, &cells, &processed_ids_per_cell);
-    persist_computed_cells(&persistence, computed)?;
+    let strategy_count = computed.iter().map(|output| output.strategies.len()).sum();
+    persist_computed_cells(&persistence, computed, strategy_count)?;
 
-    report_run(&summary, cells.len(), command_start);
+    report_run(&summary, cells.len(), strategy_count, command_start);
     fail_on_total_failure(&summary)
 }
 
 fn persist_computed_cells(
     persistence: &StrategyPersistence,
     computed: Vec<CellOutput>,
+    strategy_count: usize,
 ) -> anyhow::Result<()> {
     let cell_count = computed.len();
     let persist_start = Instant::now();
@@ -43,15 +45,20 @@ fn persist_computed_cells(
         .persist_cells(computed)
         .with_context(|| format!("failed to persist {cell_count} computed cells"))?;
     info!(
-        "Persist done: {cell_count} cells in {:?}",
+        "Persist done: {strategy_count} strategies across {cell_count} cells in {:?}",
         persist_start.elapsed()
     );
     Ok(())
 }
 
-fn report_run(summary: &BatchSummary, total_cells: usize, command_start: Instant) {
+fn report_run(
+    summary: &BatchSummary,
+    total_cells: usize,
+    strategy_count: usize,
+    command_start: Instant,
+) {
     info!(
-        "Done: {} computed, {} skipped (already processed), {} failed. Total command time: {:?}",
+        "Done: {strategy_count} strategies created. Cells: {} computed, {} skipped (already processed), {} failed. Total command time: {:?}",
         summary.computed,
         summary.skipped,
         summary.failed(),

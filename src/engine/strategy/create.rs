@@ -14,12 +14,15 @@ use crate::infrastructure::strategy_persistence::StrategyPersistence;
 
 pub fn execute(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
     let command_start = Instant::now();
-    create_strategies(money_management_strategy_id, instrument)?;
-    info!("Total command time: {:?}", command_start.elapsed());
+    let strategy_count = create_strategies(money_management_strategy_id, instrument)?;
+    info!(
+        "{strategy_count} strategies created. Total command time: {:?}",
+        command_start.elapsed()
+    );
     Ok(())
 }
 
-fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<()> {
+fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> anyhow::Result<usize> {
     let env = resolve_environment()?;
     let db_config = DbConfig::from_env(env);
     let persistence = StrategyPersistence::new(parquet_root_dir(env));
@@ -38,7 +41,7 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
         info!(
             "All {indicator_count} indicators already processed for {instrument} (mms_id={money_management_strategy_id}). Nothing to do."
         );
-        return Ok(());
+        return Ok(0);
     }
 
     info!(
@@ -79,7 +82,7 @@ fn create_strategies(money_management_strategy_id: i32, instrument: &str) -> any
         "Done. {strategy_count} strategies for {instrument} (mms_id={money_management_strategy_id}). {unprocessed_count} indicators marked as processed.",
     );
 
-    Ok(())
+    Ok(strategy_count)
 }
 
 fn read_processed_indicator_ids(
