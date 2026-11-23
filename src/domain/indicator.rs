@@ -53,6 +53,13 @@ pub enum IndicatorParameters {
     Roc {
         period: i32,
     },
+    Stochastic {
+        k_period: i32,
+        slowing: i32,
+        /// %K levels on its 0–100 scale, e.g. 80 overbought and 20 oversold.
+        high_threshold: i32,
+        low_threshold: i32,
+    },
     Tema {
         period: i32,
     },

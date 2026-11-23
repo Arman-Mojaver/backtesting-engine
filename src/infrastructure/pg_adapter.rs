@@ -46,6 +46,15 @@ struct MfiParams {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct StochasticParams {
+    k_period: i32,
+    slowing: i32,
+    high_threshold: i32,
+    low_threshold: i32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PeriodParams {
     period: i32,
 }
@@ -96,6 +105,9 @@ fn parse_empty_params(indicator_type: &str, json_text: &str) -> anyhow::Result<(
 
 /// The type strings and JSON shapes mirror the `indicator` table, which is
 /// owned by the Django companion.
+// One flat arm per indicator type: it grows with every indicator, and
+// splitting it would only scatter the mapping.
+#[allow(clippy::too_many_lines)]
 fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<IndicatorParameters> {
     Ok(match indicator_type {
         "macd" => {
@@ -176,6 +188,15 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
         "roc" => {
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
             IndicatorParameters::Roc { period: p.period }
+        }
+        "stochastic" => {
+            let p = parse_params::<StochasticParams>(indicator_type, json_text)?;
+            IndicatorParameters::Stochastic {
+                k_period: p.k_period,
+                slowing: p.slowing,
+                high_threshold: p.high_threshold,
+                low_threshold: p.low_threshold,
+            }
         }
         "tema" => {
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
@@ -507,6 +528,24 @@ mod tests {
     }
 
     #[test]
+    fn stochastic_params_parse_from_db_json_shape() {
+        let params = map_parameters(
+            "stochastic",
+            r#"{"k_period": 5, "slowing": 3, "high_threshold": 80, "low_threshold": 20}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            params,
+            IndicatorParameters::Stochastic {
+                k_period: 5,
+                slowing: 3,
+                high_threshold: 80,
+                low_threshold: 20,
+            }
+        );
+    }
+
+    #[test]
     fn cho_params_parse_from_db_json_shape() {
         let params = map_parameters("cho", r#"{"fast_ma": 30, "slow_ma": 40}"#).unwrap();
         assert_eq!(
@@ -593,11 +632,8 @@ mod tests {
 
     #[test]
     fn unknown_type_is_rejected() {
-        let err = map_parameters("stochastic", r#"{"n": 1}"#).unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("unknown indicator type: stochastic")
-        );
+        let err = map_parameters("ichimoku", r#"{"n": 1}"#).unwrap_err();
+        assert!(err.to_string().contains("unknown indicator type: ichimoku"));
     }
 
     #[test]

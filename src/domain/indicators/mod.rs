@@ -19,6 +19,7 @@ pub mod moving_averages;
 pub mod osma;
 pub mod roc;
 pub mod rsi;
+pub mod stochastic;
 pub mod tema;
 
 #[cfg(test)]
@@ -105,6 +106,16 @@ pub enum IndicatorError {
     InvalidOsMaPeriodOrder { fast: i32, slow: i32 },
     #[error("rate of change period must be positive, got {n}")]
     InvalidRocPeriod { n: i32 },
+    #[error("stochastic k period must be positive, got {n}")]
+    InvalidStochasticKPeriod { n: i32 },
+    #[error("stochastic slowing must be positive, got {n}")]
+    InvalidStochasticSlowing { n: i32 },
+    #[error(
+        "stochastic low threshold must be less than high threshold, got high {high}, low {low}"
+    )]
+    InvalidStochasticThresholdOrder { high: i32, low: i32 },
+    #[error("stochastic threshold must be between 0 and 100, got {value}")]
+    InvalidStochasticThresholdRange { value: i32 },
     #[error("tema period must be positive, got {n}")]
     InvalidTemaPeriod { n: i32 },
     #[error("trix period must be positive, got {n}")]
@@ -218,6 +229,16 @@ pub fn create_indicator_output(
         IndicatorParameters::Roc { period } => {
             let buffer = roc::compute(points, *period)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Stochastic {
+            k_period,
+            slowing,
+            high_threshold,
+            low_threshold,
+        } => {
+            let buffer =
+                stochastic::compute(points, *k_period, *slowing, *high_threshold, *low_threshold)?;
+            Ok(IndicatorOutput::Threshold { instrument, buffer })
         }
         IndicatorParameters::Tema { period } => {
             let buffers = tema::compute(points, *period)?;
@@ -1115,6 +1136,43 @@ mod tests {
         assert_eq!(err, IndicatorError::InvalidMfiPeriod { n: 0 });
     }
 
+    #[test]
+    fn stochastic_dispatch_returns_threshold_variant() {
+        let params = IndicatorParameters::Stochastic {
+            k_period: 2,
+            slowing: 2,
+            high_threshold: 80,
+            low_threshold: 20,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0), rp(3, 3, 3.0), rp(4, 4, 4.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Threshold { buffer: buf, .. } => {
+                // 4 points, k_period 2, slowing 2 -> 2 values from bar 3
+                // (close at the highest high -> 100).
+                assert_eq!(buf.high_threshold, 80.0);
+                assert_eq!(buf.low_threshold, 20.0);
+                assert_eq!(buf.items.len(), 2);
+                assert_eq!(buf.items[0].timestamp, 3);
+                assert_eq!(buf.items[0].value, 100.0);
+            }
+            other => panic!("expected Threshold, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn stochastic_invalid_k_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Stochastic {
+            k_period: 0,
+            slowing: 3,
+            high_threshold: 80,
+            low_threshold: 20,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidStochasticKPeriod { n: 0 });
+    }
+
     /// 5 points with constant close -> exactly 1 TRIX value
     /// (period 2 -> needs 5 points = 3*2 - 1).
     fn rp_trix_5() -> Vec<ResampledPointD1> {
@@ -1324,6 +1382,22 @@ mod tests {
             (
                 IndicatorError::InvalidRocPeriod { n: 0 },
                 "rate of change period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidStochasticKPeriod { n: 0 },
+                "stochastic k period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidStochasticSlowing { n: 0 },
+                "stochastic slowing must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidStochasticThresholdOrder { high: 20, low: 80 },
+                "stochastic low threshold must be less than high threshold, got high 20, low 80",
+            ),
+            (
+                IndicatorError::InvalidStochasticThresholdRange { value: 101 },
+                "stochastic threshold must be between 0 and 100, got 101",
             ),
             (
                 IndicatorError::InvalidTemaPeriod { n: 0 },
