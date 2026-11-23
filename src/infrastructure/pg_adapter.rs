@@ -189,6 +189,10 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
             IndicatorParameters::Roc { period: p.period }
         }
+        "rvi" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::Rvi { period: p.period }
+        }
         "stochastic" => {
             let p = parse_params::<StochasticParams>(indicator_type, json_text)?;
             IndicatorParameters::Stochastic {
@@ -603,6 +607,7 @@ mod tests {
             ),
             ("force", IndicatorParameters::ForceIndex { period: 105 }),
             ("roc", IndicatorParameters::Roc { period: 105 }),
+            ("rvi", IndicatorParameters::Rvi { period: 105 }),
             ("vroc", IndicatorParameters::Vroc { period: 105 }),
         ];
         for (indicator_type, expected) in cases {

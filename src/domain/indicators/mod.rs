@@ -19,6 +19,7 @@ pub mod moving_averages;
 pub mod osma;
 pub mod roc;
 pub mod rsi;
+pub mod rvi;
 pub mod stochastic;
 pub mod tema;
 
@@ -106,6 +107,8 @@ pub enum IndicatorError {
     InvalidOsMaPeriodOrder { fast: i32, slow: i32 },
     #[error("rate of change period must be positive, got {n}")]
     InvalidRocPeriod { n: i32 },
+    #[error("relative vigor index period must be positive, got {n}")]
+    InvalidRviPeriod { n: i32 },
     #[error("stochastic k period must be positive, got {n}")]
     InvalidStochasticKPeriod { n: i32 },
     #[error("stochastic slowing must be positive, got {n}")]
@@ -229,6 +232,13 @@ pub fn create_indicator_output(
         IndicatorParameters::Roc { period } => {
             let buffer = roc::compute(points, *period)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Rvi { period } => {
+            let buffers = rvi::compute(points, *period)?;
+            Ok(IndicatorOutput::Crossover {
+                instrument,
+                buffers,
+            })
         }
         IndicatorParameters::Stochastic {
             k_period,
@@ -1014,6 +1024,43 @@ mod tests {
     }
 
     #[test]
+    fn rvi_dispatch_returns_crossover_buffers() {
+        let params = IndicatorParameters::Rvi { period: 2 };
+        let points: Vec<ResampledPointD1> = (1..=8)
+            .map(|i| ResampledPointD1 {
+                id: i,
+                instrument: "EURUSD".to_string(),
+                open: 1.0,
+                high: 2.0,
+                low: 1.0,
+                close: 2.0,
+                volume: 1000,
+                timestamp: i64::from(i),
+            })
+            .collect();
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers, .. } => {
+                // 8 points, period 2 -> 1 value at bar 8
+                // (every bar closes at its high from a low open -> 1).
+                assert_eq!(buffers.upcross_long_buffer.len(), 1);
+                assert_eq!(buffers.upcross_long_buffer[0].timestamp, 8);
+                assert_eq!(buffers.upcross_long_buffer[0].value, 1.0);
+                assert_eq!(buffers.upcross_short_buffer[0].value, 1.0);
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rvi_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Rvi { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidRviPeriod { n: 0 });
+    }
+
+    #[test]
     fn dema_dispatch_returns_crossover_buffers() {
         let params = IndicatorParameters::Dema { period: 2 };
         let points = vec![
@@ -1382,6 +1429,10 @@ mod tests {
             (
                 IndicatorError::InvalidRocPeriod { n: 0 },
                 "rate of change period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidRviPeriod { n: 0 },
+                "relative vigor index period must be positive, got 0",
             ),
             (
                 IndicatorError::InvalidStochasticKPeriod { n: 0 },

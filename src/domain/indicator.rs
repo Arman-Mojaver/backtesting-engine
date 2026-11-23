@@ -53,6 +53,9 @@ pub enum IndicatorParameters {
     Roc {
         period: i32,
     },
+    Rvi {
+        period: i32,
+    },
     Stochastic {
         k_period: i32,
         slowing: i32,
