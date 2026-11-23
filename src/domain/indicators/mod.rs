@@ -18,6 +18,7 @@ pub mod moving_averages;
 pub mod osma;
 pub mod roc;
 pub mod rsi;
+pub mod tema;
 
 #[cfg(test)]
 pub mod test_support;
@@ -95,6 +96,8 @@ pub enum IndicatorError {
     InvalidOsMaPeriodOrder { fast: i32, slow: i32 },
     #[error("rate of change period must be positive, got {n}")]
     InvalidRocPeriod { n: i32 },
+    #[error("tema period must be positive, got {n}")]
+    InvalidTemaPeriod { n: i32 },
     #[error("trix period must be positive, got {n}")]
     InvalidTrixPeriod { n: i32 },
     #[error("volume rate of change period must be positive, got {n}")]
@@ -103,6 +106,9 @@ pub enum IndicatorError {
     NotEnoughData { points: usize, required: usize },
 }
 
+// One flat arm per indicator: it grows with every indicator, and splitting it
+// would only scatter the dispatch.
+#[allow(clippy::too_many_lines)]
 pub fn create_indicator_output(
     parameters: &IndicatorParameters,
     points: &[ResampledPointD1],
@@ -195,6 +201,13 @@ pub fn create_indicator_output(
         IndicatorParameters::Roc { period } => {
             let buffer = roc::compute(points, *period)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Tema { period } => {
+            let buffers = tema::compute(points, *period)?;
+            Ok(IndicatorOutput::Crossover {
+                instrument,
+                buffers,
+            })
         }
         IndicatorParameters::Trix { period } => {
             let buffer = trix::compute(points, *period)?;
@@ -1006,6 +1019,51 @@ mod tests {
         assert_eq!(err, IndicatorError::InvalidDemaPeriod { n: 0 });
     }
 
+    #[test]
+    fn tema_dispatch_returns_crossover_buffers() {
+        let params = IndicatorParameters::Tema { period: 2 };
+        let points = vec![
+            rp(1, 1, 10.0),
+            rp(2, 2, 10.0),
+            rp(3, 3, 10.0),
+            rp(4, 4, 10.0),
+            rp(5, 5, 10.0),
+        ];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                // 5 points, period 2 -> 2 values from bar 4 (constant close -> 10.0).
+                assert_eq!(bufs.upcross_long_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer[0].value, 10.0);
+                assert_eq!(bufs.upcross_short_buffer[0].timestamp, 4);
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn tema_dispatch_with_insufficient_data_yields_empty_buffers() {
+        let params = IndicatorParameters::Tema { period: 14 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                assert!(bufs.upcross_long_buffer.is_empty());
+                assert!(bufs.upcross_short_buffer.is_empty());
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn tema_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Tema { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidTemaPeriod { n: 0 });
+    }
+
     /// 5 points with constant close -> exactly 1 TRIX value
     /// (period 2 -> needs 5 points = 3*2 - 1).
     fn rp_trix_5() -> Vec<ResampledPointD1> {
@@ -1203,6 +1261,10 @@ mod tests {
             (
                 IndicatorError::InvalidRocPeriod { n: 0 },
                 "rate of change period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidTemaPeriod { n: 0 },
+                "tema period must be positive, got 0",
             ),
             (
                 IndicatorError::InvalidTrixPeriod { n: 0 },

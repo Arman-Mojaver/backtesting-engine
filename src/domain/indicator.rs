@@ -47,6 +47,9 @@ pub enum IndicatorParameters {
     Roc {
         period: i32,
     },
+    Tema {
+        period: i32,
+    },
     Trix {
         period: i32,
     },
