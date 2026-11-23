@@ -11,6 +11,8 @@ pub enum Environment {
     Production,
     Development,
     Testing,
+    Alpha,
+    Beta,
 }
 
 impl Environment {
@@ -19,6 +21,8 @@ impl Environment {
             Self::Production => "production",
             Self::Development => "development",
             Self::Testing => "testing",
+            Self::Alpha => "alpha",
+            Self::Beta => "beta",
         }
     }
 }
@@ -31,6 +35,8 @@ impl FromStr for Environment {
             "production" => Ok(Self::Production),
             "development" => Ok(Self::Development),
             "testing" => Ok(Self::Testing),
+            "alpha" => Ok(Self::Alpha),
+            "beta" => Ok(Self::Beta),
             _ => Err(InvalidEnvironmentError {
                 value: s.to_owned(),
             }),
@@ -40,7 +46,7 @@ impl FromStr for Environment {
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[error(
-    "invalid ENVIRONMENT value '{value}': expected 'production', 'development', or 'testing' (case-insensitive)"
+    "invalid ENVIRONMENT value '{value}': expected 'production', 'development', 'testing', 'alpha', or 'beta' (case-insensitive)"
 )]
 pub struct InvalidEnvironmentError {
     value: String,
@@ -79,11 +85,15 @@ impl DbConfig {
             Environment::Production => 5432,
             Environment::Development => 54320,
             Environment::Testing => 54321,
+            Environment::Alpha => 54322,
+            Environment::Beta => 54323,
         };
         let database = match env {
             Environment::Production => "db-production",
             Environment::Development => "db-development",
             Environment::Testing => "db-testing",
+            Environment::Alpha => "db-alpha",
+            Environment::Beta => "db-beta",
         };
         // Intentional: the host and credentials are hard-coded. The engine runs
         // only locally, against PostgreSQL containers on the developer's machine,
@@ -131,6 +141,10 @@ mod tests {
             ("PRODUCTION", Environment::Production),
             ("DEVELOPMENT", Environment::Development),
             ("TESTING", Environment::Testing),
+            ("alpha", Environment::Alpha),
+            ("beta", Environment::Beta),
+            ("ALPHA", Environment::Alpha),
+            ("BETA", Environment::Beta),
             ("Production", Environment::Production),
             ("Development", Environment::Development),
         ];
@@ -156,8 +170,8 @@ mod tests {
         let err = "produciton".parse::<Environment>().unwrap_err();
         assert_eq!(
             err.to_string(),
-            "invalid ENVIRONMENT value 'produciton': expected 'production', 'development', or \
-             'testing' (case-insensitive)"
+            "invalid ENVIRONMENT value 'produciton': expected 'production', 'development', \
+             'testing', 'alpha', or 'beta' (case-insensitive)"
         );
     }
 
@@ -167,6 +181,8 @@ mod tests {
             (Environment::Production, 5432, "db-production"),
             (Environment::Development, 54320, "db-development"),
             (Environment::Testing, 54321, "db-testing"),
+            (Environment::Alpha, 54322, "db-alpha"),
+            (Environment::Beta, 54323, "db-beta"),
         ];
         for (env, port, database) in cases {
             let config = DbConfig::from_env(env);
@@ -212,8 +228,8 @@ mod tests {
         let err = resolve_from_raw(Ok("produciton".to_owned())).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "invalid ENVIRONMENT value 'produciton': expected 'production', 'development', or \
-             'testing' (case-insensitive)"
+            "invalid ENVIRONMENT value 'produciton': expected 'production', 'development', \
+             'testing', 'alpha', or 'beta' (case-insensitive)"
         );
     }
 
@@ -235,6 +251,8 @@ mod tests {
             (Environment::Production, "/app/parquet_files/production"),
             (Environment::Development, "/app/parquet_files/development"),
             (Environment::Testing, "/app/parquet_files/testing"),
+            (Environment::Alpha, "/app/parquet_files/alpha"),
+            (Environment::Beta, "/app/parquet_files/beta"),
         ];
         for (env, root) in cases {
             assert_eq!(parquet_root_dir(env), Path::new(root));

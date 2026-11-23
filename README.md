@@ -266,6 +266,8 @@ Database targets are fixed per environment (Docker-oriented — the host is alwa
 | `production` | 5432 | `db-production` |
 | `development` | 54320 | `db-development` |
 | `testing` | 54321 | `db-testing` |
+| `alpha` | 54322 | `db-alpha` |
+| `beta` | 54323 | `db-beta` |
 
 User/password are `postgres`/`postgres`. There is currently **no env override for DB
 credentials** — see [Known limitations](#known-limitations).
