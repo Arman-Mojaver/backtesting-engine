@@ -4,6 +4,7 @@
 //! buffer, never an error; a non-positive period is the only configuration
 //! error.
 pub mod ac;
+pub mod adx;
 pub mod ama;
 pub mod ao;
 pub mod bears;
@@ -77,6 +78,8 @@ pub enum IndicatorError {
     InvalidRsiThresholdOrder { high: i32, low: i32 },
     #[error("rsi threshold must be between 0 and 100, got {value}")]
     InvalidRsiThresholdRange { value: i32 },
+    #[error("adx period must be positive, got {n}")]
+    InvalidAdxPeriod { n: i32 },
     #[error("ama period must be positive, got {n}")]
     InvalidAmaPeriod { n: i32 },
     #[error("ama fast period must be positive, got {n}")]
@@ -214,6 +217,13 @@ pub fn create_indicator_output(
         IndicatorParameters::AcceleratorDecelerator => {
             let buffer = ac::compute(points)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Adx { period } => {
+            let buffers = adx::compute(points, *period)?;
+            Ok(IndicatorOutput::Crossover {
+                instrument,
+                buffers,
+            })
         }
         IndicatorParameters::Ama {
             period,
@@ -1165,6 +1175,36 @@ mod tests {
     }
 
     #[test]
+    fn adx_dispatch_returns_crossover_buffers() {
+        let params = IndicatorParameters::Adx { period: 2 };
+        let points = vec![
+            rp(1, 1, 10.0),
+            rp(2, 2, 10.0),
+            rp(3, 3, 10.0),
+            rp(4, 4, 10.0),
+        ];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                // 4 points, period 2 -> 2 values from bar 3 (flat market -> 0.0).
+                assert_eq!(bufs.upcross_long_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer.len(), 2);
+                assert_eq!(bufs.upcross_long_buffer[0].value, 0.0);
+                assert_eq!(bufs.upcross_long_buffer[0].timestamp, 3);
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn adx_invalid_period_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Adx { period: 0 };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(err, IndicatorError::InvalidAdxPeriod { n: 0 });
+    }
+
+    #[test]
     fn ama_dispatch_returns_crossover_buffers() {
         let params = IndicatorParameters::Ama {
             period: 2,
@@ -1649,6 +1689,10 @@ mod tests {
             (
                 IndicatorError::InvalidRsiThresholdRange { value: 101 },
                 "rsi threshold must be between 0 and 100, got 101",
+            ),
+            (
+                IndicatorError::InvalidAdxPeriod { n: 0 },
+                "adx period must be positive, got 0",
             ),
             (
                 IndicatorError::InvalidAmaPeriod { n: 0 },

@@ -158,6 +158,10 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
             parse_empty_params(indicator_type, json_text)?;
             IndicatorParameters::AcceleratorDecelerator
         }
+        "adx" => {
+            let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
+            IndicatorParameters::Adx { period: p.period }
+        }
         "ama" => {
             let p = parse_params::<AmaParams>(indicator_type, json_text)?;
             IndicatorParameters::Ama {
@@ -669,6 +673,9 @@ mod tests {
 
         let tema = map_parameters("tema", r#"{"period": 14}"#).unwrap();
         assert_eq!(tema, IndicatorParameters::Tema { period: 14 });
+
+        let adx = map_parameters("adx", r#"{"period": 14}"#).unwrap();
+        assert_eq!(adx, IndicatorParameters::Adx { period: 14 });
 
         let ama = map_parameters(
             "ama",

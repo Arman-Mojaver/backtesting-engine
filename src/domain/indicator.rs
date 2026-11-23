@@ -16,6 +16,9 @@ pub enum IndicatorParameters {
     },
     AwesomeOscillator,
     AcceleratorDecelerator,
+    Adx {
+        period: i32,
+    },
     Ama {
         period: i32,
         fast_period: i32,
