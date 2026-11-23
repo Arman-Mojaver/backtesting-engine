@@ -73,15 +73,17 @@ fn open_log_file(path: &Path) -> Result<File> {
 }
 
 fn parse_level(raw: &str) -> Option<LevelFilter> {
-    raw.split(',')
-        .filter_map(|directive| {
-            directive
-                .split('=')
-                .next_back()?
-                .parse::<LevelFilter>()
-                .ok()
-        })
-        .max()
+    let mut most_verbose = None;
+    for directive in raw.split(',') {
+        let level = directive
+            .split('=')
+            .next_back()?
+            .trim()
+            .parse::<LevelFilter>()
+            .ok()?;
+        most_verbose = most_verbose.max(Some(level));
+    }
+    most_verbose
 }
 
 #[cfg(test)]
@@ -128,6 +130,17 @@ mod tests {
     #[test]
     fn parse_level_rejects_garbage() {
         assert_eq!(parse_level("nonsense"), None);
+    }
+
+    #[test]
+    fn parse_level_rejects_partially_unrecognised() {
+        assert_eq!(parse_level("nonsense,warn"), None);
+        assert_eq!(parse_level("debgu,postgres=warn"), None);
+    }
+
+    #[test]
+    fn parse_level_ignores_whitespace_around_directives() {
+        assert_eq!(parse_level("info, debug"), Some(LevelFilter::Debug));
     }
 
     #[test]
