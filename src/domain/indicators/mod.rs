@@ -4,6 +4,7 @@
 //! buffer, never an error; a non-positive period is the only configuration
 //! error.
 pub mod ac;
+pub mod ama;
 pub mod ao;
 pub mod bears;
 pub mod bulls;
@@ -74,6 +75,14 @@ pub enum IndicatorError {
     InvalidRsiThresholdOrder { high: i32, low: i32 },
     #[error("rsi threshold must be between 0 and 100, got {value}")]
     InvalidRsiThresholdRange { value: i32 },
+    #[error("ama period must be positive, got {n}")]
+    InvalidAmaPeriod { n: i32 },
+    #[error("ama fast period must be positive, got {n}")]
+    InvalidAmaFastPeriod { n: i32 },
+    #[error("ama slow period must be positive, got {n}")]
+    InvalidAmaSlowPeriod { n: i32 },
+    #[error("ama fast period must not exceed slow period, got fast {fast}, slow {slow}")]
+    InvalidAmaPeriodOrder { fast: i32, slow: i32 },
     #[error("bears power period must be positive, got {n}")]
     InvalidBearsPeriod { n: i32 },
     #[error("bulls power period must be positive, got {n}")]
@@ -197,6 +206,17 @@ pub fn create_indicator_output(
         IndicatorParameters::AcceleratorDecelerator => {
             let buffer = ac::compute(points)?;
             Ok(IndicatorOutput::Oscillator { instrument, buffer })
+        }
+        IndicatorParameters::Ama {
+            period,
+            fast_period,
+            slow_period,
+        } => {
+            let buffers = ama::compute(points, *period, *fast_period, *slow_period)?;
+            Ok(IndicatorOutput::Crossover {
+                instrument,
+                buffers,
+            })
         }
         IndicatorParameters::BearsPower { period } => {
             let buffer = bears::compute(points, *period)?;
@@ -1120,6 +1140,65 @@ mod tests {
     }
 
     #[test]
+    fn ama_dispatch_returns_crossover_buffers() {
+        let params = IndicatorParameters::Ama {
+            period: 2,
+            fast_period: 2,
+            slow_period: 30,
+        };
+        let points = vec![
+            rp(1, 1, 10.0),
+            rp(2, 2, 10.0),
+            rp(3, 3, 10.0),
+            rp(4, 4, 10.0),
+        ];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                // 4 points, period 2 -> 2 values from bar 3 (constant open -> 10.0).
+                assert_eq!(bufs.upcross_long_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer.len(), 2);
+                assert_eq!(bufs.upcross_short_buffer[0].value, 10.0);
+                assert_eq!(bufs.upcross_short_buffer[0].timestamp, 3);
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ama_dispatch_with_insufficient_data_yields_empty_buffers() {
+        let params = IndicatorParameters::Ama {
+            period: 10,
+            fast_period: 2,
+            slow_period: 30,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let result = create_indicator_output(&params, &points).unwrap();
+        match &result {
+            IndicatorOutput::Crossover { buffers: bufs, .. } => {
+                assert!(bufs.upcross_long_buffer.is_empty());
+                assert!(bufs.upcross_short_buffer.is_empty());
+            }
+            other => panic!("expected Crossover, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ama_invalid_period_order_propagates_error_through_dispatch() {
+        let params = IndicatorParameters::Ama {
+            period: 10,
+            fast_period: 30,
+            slow_period: 2,
+        };
+        let points = vec![rp(1, 1, 1.0), rp(2, 2, 2.0)];
+        let err = create_indicator_output(&params, &points).unwrap_err();
+        assert_eq!(
+            err,
+            IndicatorError::InvalidAmaPeriodOrder { fast: 30, slow: 2 }
+        );
+    }
+
+    #[test]
     fn dema_dispatch_returns_crossover_buffers() {
         let params = IndicatorParameters::Dema { period: 2 };
         let points = vec![
@@ -1477,6 +1556,22 @@ mod tests {
             (
                 IndicatorError::InvalidRsiThresholdRange { value: 101 },
                 "rsi threshold must be between 0 and 100, got 101",
+            ),
+            (
+                IndicatorError::InvalidAmaPeriod { n: 0 },
+                "ama period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidAmaFastPeriod { n: 0 },
+                "ama fast period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidAmaSlowPeriod { n: 0 },
+                "ama slow period must be positive, got 0",
+            ),
+            (
+                IndicatorError::InvalidAmaPeriodOrder { fast: 30, slow: 2 },
+                "ama fast period must not exceed slow period, got fast 30, slow 2",
             ),
             (
                 IndicatorError::InvalidBearsPeriod { n: 0 },

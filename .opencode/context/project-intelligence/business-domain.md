@@ -31,7 +31,7 @@ Solution: A Rust engine that loads historical OHLCV candles, long/short trade re
 - Catches data inconsistencies (mixed instruments, misaligned timestamps, wrong MMS) before they corrupt results
 - Separates long and short analysis for directional clarity
 - Pure-domain validation — no database or network required to verify data integrity
-- Real indicator mathematics (22 indicators) with explicit signal semantics — no black box
+- Real indicator mathematics (23 indicators) with explicit signal semantics — no black box
 - Idempotent batch runs — re-running never duplicates work or output
 
 **For Business**:
@@ -51,7 +51,7 @@ The engine is in **active development** — the strategy pipeline is real end-to
 - ✅ Application layer (`fetch_source_data`, `create_signal_groups`, `create_strategies`, `run_strategies`)
 - ✅ Performance metrics: single-pass `performance_metrics()` (global ROI + max draw down), `annual_roi()`, `annual_operation_count()` — pure domain functions
 - ✅ Real metrics computed in the strategy generator (rayon-parallelized)
-- ✅ **Real signal generation** — 22 indicators computed from candle data (RSI, AO, AC, Bears, Bulls, CCI, CHO, CHV, DEMA, DPO, Force, MFI, Momentum, OsMa, MACD, ROC, RVI, Stochastic, TEMA, TRIX, VROC, WPR) with zero-cross / threshold / crossover signal semantics
+- ✅ **Real signal generation** — 23 indicators computed from candle data (RSI, AO, AC, AMA, Bears, Bulls, CCI, CHO, CHV, DEMA, DPO, Force, MFI, Momentum, OsMa, MACD, ROC, RVI, Stochastic, TEMA, TRIX, VROC, WPR) with zero-cross / threshold / crossover signal semantics
 - ✅ Two-stage filtering: signal groups by annual op count, then strategies by DD + ROI
 - ✅ In-memory signal-group memoization (`cached` crate, keyed by `indicator_id` + instrument)
 - ✅ `SignalGroup` in domain layer with embedded `indicator_id`, `instrument`, `operation_count`

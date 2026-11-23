@@ -69,6 +69,14 @@ struct PeriodParams {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct AmaParams {
+    period: i32,
+    fast_period: i32,
+    slow_period: i32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ChoParams {
     fast_ma: i32,
     slow_ma: i32,
@@ -142,6 +150,14 @@ fn map_parameters(indicator_type: &str, json_text: &str) -> anyhow::Result<Indic
         "ac" => {
             parse_empty_params(indicator_type, json_text)?;
             IndicatorParameters::AcceleratorDecelerator
+        }
+        "ama" => {
+            let p = parse_params::<AmaParams>(indicator_type, json_text)?;
+            IndicatorParameters::Ama {
+                period: p.period,
+                fast_period: p.fast_period,
+                slow_period: p.slow_period,
+            }
         }
         "bears" => {
             let p = parse_params::<PeriodParams>(indicator_type, json_text)?;
@@ -635,6 +651,20 @@ mod tests {
 
         let tema = map_parameters("tema", r#"{"period": 14}"#).unwrap();
         assert_eq!(tema, IndicatorParameters::Tema { period: 14 });
+
+        let ama = map_parameters(
+            "ama",
+            r#"{"period": 10, "fast_period": 2, "slow_period": 30}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            ama,
+            IndicatorParameters::Ama {
+                period: 10,
+                fast_period: 2,
+                slow_period: 30,
+            }
+        );
     }
 
     #[test]
